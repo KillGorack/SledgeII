@@ -1,0 +1,9 @@
+# Godot 4+ specific ignores
+.godot/
+/android/
+
+# Credentials (contains API key) - ignored for now
+_globals/creds.gd
+
+# Editor backup files
+*~
