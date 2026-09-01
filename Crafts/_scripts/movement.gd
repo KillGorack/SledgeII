@@ -18,7 +18,7 @@ var isGrounded: bool = false
 var current_turn_speed = 0.0
 var body: RigidBody3D
 var stop_forces = false
-@onready var ground_check_area = $"../GroundCheck"
+@onready var ground_check_area = $"../FloorDetection"
 @onready var engine_audio_path = $"../Engine Sound"
 
 # Turret variables
@@ -43,6 +43,10 @@ func _ready() -> void:
 	pitch = barrel.rotation_degrees.x if barrel else 0.0
 	if is_multiplayer_authority():
 		_hide_own_body_from_own_camera()
+
+
+func setFreezeState(frozen: bool) -> void:
+	stop_forces = frozen
 
 
 # Every spawned craft is the same scene, so this can't be a static layer/
@@ -81,7 +85,7 @@ func _physics_process(delta: float) -> void:
 		target_pitch = stats.target_audio_pitch
 	var forward_input = Input.get_action_strength("ui_down") - Input.get_action_strength("ui_up")
 	var turn_input = Input.get_action_strength("ui_left") - Input.get_action_strength("ui_right")
-	isGrounded = ground_check_area.is_colliding()
+	isGrounded = ground_check_area.get_overlapping_bodies().size() > 0
 
 	# Turret movement
 	handle_turret_barrel_look()

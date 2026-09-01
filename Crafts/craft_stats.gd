@@ -16,3 +16,10 @@ class_name CraftStats
 @export var thruster_force: float = 60.0
 @export var rotation_speed: float = 3.0
 @export var right_side_up_threshold: float = 0.3
+
+# Health (per-instance mutable state duplicates these - see health_node.gd)
+@export var shields: float = 100.0
+@export var armor: float = 100.0
+@export var life: float = 100.0
+@export var regeneration_delay: float = 5.0
+@export var regeneration_rate: float = 10.0
