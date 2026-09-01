@@ -21,6 +21,10 @@ var feedback_base_x: float
 @onready var btn_login: TextureButton = $"Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect/MarginContainer/TextureRect/MarginContainer/MarginContainer/VBoxContainer/HBoxContainer/btn_submit_login"
 @onready var world_list: Tree = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/WorldList"
 @onready var btn_create: Button = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/btn_create"
+@onready var btn_host: Button = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/btn_host"
+@onready var game_list: Tree = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Join Game/MarginContainer/VBoxContainer/GameList"
+@onready var btn_refresh: Button = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Join Game/MarginContainer/VBoxContainer/btn_refresh"
+@onready var btn_join: Button = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Join Game/MarginContainer/VBoxContainer/btn_join"
 
 
 
@@ -35,6 +39,10 @@ var register_url: String = "https://www.killgorack.com/PX4/index.php?ap=hme&ala=
 var function_complete = ""
 var api_params = []
 
+var selected_map_title: String = ""
+var selected_map_file_id: int = -1
+var selected_game_row = null
+
 
 
 
@@ -45,10 +53,21 @@ func _ready() -> void:
 	http_request.connect("request_completed", Callable(self, "_on_request_completed"))
 	world_list.connect("item_selected", Callable(self, "_on_level_selected"))
 	btn_create.connect("pressed", Callable(self, "_on_create_button_pressed"))
+	game_list.connect("item_selected", Callable(self, "_on_game_selected"))
 	login_timer.one_shot = true
 	btn_quit.pressed.connect(func(): _on_quit())
 	btn_register.pressed.connect(func(): _on_register())
 	btn_login.pressed.connect(func(): _on_login())
+	btn_host.pressed.connect(func(): _on_host_pressed())
+	btn_refresh.pressed.connect(func(): NetworkManager.list_open_games())
+	btn_join.pressed.connect(func(): _on_join_pressed())
+	NetworkManager.games_listed.connect(_on_games_listed)
+	NetworkManager.host_started.connect(_on_host_started)
+	NetworkManager.host_failed.connect(func(reason): set_ui_feedback(reason, "NOK"))
+	NetworkManager.join_failed.connect(func(reason): set_ui_feedback(reason, "NOK"))
+	NetworkManager.api_error.connect(func(reason): set_ui_feedback(reason, "NOK"))
+	multiplayer.connected_to_server.connect(_on_joined_match)
+	multiplayer.connection_failed.connect(func(): set_ui_feedback("Could not reach host - connection failed.", "NOK"))
 	login_group.visible = true
 	load_group.visible = false
 	set_ui_feedback("Please login to continue...", "INFO")
@@ -72,7 +91,64 @@ func _input(event):
 
 
 func _on_level_selected():
-	pass
+	var selected = world_list.get_selected()
+	if selected:
+		selected_map_title = selected.get_text(0)
+		selected_map_file_id = int(selected.get_meta("fil_id"))
+
+
+func _on_game_selected():
+	selected_game_row = game_list.get_selected()
+
+
+func _on_host_pressed():
+	if selected_map_title == "":
+		set_ui_feedback("Select a map to host first.", "COK")
+		return
+	NetworkManager.host_game(selected_map_title, selected_map_file_id)
+	set_ui_feedback("Hosting \"%s\"..." % selected_map_title, "INFO")
+
+
+func _on_host_started():
+	set_ui_feedback("Game hosted, waiting for players...", "OK")
+	get_tree().change_scene_to_file("res://Networking/match.tscn")
+
+
+func _on_join_pressed():
+	if not selected_game_row:
+		set_ui_feedback("Select a game to join first.", "COK")
+		return
+	var address = selected_game_row.get_meta("hst_ip_address")
+	var port = int(selected_game_row.get_meta("hst_port"))
+	var map_file_id = int(selected_game_row.get_meta("hst_map_file_id"))
+	set_ui_feedback("Connecting...", "INFO")
+	NetworkManager.join_game(address, port, map_file_id)
+
+
+func _on_joined_match():
+	set_ui_feedback("Connected!", "OK")
+	get_tree().change_scene_to_file("res://Networking/match.tscn")
+
+
+func _on_games_listed(games: Array):
+	game_list.clear()
+	if games.is_empty():
+		set_ui_feedback("No open games found.", "COK")
+		return
+	var root = game_list.create_item()
+	root.set_text(0, "")
+	var header = game_list.create_item()
+	header.set_text(0, "Game")
+	header.set_text(1, "Host")
+	header.set_text(2, "Players")
+	for game in games:
+		var row = game_list.create_item()
+		row.set_text(0, game.get("hst_game_name", ""))
+		row.set_text(1, str(game.get("hst_user", "")))
+		row.set_text(2, "%s/%s" % [game.get("hst_current_players", "?"), game.get("hst_max_players", "?")])
+		row.set_meta("hst_ip_address", game.get("hst_ip_address", ""))
+		row.set_meta("hst_port", game.get("hst_port", 0))
+		row.set_meta("hst_map_file_id", game.get("hst_map_file_id", 0))
 
 func _on_create_button_pressed():
 	var selected_world = world_list.get_selected()
