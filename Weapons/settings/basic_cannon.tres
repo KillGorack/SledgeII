@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="WeaponSettings" format=3 uid="uid://cra5ynqajpxse"]
+
+[ext_resource type="Script" uid="uid://defwrtblkx02f" path="res://Weapons/weapon_settings.gd" id="1_settings"]
+[ext_resource type="PackedScene" uid="uid://b4qwbkxy8u1u6" path="res://Weapons/projectile.tscn" id="2_projectile"]
+
+[resource]
+script = ExtResource("1_settings")
+weapon_name = "Basic Cannon"
+hit_points = 10.0
+crit_chance = 0.05
+crit_multiplier = 2.0
+projectile_prefab = ExtResource("2_projectile")
+projectile_recoil = 2.0
+projectile_range = 150.0
+projectile_speed = 60.0
+launch_offset = 1.0

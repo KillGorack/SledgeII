@@ -94,7 +94,7 @@ func _on_level_selected():
 	var selected = world_list.get_selected()
 	if selected:
 		selected_map_title = selected.get_text(0)
-		selected_map_file_id = int(selected.get_meta("fil_id"))
+		selected_map_file_id = int(selected.get_meta("fil_id", -1))
 
 
 func _on_game_selected():
@@ -118,9 +118,9 @@ func _on_join_pressed():
 	if not selected_game_row:
 		set_ui_feedback("Select a game to join first.", "COK")
 		return
-	var address = selected_game_row.get_meta("hst_ip_address")
-	var port = int(selected_game_row.get_meta("hst_port"))
-	var map_file_id = int(selected_game_row.get_meta("hst_map_file_id"))
+	var address = selected_game_row.get_meta("hst_ip_address", "")
+	var port = int(selected_game_row.get_meta("hst_port", 0))
+	var map_file_id = int(selected_game_row.get_meta("hst_map_file_id", 0))
 	set_ui_feedback("Connecting...", "INFO")
 	NetworkManager.join_game(address, port, map_file_id)
 
@@ -141,6 +141,9 @@ func _on_games_listed(games: Array):
 	header.set_text(0, "Game")
 	header.set_text(1, "Host")
 	header.set_text(2, "Players")
+	header.set_selectable(0, false)
+	header.set_selectable(1, false)
+	header.set_selectable(2, false)
 	for game in games:
 		var row = game_list.create_item()
 		row.set_text(0, game.get("hst_game_name", ""))
@@ -259,6 +262,9 @@ func populate_levels_tree(response_data):
 	firstrow.set_text(0, "Title")
 	firstrow.set_text(1, "Author")
 	firstrow.set_text(2, "Genre")
+	firstrow.set_selectable(0, false)
+	firstrow.set_selectable(1, false)
+	firstrow.set_selectable(2, false)
 	for map_item in response_data.data:
 		var row = world_list.create_item()
 		row.set_text(0, map_item.tan_title)
