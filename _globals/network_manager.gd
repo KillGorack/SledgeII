@@ -1,6 +1,7 @@
 extends Node
 
 signal player_registered(peer_id: int, team: String)
+signal player_unregistered(peer_id: int)
 signal host_started()
 signal host_failed(reason: String)
 signal join_failed(reason: String)
@@ -15,8 +16,11 @@ var peer: ENetMultiplayerPeer
 var is_host: bool = false
 var peer_teams: Dictionary = {}
 var current_map_file_id: int = -1
+# Every map .pck exports under the same virtual path (res://secret_level.tscn),
+# so "does that path already resolve" can't tell two different maps apart -
+# this is the actual bookkeeping for which map_file_id is currently mounted.
+var mounted_map_file_id: int = -1
 
-var _next_team_is_a: bool = false
 var _heartbeat_timer: Timer
 
 
@@ -35,7 +39,6 @@ func host_game(game_name: String, map_file_id: int, port: int = DEFAULT_PORT, ma
 	is_host = true
 	current_map_file_id = map_file_id
 	peer_teams = {1: "team_a"}
-	_next_team_is_a = false
 	_register_host(game_name, map_file_id, port, max_players)
 	_start_heartbeat()
 	host_started.emit()
@@ -67,6 +70,19 @@ func stop_hosting() -> void:
 	peer_teams.clear()
 
 
+# Covers both sides of leaving a match: unhosts (unregisters from the lobby,
+# stops the heartbeat) if we're the host, or just tears down the connection
+# if we're a joined client.
+func leave_game() -> void:
+	if is_host:
+		stop_hosting()
+	elif multiplayer.multiplayer_peer:
+		multiplayer.multiplayer_peer.close()
+		multiplayer.multiplayer_peer = null
+	peer_teams.clear()
+	current_map_file_id = -1
+
+
 func list_open_games() -> void:
 	_api_request("list_hosts", {}, func(data): games_listed.emit(data.get("data", [])))
 
@@ -77,14 +93,33 @@ func _on_peer_connected(peer_id: int) -> void:
 	# Backfill the roster so the newly joined peer learns everyone already assigned.
 	for existing_id in peer_teams.keys():
 		_assign_team.rpc_id(peer_id, existing_id, peer_teams[existing_id])
-	var team = "team_a" if _next_team_is_a else "team_b"
-	_next_team_is_a = not _next_team_is_a
+	var team = _pick_balanced_team()
 	peer_teams[peer_id] = team
 	_assign_team.rpc(peer_id, team)
 
 
+# Teams come from who is actually on the roster right now, not from a running
+# alternating flag. The flag drifted permanently the moment anybody left: it
+# kept alternating regardless of which team the leaver had been on, so after a
+# single leave/rejoin cycle the returning player was handed the HOST'S OWN
+# team. Same-team players cannot shoot each other at all here - a team_a
+# projectile masks only world and team_b (see Utilities.GROUP_LAYER_SCOPE) -
+# while craft-vs-craft masks still overlap, which is exactly the "my shots
+# pass straight through him but I can still bump into him" symptom.
+func _pick_balanced_team() -> String:
+	var count_a := 0
+	var count_b := 0
+	for assigned_team in peer_teams.values():
+		if assigned_team == "team_a":
+			count_a += 1
+		else:
+			count_b += 1
+	return "team_a" if count_a <= count_b else "team_b"
+
+
 func _on_peer_disconnected(peer_id: int) -> void:
 	peer_teams.erase(peer_id)
+	player_unregistered.emit(peer_id)
 
 
 @rpc("authority", "call_local", "reliable")

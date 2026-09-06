@@ -5,6 +5,8 @@
 [node name="Match" type="Node3D"]
 script = ExtResource("1_match")
 
+[node name="LocalCamera" type="Camera3D" parent="."]
+
 [node name="Crafts" type="Node3D" parent="."]
 
 [node name="CraftSpawner" type="MultiplayerSpawner" parent="."]
