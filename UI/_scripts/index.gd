@@ -25,6 +25,7 @@ var feedback_base_x: float
 @onready var game_list: Tree = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Join Game/MarginContainer/VBoxContainer/GameList"
 @onready var btn_refresh: Button = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Join Game/MarginContainer/VBoxContainer/btn_refresh"
 @onready var btn_join: Button = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Join Game/MarginContainer/VBoxContainer/btn_join"
+@onready var load_game_tabs: TabContainer = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer"
 
 
 
@@ -68,10 +69,6 @@ func _ready() -> void:
 	NetworkManager.api_error.connect(func(reason): set_ui_feedback(reason, "NOK"))
 	multiplayer.connected_to_server.connect(_on_joined_match)
 	multiplayer.connection_failed.connect(func(): set_ui_feedback("Could not reach host - connection failed.", "NOK"))
-	login_group.visible = true
-	load_group.visible = false
-	set_ui_feedback("Please login to continue...", "INFO")
-	btn_play.disabled = true
 	api_params = {
 		"ap": "game",
 		"cn": "hme",
@@ -79,6 +76,25 @@ func _ready() -> void:
 		"api": "json",
 		"vc": Creds.apiKEY
 	}
+	# UserData is an autoload and survives scene changes (e.g. leaving a
+	# match back to this menu), so an existing session shouldn't force a
+	# fresh login on a brand new instance of this scene.
+	if UserData.user_id > 0:
+		_enter_load_screen("Welcome back, %s!" % UserData.username)
+	else:
+		login_group.visible = true
+		load_group.visible = false
+		set_ui_feedback("Please login to continue...", "INFO")
+		btn_play.disabled = true
+
+
+func _enter_load_screen(feedback_message: String) -> void:
+	login_group.visible = false
+	load_group.visible = true
+	btn_play.disabled = false
+	load_game_tabs.current_tab = 0
+	set_ui_feedback(feedback_message, "OK")
+	getLevels()
 
 
 
@@ -234,11 +250,7 @@ func _on_request_completed(_result, response_code, _headers, body):
 					login_attempts = 0
 					is_cooldown = false
 					UserData.populate_user_data(response_data.data)
-					set_ui_feedback("Welcome %s, login successful!" % UserData.username, "OK")
-					login_group.visible = false
-					load_group.visible = true
-					btn_play.disabled = false
-					getLevels()
+					_enter_load_screen("Welcome %s, login successful!" % UserData.username)
 				else:
 					set_ui_feedback("Login NOT successful, please try again!", "NOK")
 					resetForm()

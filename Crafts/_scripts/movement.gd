@@ -18,6 +18,7 @@ var isGrounded: bool = false
 var current_turn_speed = 0.0
 var body: RigidBody3D
 var stop_forces = false
+var _knockback_until_msec: int = 0
 @onready var ground_check_area = $"../FloorDetection"
 @onready var engine_audio_path = $"../Engine Sound"
 
@@ -42,29 +43,38 @@ func _ready() -> void:
 	yaw = get_node("../Turret").rotation_degrees.y if has_node("../Turret") else 0.0
 	pitch = barrel.rotation_degrees.x if barrel else 0.0
 	if is_multiplayer_authority():
-		_hide_own_body_from_own_camera()
+		_hide_own_body()
 
 
 func setFreezeState(frozen: bool) -> void:
 	stop_forces = frozen
 
 
-# Every spawned craft is the same scene, so this can't be a static layer/
-# cull_mask baked into the .tscn - that would hide EVERY craft's body from
-# EVERY camera. Instead, only the locally-authoritative instance moves its
-# own meshes onto a reserved layer and excludes that layer on its own
-# camera, so each client only ever hides its own craft's body.
-func _hide_own_body_from_own_camera() -> void:
+# Called from health_node when an external hit lands (repulsor and friends).
+# move_player() below hard-sets linear velocity to max_speed on every physics
+# tick while grounded, so without a stand-off window any knockback is erased
+# on the very next tick - a 155 impulse on this 5kg hull is a 31 m/s shove
+# clamped straight back down to 4. The normal deceleration force still runs
+# during the window, so the craft slides and settles rather than skating.
+func apply_knockback_grace(duration: float = 1.5) -> void:
+	_knockback_until_msec = max(_knockback_until_msec, Time.get_ticks_msec() + int(duration * 1000.0))
+
+
+func _is_knockback_active() -> bool:
+	return Time.get_ticks_msec() < _knockback_until_msec
+
+
+# Every spawned craft is the same scene, so this can't be a static layer
+# baked into the .tscn - that would hide EVERY craft's body from EVERY
+# camera. Instead, only the locally-authoritative instance moves its own
+# meshes onto a reserved layer. The one persistent camera each client owns
+# (see Networking/match.gd) permanently excludes this layer, so whichever
+# craft is currently locally-owned always has its own body hidden from it -
+# camera setup itself no longer lives here at all, see match.gd.
+func _hide_own_body() -> void:
 	var self_layer_bit := 1 << (SELF_RENDER_LAYER - 1)
 	for mesh in _find_mesh_instances(body):
 		mesh.layers = self_layer_bit
-	var camera := get_node_or_null("../Turret/Barrel/Camera3D")
-	if camera:
-		camera.cull_mask = ((1 << 20) - 1) & ~self_layer_bit
-		# Every spawned craft (yours, other players', debug references) has
-		# its own Camera3D; without this Godot just defaults to whichever one
-		# entered the tree first, which is not necessarily your own.
-		camera.current = true
 
 
 func _find_mesh_instances(node: Node) -> Array:
@@ -164,7 +174,7 @@ func move_player(forward_input):
 		var current_velocity = body.get_linear_velocity()
 		var deceleration_force = -current_velocity * stats.deceleration
 		body.apply_central_force(deceleration_force)
-	if isGrounded:
+	if isGrounded and not _is_knockback_active():
 		var clamped_velocity = body.get_linear_velocity().limit_length(stats.max_speed)
 		body.set_linear_velocity(clamped_velocity)
 

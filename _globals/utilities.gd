@@ -42,6 +42,21 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	pass
 
+
+func GarbageCollection(node: Node, delay: float) -> void:
+	if not node:
+		return
+	var timer = Timer.new()
+	timer.wait_time = delay
+	timer.one_shot = true
+	node.add_child(timer)
+	timer.connect("timeout", func():
+		if is_instance_valid(node):
+			node.queue_free()
+		timer.queue_free()
+	)
+	timer.start()
+
 func set_allegiance(body: Node3D, group_name: String):
 	if body and GROUP_LAYER_SCOPE.has(group_name):
 		var layer_data = GROUP_LAYER_SCOPE[group_name]
