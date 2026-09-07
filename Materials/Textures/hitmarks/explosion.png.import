@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://xb5l58ih7mb2"
-path="res://.godot/imported/missile_green_texture.png-c523d331838bfe1c424de6547e273eb6.ctex"
+uid="uid://kpga6wdexu6a"
+path="res://.godot/imported/explosion.png-95a0e8461e0e7bdbfc8495089459088c.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Materials/Textures/Missiles/missile_green_texture.png"
-dest_files=["res://.godot/imported/missile_green_texture.png-c523d331838bfe1c424de6547e273eb6.ctex"]
+source_file="res://Materials/Textures/hitmarks/explosion.png"
+dest_files=["res://.godot/imported/explosion.png-95a0e8461e0e7bdbfc8495089459088c.ctex"]
 
 [params]
 

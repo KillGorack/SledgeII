@@ -1,6 +1,7 @@
 [gd_resource type="Resource" script_class="WeaponSettings" format=3 uid="uid://d2bcvfd5dw7pj"]
 
-[ext_resource type="PackedScene" uid="uid://ysl4fjv5gdgy" path="res://Weapons/Scenes/explosions/sparks_red.tscn" id="1_dseh2"]
+[ext_resource type="PackedScene" uid="uid://dqu4r8p4yt5jp" path="res://Weapons/Scenes/explosions/sparks.tscn" id="1_dseh2"]
+[ext_resource type="PackedScene" uid="uid://c8wgfwmq20j15" path="res://Weapons/Scenes/hitmarks/scorch.tscn" id="1_fltvq"]
 [ext_resource type="Script" uid="uid://defwrtblkx02f" path="res://Weapons/_scripts/weapon_settings.gd" id="1_l7uby"]
 [ext_resource type="PackedScene" uid="uid://b2vljciuo54jp" path="res://Weapons/Scenes/projectiles/laser.tscn" id="2_fltvq"]
 
@@ -9,7 +10,10 @@ script = ExtResource("1_l7uby")
 weapon_name = "MKIV Coherant Energy"
 hit_points = 25.0
 projectile_prefab = ExtResource("2_fltvq")
+projectile_color = Color(1, 0, 0, 1)
 explosion_prefab = ExtResource("1_dseh2")
+bullet_hole_prefab = ExtResource("1_fltvq")
 projectile_count = 4
 projectile_spacing = 0.125
+launch_offset = 0.0
 metadata/_custom_type_script = "uid://defwrtblkx02f"

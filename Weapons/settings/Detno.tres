@@ -1,22 +1,25 @@
 [gd_resource type="Resource" script_class="WeaponSettings" format=3 uid="uid://b5trap215xo20"]
 
+[ext_resource type="PackedScene" uid="uid://b3f44mlsxoif8" path="res://Weapons/Scenes/hitmarks/crater.tscn" id="1_7qxki"]
 [ext_resource type="Script" uid="uid://defwrtblkx02f" path="res://Weapons/_scripts/weapon_settings.gd" id="1_lj0dn"]
-[ext_resource type="PackedScene" uid="uid://ysl4fjv5gdgy" path="res://Weapons/Scenes/explosions/sparks_red.tscn" id="1_qca65"]
-[ext_resource type="PackedScene" uid="uid://dgc2wniebgtat" path="res://Weapons/Scenes/projectiles/rocket_red.tscn" id="1_va6vx"]
+[ext_resource type="PackedScene" uid="uid://dqu4r8p4yt5jp" path="res://Weapons/Scenes/explosions/sparks.tscn" id="1_qca65"]
+[ext_resource type="PackedScene" uid="uid://byxqkihhw08gb" path="res://Weapons/Scenes/projectiles/rocket.tscn" id="2_qca65"]
 
 [resource]
 script = ExtResource("1_lj0dn")
-weapon_type = 3
 weapon_name = "Detno Missile"
 hit_points = 150.0
 crit_chance = 0.125
 crit_multiplier = 7.0
 cool_down = 1.0
-projectile_prefab = ExtResource("1_va6vx")
+projectile_prefab = ExtResource("2_qca65")
+projectile_color = Color(1, 0, 0, 1)
 explosion_prefab = ExtResource("1_qca65")
+bullet_hole_prefab = ExtResource("1_7qxki")
 explosive_force = 100.0
 explosive_force_distance = 5.0
 body_collection_max = 25
 targeting_system = true
 target_rotation_speed = 12.0
+launch_offset = 0.0
 metadata/_custom_type_script = "uid://defwrtblkx02f"

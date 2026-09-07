@@ -1,0 +1,13 @@
+[gd_scene format=3 uid="uid://b3f44mlsxoif8"]
+
+[ext_resource type="Texture2D" uid="uid://kpga6wdexu6a" path="res://Materials/Textures/hitmarks/explosion.png" id="1_cpjor"]
+[ext_resource type="Script" uid="uid://c6e2d0hsfw6gk" path="res://_globals/_gc.gd" id="1_vu1a0"]
+
+[node name="hitmark" type="Node3D" unique_id=1155614307]
+script = ExtResource("1_vu1a0")
+duration = 2.0
+
+[node name="Decal" type="Decal" parent="." unique_id=2121939095]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 0, 0, 0)
+size = Vector3(1, 0.2, 1)
+texture_albedo = ExtResource("1_cpjor")

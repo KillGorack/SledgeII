@@ -40,6 +40,33 @@ func _ready() -> void:
 	if team != "":
 		allegiance_group = "projectile_" + team
 		Utilities.set_allegiance(self, allegiance_group)
+	if weapon_settings:
+		_apply_projectile_color(weapon_settings.projectile_color)
+
+
+# Runs identically on every peer - weapon_settings is assigned by
+# match.gd::_spawn_projectile before this node is added to the tree (same
+# ordering apply_damage()/respawn_at() already rely on elsewhere), and every
+# peer loads its own copy of the same weapon_settings.tres by path, so there
+# is nothing here that needs authority gating or a network trip; it's exactly
+# as local as the mesh and material this projectile scene already ships with.
+#
+# Deliberately duck-typed rather than reaching for named child paths: rocket,
+# laser and shell are three different scene shapes (rocket has a tinted mesh,
+# laser has none, shell's mesh stays its own Gun_Metal on purpose) sharing
+# this one script, so it asks each descendant whether it knows how to color
+# itself instead of assuming any particular one exists. See
+# colorable_light.gd, colorable_mesh.gd and Trail3D.gd::apply_projectile_color
+# for the nodes that currently answer yes.
+func _apply_projectile_color(color: Color) -> void:
+	_apply_projectile_color_to(self, color)
+
+
+func _apply_projectile_color_to(node: Node, color: Color) -> void:
+	if node.has_method("apply_projectile_color"):
+		node.apply_projectile_color(color)
+	for child in node.get_children():
+		_apply_projectile_color_to(child, color)
 
 
 func _physics_process(delta: float) -> void:
@@ -130,7 +157,15 @@ func handle_collision() -> void:
 		if weapon_settings.freeze_timer > 0:
 			freeze_target()
 
-		if weapon_settings.hit_points > 0 and weapon_settings.weapon_type != WeaponSettings.WeaponType.Explosive:
+		# Skips direct damage when the AOE branch above already hit this same
+		# target - the blast origin is the impact point, so whatever this
+		# projectile struck directly is already getting near-full damage from
+		# apply_aoe_damage()'s own falloff. Derived from aoe_damage_one_off
+		# (flipped true the moment that branch actually runs) instead of a
+		# separate weapon_type field a designer had to remember to set to
+		# match - a weapon with explosive_force left at 0 no longer loses its
+		# direct damage for no reason.
+		if weapon_settings.hit_points > 0 and not aoe_damage_one_off:
 			apply_direct_damage(weapon_settings.hit_points)
 
 		if weapon_settings.projectile_force > 0:
@@ -193,7 +228,6 @@ func apply_direct_damage(damage: float, target: Object = null) -> void:
 	varied_damage = clamp(varied_damage, damage - (3 * stdev), damage + (3 * stdev))
 	if randf() < weapon_settings.crit_chance:
 		varied_damage *= weapon_settings.crit_multiplier
-		set_critical_decal()
 		play_crit_sound()
 	var parental_object = target if target != null else collided_object
 	_apply_damage_to(parental_object, varied_damage)
@@ -215,7 +249,6 @@ func apply_aoe_damage(bodies) -> void:
 			varied_damage = clamp(varied_damage, damage - (3 * stdev), damage + (3 * stdev))
 			if randf() < weapon_settings.crit_chance:
 				varied_damage *= weapon_settings.crit_multiplier
-				set_critical_decal()
 				play_crit_sound()
 			_apply_damage_to(body, varied_damage)
 	aoe_damage_one_off = true
@@ -269,12 +302,22 @@ func handle_ricochet() -> bool:
 		var reflect_direction = current_direction.bounce(collision_normal).normalized()
 		current_direction = reflect_direction
 		linear_velocity = reflect_direction * weapon_settings.projectile_speed
-		global_transform.origin += collision_normal * 0.05
-		angular_velocity = current_direction * weapon_settings.projectile_spin
+		# 2x the collider's own radius (0.05), same margin handle_pierce() uses
+		# below - 1x was barely more than the radius itself, so a shallow or
+		# corner hit could still be touching next physics step and immediately
+		# ricochet again in the same spot.
+		global_transform.origin += collision_normal * 0.1
 		var adjusted_direction = reflect_direction
 		if abs(reflect_direction.dot(Vector3.UP)) > 0.99:
 			adjusted_direction += Vector3(0.001, 0, 0)
 		look_at(global_transform.origin + adjusted_direction, Vector3.UP)
+		# look_at() only snaps where it's FACING - it does nothing to whatever
+		# angular_velocity the actual physics collision just imparted (real
+		# torque/friction from the contact), so without this the leftover spin
+		# keeps integrating right through the reorient and compounds with each
+		# subsequent bounce. handle_pierce() below already does this for the
+		# exact same reason.
+		angular_velocity = Vector3.ZERO
 		_reset_one_offs()
 		return false
 	return true
@@ -367,21 +410,10 @@ func _play_bullet_hole_effect(hit_point: Vector3, hit_normal: Vector3) -> void:
 	var up_vector = Vector3.UP
 	if hit_normal.dot(up_vector) > 0.999:
 		up_vector = Vector3.RIGHT
+	up_vector = up_vector.rotated(hit_normal, randf() * TAU)
 	var direction = (offset_position + hit_normal) - offset_position
 	if not direction.is_zero_approx() and not up_vector.cross(direction).is_zero_approx():
 		bullet_hole_instance.look_at_from_position(offset_position, offset_position + hit_normal, up_vector)
-
-
-func set_critical_decal() -> void:
-	_play_critical_effect.rpc()
-
-
-@rpc("authority", "call_local", "reliable")
-func _play_critical_effect() -> void:
-	if weapon_settings.critical_hit_prefab and get_parent():
-		var crit_instance = weapon_settings.critical_hit_prefab.instantiate()
-		get_parent().add_child(crit_instance)
-		crit_instance.transform = global_transform
 
 
 func set_hit_scene() -> void:
