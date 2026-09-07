@@ -2,12 +2,12 @@
 
 [ext_resource type="Material" uid="uid://nlfneyr4a2pn" path="res://Materials/PBR/missile_blue.tres" id="1_fmkds"]
 [ext_resource type="Script" uid="uid://75sa32sebpqn" path="res://Weapons/_scripts/collision_handler.gd" id="1_x6uhk"]
-[ext_resource type="ArrayMesh" uid="uid://cevipne0ri5wn" path="res://Models/missile_bighead.obj" id="2_fmkds"]
 [ext_resource type="Script" uid="uid://dpr2qkc7glln2" path="res://Materials/Shaders/Trail3D.gd" id="3_2d37w"]
 [ext_resource type="Script" uid="uid://bwdrqy4iifec4" path="res://_globals/twirl.gd" id="3_ddvmj"]
+[ext_resource type="ArrayMesh" uid="uid://ccndq1ey68q6u" path="res://Models/hornet.obj" id="3_x6uhk"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_fmkds"]
-radius = 0.1
+radius = 0.05
 
 [sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_2d37w"]
 properties/0/path = NodePath(".:position")
@@ -34,12 +34,11 @@ contact_monitor = true
 max_contacts_reported = 1
 script = ExtResource("1_x6uhk")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1792590105]
-transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, 0, 0, 0)
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1792590105]
 material_override = ExtResource("1_fmkds")
-mesh = ExtResource("2_fmkds")
+mesh = ExtResource("3_x6uhk")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=2028424285]
+[node name="Collider" type="CollisionShape3D" parent="." unique_id=2028424285]
 shape = SubResource("SphereShape3D_fmkds")
 
 [node name="RayCast3D" type="RayCast3D" parent="." unique_id=1822453284]

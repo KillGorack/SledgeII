@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://ccndq1ey68q6u"
+path="res://.godot/imported/hornet.obj-af49bc48c690357cb5c0380c08c812ce.mesh"
+
+[deps]
+
+files=["res://.godot/imported/hornet.obj-af49bc48c690357cb5c0380c08c812ce.mesh"]
+
+source_file="res://Models/hornet.obj"
+dest_files=["res://.godot/imported/hornet.obj-af49bc48c690357cb5c0380c08c812ce.mesh", "res://.godot/imported/hornet.obj-af49bc48c690357cb5c0380c08c812ce.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false
