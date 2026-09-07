@@ -2,12 +2,12 @@
 
 [ext_resource type="Script" uid="uid://75sa32sebpqn" path="res://Weapons/_scripts/collision_handler.gd" id="1_mkoq4"]
 [ext_resource type="Material" uid="uid://cn1qoumdftfes" path="res://Materials/PBR/missile_red.tres" id="2_mkoq4"]
-[ext_resource type="ArrayMesh" uid="uid://cevipne0ri5wn" path="res://Models/missile_bighead.obj" id="3_717ad"]
+[ext_resource type="ArrayMesh" uid="uid://ccndq1ey68q6u" path="res://Models/hornet.obj" id="3_mkoq4"]
 [ext_resource type="Script" uid="uid://bwdrqy4iifec4" path="res://_globals/twirl.gd" id="4_sk65u"]
 [ext_resource type="Script" uid="uid://dpr2qkc7glln2" path="res://Materials/Shaders/Trail3D.gd" id="5_puad6"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_fmkds"]
-radius = 0.1
+radius = 0.05
 
 [sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_2d37w"]
 properties/0/path = NodePath(".:position")
@@ -28,18 +28,17 @@ albedo_color = Color(1, 0, 0, 1)
 [sub_resource type="PlaneMesh" id="PlaneMesh_2d37w"]
 size = Vector2(0.001, 0.001)
 
-[node name="RocketBlue" type="RigidBody3D" unique_id=585907524]
+[node name="RocketRed" type="RigidBody3D" unique_id=585907524]
 continuous_cd = true
 contact_monitor = true
 max_contacts_reported = 1
 script = ExtResource("1_mkoq4")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1792590105]
-transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, 0, 0, 0)
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1992919504]
 material_override = ExtResource("2_mkoq4")
-mesh = ExtResource("3_717ad")
+mesh = ExtResource("3_mkoq4")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=2028424285]
+[node name="Collider" type="CollisionShape3D" parent="." unique_id=2028424285]
 shape = SubResource("SphereShape3D_fmkds")
 
 [node name="RayCast3D" type="RayCast3D" parent="." unique_id=1822453284]
