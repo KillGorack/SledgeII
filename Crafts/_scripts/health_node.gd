@@ -4,6 +4,9 @@ signal craft_defeated(peer_id: int)
 
 const VEHICLE_EXPLOSION := preload("res://Weapons/Scenes/explosions/explosion_main.tscn")
 const VEHICLE_EXPLOSION_SCALE := 3.0
+# Falling off the map counts as a kill, same explosion/respawn path as dying
+# to weapons fire - see the fall-death check in _process below.
+const FALL_DEATH_Y := -50.0
 
 @export var stats: CraftStats
 
@@ -56,6 +59,13 @@ func _process(delta: float) -> void:
 		return
 	if _is_regenerating and shields < _shields_max:
 		shields = min(_shields_max, shields + stats.regeneration_rate * delta)
+	# _is_destroyed guard matters here specifically: destroy_self() itself is
+	# already safe to call more than once (see its own guard), but without
+	# this the craft sits below FALL_DEATH_Y for the entire respawn delay -
+	# it doesn't get teleported back up until respawn_at() actually fires -
+	# so this would otherwise re-fire every frame for the whole 4 seconds.
+	if not _is_destroyed and body.global_position.y < FALL_DEATH_Y:
+		destroy_self()
 
 
 # Only the server should ever decide damage - the collision handler that

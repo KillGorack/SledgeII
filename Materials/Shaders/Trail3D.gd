@@ -15,6 +15,15 @@ var _oldPos: Vector3
 @export var _toWidth: float = 0.0
 
 
+# Paired with colorable_light.gd/colorable_mesh.gd - see
+# collision_handler.gd::_apply_projectile_color for how these all get called.
+# _endColor keeps its existing alpha (0.0, fading to transparent) - only the
+# hue changes, so the fade-out behavior is untouched.
+func apply_projectile_color(color: Color) -> void:
+	_startColor = color
+	_endColor = Color(color.r, color.g, color.b, _endColor.a)
+
+
 func _ready():
 	_oldPos = get_global_transform().origin
 	mesh = ImmediateMesh.new()

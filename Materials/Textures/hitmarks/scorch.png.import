@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ylutenmbh8pc"
-path="res://.godot/imported/missile_pink_texture.png-71f759bc5325c8f4e153cccb0d1fcf6e.ctex"
+uid="uid://f4ncieqrsed8"
+path="res://.godot/imported/scorch.png-9f1e5c32795210b0d95d73109c428bfd.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Materials/Textures/Missiles/missile_pink_texture.png"
-dest_files=["res://.godot/imported/missile_pink_texture.png-71f759bc5325c8f4e153cccb0d1fcf6e.ctex"]
+source_file="res://Materials/Textures/hitmarks/scorch.png"
+dest_files=["res://.godot/imported/scorch.png-9f1e5c32795210b0d95d73109c428bfd.ctex"]
 
 [params]
 

@@ -1,8 +1,0 @@
-[gd_resource type="StandardMaterial3D" format=3 uid="uid://nlfneyr4a2pn"]
-
-[ext_resource type="Texture2D" uid="uid://nn7hcktejmxe" path="res://Materials/Textures/Missiles/missile_blue_texture.png" id="1_bewd2"]
-
-[resource]
-albedo_texture = ExtResource("1_bewd2")
-metallic = 1.0
-roughness = 0.45

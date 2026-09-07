@@ -1,9 +1,6 @@
 extends Resource
 class_name WeaponSettings
 
-enum WeaponType { Default, Force, Pierce, Explosive, Bounce }
-@export var weapon_type: WeaponType = WeaponType.Default
-
 @export var weapon_name: String = "Default Weapon"
 @export var weapon_icon: Texture
 @export var hit_points: float = 0.0
@@ -12,9 +9,14 @@ enum WeaponType { Default, Force, Pierce, Explosive, Bounce }
 @export var cool_down: float = 0.5
 
 @export var projectile_prefab: PackedScene
+# Tint for this weapon's projectile - see collision_handler.gd::_apply_projectile_color.
+# Projectile scenes (rocket/laser/shell) now carry one shared grayscale-ready
+# material/trail/light setup each, instead of a separate color-baked scene per
+# weapon; this is what actually paints that shared setup per weapon. No-alpha
+# so the picker can't accidentally leave a projectile half-transparent.
+@export_color_no_alpha var projectile_color: Color = Color.WHITE
 @export var explosion_prefab: PackedScene
 @export var bullet_hole_prefab: PackedScene
-@export var critical_hit_prefab: PackedScene
 
 @export var launch_sound: AudioStream
 @export var hit_sound: AudioStream
@@ -45,7 +47,6 @@ enum WeaponType { Default, Force, Pierce, Explosive, Bounce }
 
 @export var projectile_range: float = 100.0
 @export var projectile_speed: float = 45.0
-@export var projectile_spin: float = 0.0
 
 @export var launch_offset: float = -0.5
 @export var projectile_destruction_delay: float = 0.0

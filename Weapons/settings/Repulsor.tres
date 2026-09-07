@@ -1,15 +1,18 @@
 [gd_resource type="Resource" script_class="WeaponSettings" format=3 uid="uid://qqc2vwxrscfy"]
 
-[ext_resource type="PackedScene" uid="uid://cjlfqvbpd2k7u" path="res://Weapons/Scenes/explosions/sparks_blue.tscn" id="1_icuoo"]
+[ext_resource type="PackedScene" uid="uid://galytbjmlf8u" path="res://Weapons/Scenes/hitmarks/cracked.tscn" id="1_egv2f"]
+[ext_resource type="PackedScene" uid="uid://dqu4r8p4yt5jp" path="res://Weapons/Scenes/explosions/sparks.tscn" id="1_icuoo"]
 [ext_resource type="Script" uid="uid://defwrtblkx02f" path="res://Weapons/_scripts/weapon_settings.gd" id="1_k3735"]
-[ext_resource type="PackedScene" uid="uid://byxqkihhw08gb" path="res://Weapons/Scenes/projectiles/rocket_blue.tscn" id="2_egv2f"]
+[ext_resource type="PackedScene" uid="uid://byxqkihhw08gb" path="res://Weapons/Scenes/projectiles/rocket.tscn" id="2_icuoo"]
 
 [resource]
 script = ExtResource("1_k3735")
-weapon_type = 1
 weapon_name = "Repulsor Missile"
-projectile_prefab = ExtResource("2_egv2f")
+projectile_prefab = ExtResource("2_icuoo")
+projectile_color = Color(0, 1, 0, 1)
 explosion_prefab = ExtResource("1_icuoo")
+bullet_hole_prefab = ExtResource("1_egv2f")
 projectile_ricochet_count = 3
 projectile_force = 155.0
+launch_offset = 0.0
 metadata/_custom_type_script = "uid://defwrtblkx02f"
