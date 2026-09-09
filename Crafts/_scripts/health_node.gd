@@ -198,11 +198,20 @@ func apply_impulse(impulse: Vector3) -> void:
 		return
 	if not body.is_multiplayer_authority():
 		return
+	var movement_node = body.get_node_or_null("movement_node")
+	# A grounded craft has nowhere to go but down through the floor if the
+	# blast has a downward component - raising the knockback force (see
+	# Repulsor/Detno) makes that a bigger single-tick shove than Godot's CCD
+	# reliably sweeps against. The floor never needs to push craft further
+	# into itself, so while grounded the downward part of the impulse is
+	# dropped; the sideways/upward part - the part that actually reads as a
+	# "hit" - is untouched.
+	if movement_node and movement_node.isGrounded and impulse.y < 0.0:
+		impulse.y = 0.0
 	body.apply_central_impulse(impulse)
 	# movement.gd hard-sets linear velocity to max_speed every tick while
 	# grounded, which erases the shove on the very next tick. Ask it to stand
 	# off briefly so the knockback actually plays out.
-	var movement_node = body.get_node_or_null("movement_node")
 	if movement_node and movement_node.has_method("apply_knockback_grace"):
 		movement_node.apply_knockback_grace()
 

@@ -13,6 +13,6 @@ projectile_color = Color(0, 1, 0, 1)
 explosion_prefab = ExtResource("1_icuoo")
 bullet_hole_prefab = ExtResource("1_egv2f")
 projectile_ricochet_count = 3
-projectile_force = 155.0
+projectile_force = 225.0
 launch_offset = 0.0
 metadata/_custom_type_script = "uid://defwrtblkx02f"

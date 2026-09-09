@@ -53,7 +53,7 @@ func setFreezeState(frozen: bool) -> void:
 # Called from health_node when an external hit lands (repulsor and friends).
 # move_player() below hard-sets linear velocity to max_speed on every physics
 # tick while grounded, so without a stand-off window any knockback is erased
-# on the very next tick - a 155 impulse on this 5kg hull is a 31 m/s shove
+# on the very next tick - a 310 impulse on this 5kg hull is a 62 m/s shove
 # clamped straight back down to 4. The normal deceleration force still runs
 # during the window, so the craft slides and settles rather than skating.
 func apply_knockback_grace(duration: float = 1.5) -> void:

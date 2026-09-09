@@ -3,6 +3,10 @@ class_name WeaponSettings
 
 @export var weapon_name: String = "Default Weapon"
 @export var weapon_icon: Texture
+# Seeds the checkbox state on the host's Create Game weapon list - read-only
+# at runtime (see UI/_scripts/index.gd and Networking/match.gd), never
+# written back to, since this Resource is shared/cached across every match.
+@export var default_available: bool = true
 @export var hit_points: float = 0.0
 @export var crit_chance: float = 0.0
 @export var crit_multiplier: float = 1.0

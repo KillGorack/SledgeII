@@ -336,9 +336,10 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-current_tab = 0
+current_tab = 1
 
 [node name="Create Game" type="TabBar" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer" unique_id=760376868]
+visible = false
 layout_mode = 2
 metadata/_tab_index = 0
 
@@ -357,7 +358,17 @@ theme_override_constants/margin_bottom = 15
 [node name="VBoxContainer" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer" unique_id=449342672]
 layout_mode = 2
 
-[node name="WorldList" type="Tree" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer" unique_id=701287020]
+[node name="HBoxContainer" type="HBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 20
+
+[node name="LeftColumn" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="WorldList" type="Tree" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/LeftColumn" unique_id=701287020]
 layout_mode = 2
 size_flags_vertical = 3
 columns = 3
@@ -368,16 +379,46 @@ enable_drag_unfolding = false
 hide_root = true
 select_mode = 1
 
-[node name="btn_create" type="Button" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer" unique_id=1801548184]
+[node name="RightColumn" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer"]
 layout_mode = 2
-text = "Load Game"
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="HostAddressLabel" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn"]
+layout_mode = 2
+text = "Host Address (optional)"
+
+[node name="HostAddressOverride" type="LineEdit" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn"]
+layout_mode = 2
+placeholder_text = "auto-detect"
+tooltip_text = "Leave blank to auto-detect. Set this if joins are ever slow to connect - auto-detection can pick the wrong network adapter when more than one is active."
+
+[node name="RulesLabel" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn"]
+layout_mode = 2
+text = "Match Rules"
+
+[node name="DayNightCheck" type="CheckBox" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn"]
+layout_mode = 2
+button_pressed = true
+text = "Day/Night Cycle"
+
+[node name="WeaponsLabel" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn"]
+layout_mode = 2
+text = "Available Weapons"
+
+[node name="WeaponChecklistScroll" type="ScrollContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="WeaponChecklist" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn/WeaponChecklistScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
 
 [node name="btn_host" type="Button" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer" unique_id=461025351]
 layout_mode = 2
 text = "Host Selected Map"
 
 [node name="Join Game" type="TabBar" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer" unique_id=160290931]
-visible = false
 layout_mode = 2
 metadata/_tab_index = 1
 

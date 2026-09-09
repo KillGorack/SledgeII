@@ -36,7 +36,12 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	time_of_day = fmod(time_of_day + delta / day_length_seconds, 1.0)
+	# When the host disabled the cycle, time_of_day just stays pinned at
+	# start_time_of_day forever - _update_sun() still runs every frame so the
+	# lighting stays consistent, it just keeps recomputing the same fixed
+	# position instead of a moving one.
+	if NetworkManager.day_night_enabled:
+		time_of_day = fmod(time_of_day + delta / day_length_seconds, 1.0)
 	_update_sun()
 
 
