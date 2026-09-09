@@ -19,13 +19,27 @@ var feedback_base_x: float
 @onready var txt_login: LineEdit = $"Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect/MarginContainer/TextureRect/MarginContainer/MarginContainer/VBoxContainer/hb_username/txt_username"
 @onready var txt_password: LineEdit = $"Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect/MarginContainer/TextureRect/MarginContainer/MarginContainer/VBoxContainer/hb_password/txt_password"
 @onready var btn_login: TextureButton = $"Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect/MarginContainer/TextureRect/MarginContainer/MarginContainer/VBoxContainer/HBoxContainer/btn_submit_login"
-@onready var world_list: Tree = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/WorldList"
-@onready var btn_create: Button = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/btn_create"
+@onready var world_list: Tree = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/LeftColumn/WorldList"
 @onready var btn_host: Button = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/btn_host"
 @onready var game_list: Tree = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Join Game/MarginContainer/VBoxContainer/GameList"
 @onready var btn_refresh: Button = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Join Game/MarginContainer/VBoxContainer/btn_refresh"
 @onready var btn_join: Button = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Join Game/MarginContainer/VBoxContainer/btn_join"
 @onready var load_game_tabs: TabContainer = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer"
+@onready var game_list_poll_timer := Timer.new()
+@onready var day_night_check: CheckBox = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn/DayNightCheck"
+@onready var host_address_override: LineEdit = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn/HostAddressOverride"
+@onready var weapon_checklist: VBoxContainer = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn/WeaponChecklistScroll/WeaponChecklist"
+
+# "Create Game" is tab 0, "Join Game" is tab 1 (see index.tscn) - only poll
+# the lobby API while the player is actually looking at the Join Game list,
+# not in the background while they're picking a map to host.
+const JOIN_GAME_TAB_INDEX := 1
+
+# A list of folders rather than one hardcoded path, so mines (or anything
+# else equippable added later) can slot into the same checklist/ruleset by
+# adding a directory here - see the mines reference note from the design
+# discussion for why they won't live in this same folder.
+const WEAPON_CATALOG_DIRS: Array[String] = ["res://Weapons/settings/"]
 
 
 
@@ -49,11 +63,18 @@ var selected_game_row = null
 
 func _ready() -> void:
 	add_child(login_timer)
+	add_child(game_list_poll_timer)
+	# Same cadence NetworkManager already uses to keep a hosted game's own
+	# listing alive - one interval to remember instead of a second invented
+	# number for "how fresh does this list need to be".
+	game_list_poll_timer.wait_time = NetworkManager.HEARTBEAT_INTERVAL
+	game_list_poll_timer.timeout.connect(func(): NetworkManager.list_open_games())
+	load_game_tabs.tab_changed.connect(_on_load_game_tab_changed)
+	_build_weapon_checklist()
 	feedback_base_x = ui_feedback.position.x + 25
 	login_timer.connect("timeout", Callable(self, "_on_cooldown_finished"))
 	http_request.connect("request_completed", Callable(self, "_on_request_completed"))
 	world_list.connect("item_selected", Callable(self, "_on_level_selected"))
-	btn_create.connect("pressed", Callable(self, "_on_create_button_pressed"))
 	game_list.connect("item_selected", Callable(self, "_on_game_selected"))
 	login_timer.one_shot = true
 	btn_quit.pressed.connect(func(): _on_quit())
@@ -95,6 +116,21 @@ func _enter_load_screen(feedback_message: String) -> void:
 	load_game_tabs.current_tab = 0
 	set_ui_feedback(feedback_message, "OK")
 	getLevels()
+	# Refresh the Join Game list at the same moment, not just the Create Game
+	# one - previously this stayed empty until the player manually hit the
+	# refresh button, even though a login is exactly when it's stalest.
+	NetworkManager.list_open_games()
+
+
+# Keeps the Join Game list current for as long as it's actually on screen,
+# without polling the lobby API in the background the rest of the time (e.g.
+# while the player is just picking a map to host).
+func _on_load_game_tab_changed(tab: int) -> void:
+	if tab == JOIN_GAME_TAB_INDEX:
+		NetworkManager.list_open_games() # don't make them wait a full interval for the first refresh
+		game_list_poll_timer.start()
+	else:
+		game_list_poll_timer.stop()
 
 
 
@@ -117,16 +153,61 @@ func _on_game_selected():
 	selected_game_row = game_list.get_selected()
 
 
+# Built once from disk, not maintained by hand - drop a new .tres in any of
+# WEAPON_CATALOG_DIRS and it shows up here with no other changes needed.
+# default_available (see weapon_settings.gd) seeds each checkbox's starting
+# state; the host can still check it back on or off from there.
+func _build_weapon_checklist() -> void:
+	for child in weapon_checklist.get_children():
+		child.queue_free()
+	for dir_path in WEAPON_CATALOG_DIRS:
+		var dir := DirAccess.open(dir_path)
+		if dir == null:
+			continue
+		dir.list_dir_begin()
+		var file_name := dir.get_next()
+		while file_name != "":
+			if not dir.current_is_dir() and file_name.ends_with(".tres"):
+				var weapon_path := dir_path.path_join(file_name)
+				var settings: WeaponSettings = load(weapon_path)
+				if settings:
+					var check := CheckBox.new()
+					check.text = settings.weapon_name
+					check.button_pressed = settings.default_available
+					check.set_meta("weapon_path", weapon_path)
+					weapon_checklist.add_child(check)
+			file_name = dir.get_next()
+		dir.list_dir_end()
+
+
+func _get_checked_weapon_paths() -> Array[String]:
+	var paths: Array[String] = []
+	for child in weapon_checklist.get_children():
+		if child is CheckBox and child.button_pressed:
+			paths.append(child.get_meta("weapon_path"))
+	return paths
+
+
 func _on_host_pressed():
 	if selected_map_title == "":
 		set_ui_feedback("Select a map to host first.", "COK")
 		return
-	NetworkManager.host_game(selected_map_title, selected_map_file_id)
+	NetworkManager.host_game(
+		selected_map_title,
+		selected_map_file_id,
+		_get_checked_weapon_paths(),
+		day_night_check.button_pressed,
+		host_address_override.text
+	)
 	set_ui_feedback("Hosting \"%s\"..." % selected_map_title, "INFO")
 
 
-func _on_host_started():
-	set_ui_feedback("Game hosted, waiting for players...", "OK")
+func _on_host_started(address: String):
+	# Surfacing the actual address, not just "hosted" - auto-detection can
+	# pick a slow/wrong adapter silently when more than one is active (see
+	# NetworkManager._get_local_ip); this at least makes it visible instead
+	# of a guess nobody can check.
+	set_ui_feedback("Hosting on %s, waiting for players..." % address, "OK")
 	get_tree().change_scene_to_file("res://Networking/match.tscn")
 
 
@@ -142,6 +223,7 @@ func _on_join_pressed():
 
 
 func _on_joined_match():
+	print("[JOIN] t=%dms ENet connected_to_server fired" % NetworkManager._debug_join_elapsed_ms())
 	set_ui_feedback("Connected!", "OK")
 	get_tree().change_scene_to_file("res://Networking/match.tscn")
 
@@ -163,26 +245,14 @@ func _on_games_listed(games: Array):
 	for game in games:
 		var row = game_list.create_item()
 		row.set_text(0, game.get("hst_game_name", ""))
-		row.set_text(1, str(game.get("hst_user", "")))
+		# hst_user is just the numeric account id (see lobbyAPI.php) - the
+		# actual display name is the joined hst_username field.
+		row.set_text(1, str(game.get("hst_username", "")))
 		row.set_text(2, "%s/%s" % [game.get("hst_current_players", "?"), game.get("hst_max_players", "?")])
 		row.set_meta("hst_ip_address", game.get("hst_ip_address", ""))
 		row.set_meta("hst_port", game.get("hst_port", 0))
 		row.set_meta("hst_map_file_id", game.get("hst_map_file_id", 0))
 
-func _on_create_button_pressed():
-	var selected_world = world_list.get_selected()
-	if selected_world:
-		function_complete = "create_new_game";
-		
-
-
-
-
-
-
-
-	else:
-		return
 
 
 

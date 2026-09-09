@@ -2,7 +2,7 @@ extends Node
 
 signal player_registered(peer_id: int, team: String)
 signal player_unregistered(peer_id: int)
-signal host_started()
+signal host_started(address: String)
 signal host_failed(reason: String)
 signal join_failed(reason: String)
 signal games_listed(games: Array)
@@ -21,7 +21,23 @@ var current_map_file_id: int = -1
 # this is the actual bookkeeping for which map_file_id is currently mounted.
 var mounted_map_file_id: int = -1
 
+# The host's per-match ruleset. Empty allowed_weapon_paths means unrestricted
+# (every weapon allowed) rather than "nothing allowed" - that's what a plain
+# new/untouched game (or a client that briefly hasn't received the ruleset
+# yet) should default to, not an accidentally weaponless craft. Peer-to-peer
+# only, not part of the public lobby listing - see _assign_ruleset below and
+# match.gd's use of these two fields.
+var allowed_weapon_paths: Array[String] = []
+var day_night_enabled: bool = true
+
 var _heartbeat_timer: Timer
+
+# Temporary instrumentation for the "connecting/loading takes forever, no
+# errors" investigation - gives every later [JOIN] print a shared t=0 so the
+# console output shows one clean timeline (connect -> scene ready -> map
+# mount -> parse -> instantiate -> own craft spawned) instead of guessing
+# again which stage is actually slow. Remove once this is root-caused.
+var _debug_join_start_ms: int = 0
 
 
 func _ready() -> void:
@@ -29,7 +45,8 @@ func _ready() -> void:
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 
 
-func host_game(game_name: String, map_file_id: int, port: int = DEFAULT_PORT, max_players: int = 20) -> Error:
+func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] = [], day_night: bool = true, host_address_override: String = "", port: int = DEFAULT_PORT, max_players: int = 20) -> Error:
+	_debug_join_start_ms = Time.get_ticks_msec()
 	peer = ENetMultiplayerPeer.new()
 	var err = peer.create_server(port, max_players)
 	if err != OK:
@@ -39,14 +56,28 @@ func host_game(game_name: String, map_file_id: int, port: int = DEFAULT_PORT, ma
 	is_host = true
 	current_map_file_id = map_file_id
 	peer_teams = {1: "team_a"}
-	_register_host(game_name, map_file_id, port, max_players)
+	allowed_weapon_paths = weapon_paths
+	day_night_enabled = day_night
+	# _get_local_ip() just takes whatever address the OS happens to list
+	# first, which isn't stable if there's more than one active adapter (a
+	# VPN, a virtual bridge, Wi-Fi and Ethernet both up) - that's picked a
+	# slow/roundabout route before with nothing showing it happened. Resolved
+	# once here, reused for both registration and the feedback message below,
+	# so what actually got used is visible instead of a silent guess, and a
+	# host can override it directly if it ever picks wrong.
+	var host_address = host_address_override.strip_edges()
+	if host_address.is_empty():
+		host_address = _get_local_ip()
+	_register_host(game_name, map_file_id, port, max_players, host_address)
 	_start_heartbeat()
-	host_started.emit()
+	host_started.emit(host_address)
 	player_registered.emit(1, "team_a")
 	return OK
 
 
 func join_game(address: String, port: int, map_file_id: int) -> Error:
+	_debug_join_start_ms = Time.get_ticks_msec()
+	print("[JOIN] t=0ms connecting to %s:%d" % [address, port])
 	peer = ENetMultiplayerPeer.new()
 	var err = peer.create_client(address, port)
 	if err != OK:
@@ -56,6 +87,10 @@ func join_game(address: String, port: int, map_file_id: int) -> Error:
 	is_host = false
 	current_map_file_id = map_file_id
 	return OK
+
+
+func _debug_join_elapsed_ms() -> int:
+	return Time.get_ticks_msec() - _debug_join_start_ms
 
 
 func stop_hosting() -> void:
@@ -90,12 +125,22 @@ func list_open_games() -> void:
 func _on_peer_connected(peer_id: int) -> void:
 	if not is_host:
 		return
+	# One match-wide ruleset, not per-peer, so this is a single targeted send
+	# rather than the backfill loop below - there's nothing to backfill, the
+	# host is the only one who ever sets it.
+	_assign_ruleset.rpc_id(peer_id, allowed_weapon_paths, day_night_enabled)
 	# Backfill the roster so the newly joined peer learns everyone already assigned.
 	for existing_id in peer_teams.keys():
 		_assign_team.rpc_id(peer_id, existing_id, peer_teams[existing_id])
 	var team = _pick_balanced_team()
 	peer_teams[peer_id] = team
 	_assign_team.rpc(peer_id, team)
+
+
+@rpc("authority", "call_local", "reliable")
+func _assign_ruleset(weapon_paths: Array, day_night: bool) -> void:
+	allowed_weapon_paths.assign(weapon_paths)
+	day_night_enabled = day_night
 
 
 # Teams come from who is actually on the roster right now, not from a running
@@ -142,19 +187,36 @@ func _stop_heartbeat() -> void:
 		_heartbeat_timer = null
 
 
+# Best-effort only, not a fix by itself - the OS can report more than one
+# active adapter (VPN, virtual bridge, Wi-Fi and Ethernet both up at once)
+# and there's no reliable way to know from here which one another machine on
+# the LAN can actually reach fastest. Preferring the conventional private LAN
+# ranges, in the order most home/office networks actually use them, at least
+# beats picking whatever the OS happens to enumerate first. Overriding this
+# entirely (see host_game's host_address_override) is the real fix when it
+# still picks wrong.
+const _PRIVATE_RANGE_PREFIXES := ["192.168.", "10.", "172.16.", "172.17.", "172.18.", "172.19.", "172.2", "172.30.", "172.31."]
+
 func _get_local_ip() -> String:
+	var candidates: Array[String] = []
 	for addr in IP.get_local_addresses():
 		if addr.begins_with("127.") or addr.contains(":"):
 			continue
-		return addr
+		candidates.append(addr)
+	for prefix in _PRIVATE_RANGE_PREFIXES:
+		for addr in candidates:
+			if addr.begins_with(prefix):
+				return addr
+	if not candidates.is_empty():
+		return candidates[0]
 	return "127.0.0.1"
 
 
-func _register_host(game_name: String, map_file_id: int, port: int, max_players: int) -> void:
+func _register_host(game_name: String, map_file_id: int, port: int, max_players: int, host_address: String) -> void:
 	_api_request("register_host", {
 		"hst_game_name": game_name,
 		"hst_map_file_id": map_file_id,
-		"hst_ip_address": _get_local_ip(),
+		"hst_ip_address": host_address,
 		"hst_port": port,
 		"hst_max_players": max_players,
 		"hst_password_protected": 0
@@ -201,6 +263,17 @@ func _api_request(function_name: String, extra_data: Dictionary, on_success: Cal
 		if json.parse(body.get_string_from_utf8()) != OK:
 			api_error.emit("%s failed: bad response from server" % function_name)
 			return
-		on_success.call(json.get_data())
+		var data = json.get_data()
+		# The backend now answers an invalid/expired session with an
+		# explicit {"status":"error",...} instead of silently returning
+		# nothing (see lobbyAPI.php/gameAPI.php) - this used to call
+		# on_success regardless of what was actually in the body, so a
+		# heartbeat or register_host rejection was swallowed with zero
+		# trace: the hosted_games row would just quietly vanish a few
+		# seconds later with nothing anywhere saying why.
+		if typeof(data) == TYPE_DICTIONARY and data.get("status") != "success":
+			api_error.emit("%s failed: %s" % [function_name, data.get("message", "server rejected the request")])
+			return
+		on_success.call(data)
 	)
 	http_request.request(full_url, headers, HTTPClient.METHOD_POST, post_data_encoded)
