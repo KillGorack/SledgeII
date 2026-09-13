@@ -79,6 +79,19 @@ func AppendPoint():
 	
 	
 	
+# Wipes the whole point history rather than removing it one at a time - for
+# an abrupt redirect (a ricochet reorienting the projectile in a single
+# frame), the trail otherwise has to connect the last pre-bounce point
+# straight to the first post-bounce one, a visible whip across the turn.
+# Clearing means nothing draws until it has regrown at least 2 fresh points
+# (see _process()'s _points.size() < 2 check), which happens within a couple
+# of frames, so the trail just picks back up cleanly from the new direction.
+func clear_trail() -> void:
+	_points.clear()
+	_widths.clear()
+	_lifePoints.clear()
+
+
 func RemovePoint(i):
 	_points.remove_at(i)
 	_widths.remove_at(i)

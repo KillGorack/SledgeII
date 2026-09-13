@@ -1,10 +1,11 @@
 [gd_scene format=3 uid="uid://b4qwbkxy8u1u6"]
 
 [ext_resource type="Script" uid="uid://75sa32sebpqn" path="res://Weapons/_scripts/collision_handler.gd" id="1_gquch"]
+[ext_resource type="PhysicsMaterial" uid="uid://dia4vhnxygysj" path="res://Physics/physics_projectile_shell.tres" id="1_rfisq"]
 [ext_resource type="Material" uid="uid://dl6geb5lgd7j1" path="res://Materials/PBR/Gun_Metal.tres" id="2_v2u51"]
 [ext_resource type="Script" uid="uid://bwdrqy4iifec4" path="res://_globals/twirl.gd" id="3_dxnyr"]
 [ext_resource type="Script" uid="uid://dpr2qkc7glln2" path="res://Materials/Shaders/Trail3D.gd" id="4_q6b3d"]
-[ext_resource type="Script" path="res://Materials/Shaders/colorable_light.gd" id="5_clight"]
+[ext_resource type="Script" uid="uid://l07kt7adidgn" path="res://Materials/Shaders/colorable_light.gd" id="5_clight"]
 
 [sub_resource type="SphereMesh" id="SphereMesh_proj"]
 radius = 0.1
@@ -32,7 +33,8 @@ vertex_color_use_as_albedo = true
 size = Vector2(0.001, 0.001)
 
 [node name="Projectile" type="RigidBody3D" unique_id=2074083946]
-mass = 0.1
+mass = 50.0
+physics_material_override = ExtResource("1_rfisq")
 continuous_cd = true
 contact_monitor = true
 max_contacts_reported = 5
@@ -52,18 +54,25 @@ target_position = Vector3(0, 0, -1)
 replication_config = SubResource("SceneReplicationConfig_proj")
 
 [node name="OmniLight3D" type="OmniLight3D" parent="." unique_id=1301131724]
-script = ExtResource("5_clight")
 omni_range = 2.0
+script = ExtResource("5_clight")
 
 [node name="Spinner" type="Node3D" parent="." unique_id=1868348308]
 script = ExtResource("3_dxnyr")
-spin_speed = 35.0
+spin_speed = 25.0
 enable_x = false
 enable_y = false
 
 [node name="TrailA" type="MeshInstance3D" parent="Spinner" unique_id=1427955597]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.05, 0, 0)
 material_override = SubResource("StandardMaterial3D_rfisq")
 mesh = SubResource("PlaneMesh_8ehmd")
 script = ExtResource("4_q6b3d")
-_lifeSpan = 0.2
-_fromWidth = 0.1
+_startColor = Color(18.892157, 18.892157, 18.892157, 1)
+
+[node name="TrailA2" type="MeshInstance3D" parent="Spinner" unique_id=740367949]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.05, 0, 0)
+material_override = SubResource("StandardMaterial3D_rfisq")
+mesh = SubResource("PlaneMesh_8ehmd")
+script = ExtResource("4_q6b3d")
+_startColor = Color(18.892157, 18.892157, 18.892157, 1)

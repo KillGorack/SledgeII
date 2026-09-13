@@ -7,8 +7,9 @@
 
 [resource]
 script = ExtResource("1_l7uby")
-weapon_name = "MKIV Coherant Energy"
+weapon_name = "MK IV"
 hit_points = 25.0
+power_consumption = 5.0
 projectile_prefab = ExtResource("2_fltvq")
 projectile_color = Color(1, 0, 0, 1)
 explosion_prefab = ExtResource("1_dseh2")

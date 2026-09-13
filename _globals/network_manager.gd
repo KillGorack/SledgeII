@@ -7,14 +7,35 @@ signal host_failed(reason: String)
 signal join_failed(reason: String)
 signal games_listed(games: Array)
 signal api_error(message: String)
+# Sent back to just the peer whose request_team() got turned down (e.g. team
+# already at MAX_PLAYERS_PER_TEAM) - player_registered never fires for them,
+# so the UI needs its own signal to know to let the player pick again instead
+# of just silently not proceeding.
+signal team_request_rejected(reason: String)
+# "Universe juice" - a team-wide resource (not per-player) that gates how
+# fast a team can churn through recon captures. Generated/spent server-side
+# in match.gd (the actual mechanic), broadcast here purely so any HUD element
+# can read "my team's current juice" the same way it already reads
+# peer_teams - this isn't tied to any one craft, so it doesn't belong on a
+# per-craft MultiplayerSynchronizer the way power/health are.
+signal team_juice_changed(team: String, amount: float)
 
 const API_URL := "https://www.killgorack.com/PX4/api.php"
 const DEFAULT_PORT := 7777
 const HEARTBEAT_INTERVAL := 15.0
 
+# The 4 real team identities, matching ReconStation.StationColor's vocabulary
+# (see recon_station.gd::color_for_team) - a future 2-team variant would just
+# restrict a match to two of these four rather than needing separate names.
+const TEAM_NAMES: Array[String] = ["team_red", "team_green", "team_blue", "team_gray"]
+# Base pads are ~7x7 - capped low for now purely so there's room to spawn
+# without stacking players on top of each other, not a balance number.
+const MAX_PLAYERS_PER_TEAM := 5
+
 var peer: ENetMultiplayerPeer
 var is_host: bool = false
 var peer_teams: Dictionary = {}
+var team_juice: Dictionary = {}
 var current_map_file_id: int = -1
 # Every map .pck exports under the same virtual path (res://secret_level.tscn),
 # so "does that path already resolve" can't tell two different maps apart -
@@ -45,7 +66,7 @@ func _ready() -> void:
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 
 
-func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] = [], day_night: bool = true, host_address_override: String = "", port: int = DEFAULT_PORT, max_players: int = 20) -> Error:
+func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] = [], day_night: bool = true, host_address_override: String = "", host_team: String = "team_red", port: int = DEFAULT_PORT, max_players: int = 20) -> Error:
 	_debug_join_start_ms = Time.get_ticks_msec()
 	peer = ENetMultiplayerPeer.new()
 	var err = peer.create_server(port, max_players)
@@ -55,7 +76,7 @@ func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] 
 	multiplayer.multiplayer_peer = peer
 	is_host = true
 	current_map_file_id = map_file_id
-	peer_teams = {1: "team_a"}
+	peer_teams = {1: host_team}
 	allowed_weapon_paths = weapon_paths
 	day_night_enabled = day_night
 	# _get_local_ip() just takes whatever address the OS happens to list
@@ -71,7 +92,7 @@ func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] 
 	_register_host(game_name, map_file_id, port, max_players, host_address)
 	_start_heartbeat()
 	host_started.emit(host_address)
-	player_registered.emit(1, "team_a")
+	player_registered.emit(1, host_team)
 	return OK
 
 
@@ -129,12 +150,44 @@ func _on_peer_connected(peer_id: int) -> void:
 	# rather than the backfill loop below - there's nothing to backfill, the
 	# host is the only one who ever sets it.
 	_assign_ruleset.rpc_id(peer_id, allowed_weapon_paths, day_night_enabled)
-	# Backfill the roster so the newly joined peer learns everyone already assigned.
+	# Backfill the roster so the newly joined peer sees everyone already
+	# assigned before picking their own - no auto-assignment anymore, the new
+	# peer isn't in peer_teams at all until request_team() below succeeds, so
+	# match.gd never spawns a craft for them until they've actually chosen.
 	for existing_id in peer_teams.keys():
 		_assign_team.rpc_id(peer_id, existing_id, peer_teams[existing_id])
-	var team = _pick_balanced_team()
-	peer_teams[peer_id] = team
-	_assign_team.rpc(peer_id, team)
+
+
+# Called by a client's own UI once they've picked a color. Not authoritative
+# by itself - just forwards the request to the host, which is the only one
+# allowed to actually decide (see _request_team below).
+func request_team(team: String) -> void:
+	_request_team.rpc_id(1, team)
+
+
+@rpc("any_peer", "call_local", "reliable")
+func _request_team(team: String) -> void:
+	if not multiplayer.is_server():
+		return
+	var requester_id := multiplayer.get_remote_sender_id()
+	if requester_id == 0:
+		return
+	if not TEAM_NAMES.has(team):
+		_reject_team_request.rpc_id(requester_id, "Not a real team.")
+		return
+	if _team_count(team) >= MAX_PLAYERS_PER_TEAM:
+		_reject_team_request.rpc_id(requester_id, "%s is full." % team.trim_prefix("team_").capitalize())
+		return
+	peer_teams[requester_id] = team
+	_assign_team.rpc(requester_id, team)
+
+
+# player_registered never fires for a rejected request (peer_teams never
+# gets touched), so the UI needs its own signal to know to let the player
+# pick again instead of just silently doing nothing.
+@rpc("authority", "reliable")
+func _reject_team_request(reason: String) -> void:
+	team_request_rejected.emit(reason)
 
 
 @rpc("authority", "call_local", "reliable")
@@ -143,23 +196,26 @@ func _assign_ruleset(weapon_paths: Array, day_night: bool) -> void:
 	day_night_enabled = day_night
 
 
-# Teams come from who is actually on the roster right now, not from a running
-# alternating flag. The flag drifted permanently the moment anybody left: it
-# kept alternating regardless of which team the leaver had been on, so after a
-# single leave/rejoin cycle the returning player was handed the HOST'S OWN
-# team. Same-team players cannot shoot each other at all here - a team_a
-# projectile masks only world and team_b (see Utilities.GROUP_LAYER_SCOPE) -
-# while craft-vs-craft masks still overlap, which is exactly the "my shots
-# pass straight through him but I can still bump into him" symptom.
-func _pick_balanced_team() -> String:
-	var count_a := 0
-	var count_b := 0
+func _team_count(team: String) -> int:
+	var count := 0
 	for assigned_team in peer_teams.values():
-		if assigned_team == "team_a":
-			count_a += 1
-		else:
-			count_b += 1
-	return "team_a" if count_a <= count_b else "team_b"
+		if assigned_team == team:
+			count += 1
+	return count
+
+
+# A sensible default for the UI to preselect, nothing more - actual
+# assignment always goes through request_team()/_request_team(), the only
+# thing that ever writes a non-host entry into peer_teams.
+func suggest_team() -> String:
+	var best_team := TEAM_NAMES[0]
+	var best_count := _team_count(best_team)
+	for team in TEAM_NAMES:
+		var count := _team_count(team)
+		if count < best_count:
+			best_team = team
+			best_count = count
+	return best_team
 
 
 func _on_peer_disconnected(peer_id: int) -> void:
@@ -171,6 +227,12 @@ func _on_peer_disconnected(peer_id: int) -> void:
 func _assign_team(peer_id: int, team: String) -> void:
 	peer_teams[peer_id] = team
 	player_registered.emit(peer_id, team)
+
+
+@rpc("authority", "call_local", "reliable")
+func _update_team_juice(team: String, amount: float) -> void:
+	team_juice[team] = amount
+	team_juice_changed.emit(team, amount)
 
 
 func _start_heartbeat() -> void:

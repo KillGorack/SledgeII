@@ -7,7 +7,7 @@
 
 [resource]
 script = ExtResource("1_lj0dn")
-weapon_name = "Detno Missile"
+weapon_name = "Detno"
 hit_points = 150.0
 crit_chance = 0.125
 crit_multiplier = 7.0
@@ -16,6 +16,8 @@ projectile_prefab = ExtResource("2_qca65")
 projectile_color = Color(1, 0, 0, 1)
 explosion_prefab = ExtResource("1_qca65")
 bullet_hole_prefab = ExtResource("1_7qxki")
+projectile_count_capacity = 4
+projectile_count_actual = 4
 explosive_force = 125.0
 explosive_force_distance = 5.0
 body_collection_max = 25

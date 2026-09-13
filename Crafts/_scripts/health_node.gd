@@ -57,6 +57,18 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if not multiplayer.is_server():
 		return
+	# apply_damage()/respawn_at() below broadcast shields/armor/life correctly
+	# on their own (RPCs, so every peer computes the same result whenever a
+	# discrete event happens) - but this passive regen is a continuous
+	# per-frame increment with no RPC of its own. That's fine for the
+	# server's own craft (is_server() is true there, so its own shields
+	# visibly climb) but for every other craft, this was silently updating
+	# only the server's internal copy - the owning client (and everyone
+	# else) never found out, so shields just sat wherever they were after
+	# the last hit, everywhere except the host's own screen. The fix is the
+	# health_node/MultiplayerSynchronizer node in lightning.tscn, replicating
+	# just .:shields continuously - the one value here that changes on its
+	# own instead of only in response to a discrete, already-broadcast event.
 	if _is_regenerating and shields < _shields_max:
 		shields = min(_shields_max, shields + stats.regeneration_rate * delta)
 	# _is_destroyed guard matters here specifically: destroy_self() itself is

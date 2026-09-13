@@ -134,11 +134,13 @@ duration = 0.75
 
 [node name="Flash" type="OmniLight3D" parent="." unique_id=2050309136]
 light_color = Color(18.892157, 18.892157, 18.892157, 1)
-light_energy = 5.0
-omni_range = 10.0
+light_energy = 3.0
+omni_range = 6.0
 script = ExtResource("5_10rek")
 
 [node name="Sparks" type="Node3D" parent="." unique_id=714307792]
+script = ExtResource("4_4h2r5")
+duration = 0.5
 
 [node name="Clash" type="GPUParticles3D" parent="Sparks" unique_id=705088478]
 material_override = SubResource("ShaderMaterial_wjwvo")
@@ -153,7 +155,7 @@ draw_pass_1 = SubResource("QuadMesh_cwf0f")
 [node name="Spark" type="GPUParticles3D" parent="Sparks" unique_id=1770038442]
 material_override = SubResource("ShaderMaterial_cjbug")
 amount = 50
-lifetime = 0.75
+lifetime = 0.5
 explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_ombod")
 draw_pass_1 = SubResource("QuadMesh_28if2")

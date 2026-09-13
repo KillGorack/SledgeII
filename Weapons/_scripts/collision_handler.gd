@@ -11,8 +11,8 @@ extends RigidBody3D
 # gates craft input. Every other peer just sees the replicated transform.
 
 var weapon_settings: WeaponSettings
-var team: String = "" # shooter's team, e.g. "team_a" - kept for reference
-var allegiance_group: String = "" # projectile's own group, e.g. "projectile_team_a"
+var team: String = "" # shooter's team, e.g. "team_red" - kept for reference
+var allegiance_group: String = "" # projectile's own group, e.g. "projectile_team_red"
 
 var collided_object: Object
 var collision_point: Vector3
@@ -30,6 +30,10 @@ var targeted_group: bool = false
 var result = []
 var distance_traveled: float = 0.0
 var max_distance: float
+# Only matters for weapon_settings.affected_by_gravity - the launch velocity
+# gets set exactly once, on this projectile's first physics tick, then left
+# alone so gravity_scale can curve it from there. See _physics_process().
+var _ballistic_launched: bool = false
 
 @onready var raycast: RayCast3D = $RayCast3D
 
@@ -69,6 +73,21 @@ func _apply_projectile_color_to(node: Node, color: Color) -> void:
 		_apply_projectile_color_to(child, color)
 
 
+# Same duck-typed walk as color above, for the same reason: rocket/laser/
+# shell each carry a different number of Trail3D children (or none) under
+# their own Spinner, so this doesn't assume any particular one exists.
+# Called from handle_ricochet() - see clear_trail() in Trail3D.gd for why.
+func _clear_trails() -> void:
+	_clear_trails_on(self)
+
+
+func _clear_trails_on(node: Node) -> void:
+	if node is Trail3D:
+		node.clear_trail()
+	for child in node.get_children():
+		_clear_trails_on(child)
+
+
 func _physics_process(delta: float) -> void:
 	if not is_multiplayer_authority():
 		return
@@ -76,11 +95,26 @@ func _physics_process(delta: float) -> void:
 		return
 
 	max_distance = weapon_settings.projectile_range
-	current_direction = -global_transform.basis.z.normalized()
 
 	var distance_this_frame = linear_velocity.length() * delta
 	distance_traveled += distance_this_frame
-	linear_velocity = current_direction * weapon_settings.projectile_speed
+
+	if weapon_settings.affected_by_gravity:
+		# Set the launch velocity once, then leave it alone - the physics
+		# engine's own gravity integration (this body's gravity_scale) runs
+		# every tick regardless of whether this script touches linear_velocity,
+		# so from here on it just curves naturally instead of snapping back
+		# to a straight line. current_direction tracks the CURRENT velocity
+		# instead of the original facing, so anything that reads it (ricochet,
+		# guided targeting) still gets something sane once the arc bends.
+		if not _ballistic_launched:
+			linear_velocity = -global_transform.basis.z.normalized() * weapon_settings.projectile_speed
+			_ballistic_launched = true
+		current_direction = linear_velocity.normalized() if not linear_velocity.is_zero_approx() else -global_transform.basis.z.normalized()
+	else:
+		current_direction = -global_transform.basis.z.normalized()
+		linear_velocity = current_direction * weapon_settings.projectile_speed
+
 	if distance_traveled >= max_distance:
 		destroy_self()
 
@@ -318,6 +352,7 @@ func handle_ricochet() -> bool:
 		# subsequent bounce. handle_pierce() below already does this for the
 		# exact same reason.
 		angular_velocity = Vector3.ZERO
+		_clear_trails()
 		_reset_one_offs()
 		return false
 	return true

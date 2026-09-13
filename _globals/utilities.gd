@@ -6,25 +6,54 @@ const GROUP_LAYER_SCOPE = {
 		"layer_mask": [],
 		"target_groups": []
 	},
-	"team_a": {
+	# 4 teams instead of 2 - each craft's layer_mask still includes every
+	# team's craft layer (so crafts always physically collide with each
+	# other, friend or foe, same as the old team_a/team_b setup), but
+	# target_groups (used for weapon-targeting queries, not physics) now
+	# lists the other three instead of just one opponent.
+	"team_red": {
 		"layer": 3,
-		"layer_mask": [2, 3, 4],
-		"target_groups": ["team_b"]
+		"layer_mask": [2, 3, 4, 5, 6],
+		"target_groups": ["team_green", "team_blue", "team_gray"]
 	},
-	"team_b": {
+	"team_green": {
 		"layer": 4,
-		"layer_mask": [2, 3, 4],
-		"target_groups": ["team_a"]
+		"layer_mask": [2, 3, 4, 5, 6],
+		"target_groups": ["team_red", "team_blue", "team_gray"]
 	},
-	"projectile_team_a": {
+	"team_blue": {
 		"layer": 5,
-		"layer_mask": [2, 4],
-		"target_groups": ["team_b"]
+		"layer_mask": [2, 3, 4, 5, 6],
+		"target_groups": ["team_red", "team_green", "team_gray"]
 	},
-	"projectile_team_b": {
+	"team_gray": {
 		"layer": 6,
-		"layer_mask": [2, 3],
-		"target_groups": ["team_a"]
+		"layer_mask": [2, 3, 4, 5, 6],
+		"target_groups": ["team_red", "team_green", "team_blue"]
+	},
+	# Each team's projectile layer masks world + the three ENEMY craft
+	# layers only (never its own team's craft layer, never another team's
+	# projectile layer) - that's the actual friendly-fire-at-the-physics-level
+	# mechanism collision_handler.gd relies on, same as the old 2-team setup.
+	"projectile_team_red": {
+		"layer": 7,
+		"layer_mask": [2, 4, 5, 6],
+		"target_groups": ["team_green", "team_blue", "team_gray"]
+	},
+	"projectile_team_green": {
+		"layer": 8,
+		"layer_mask": [2, 3, 5, 6],
+		"target_groups": ["team_red", "team_blue", "team_gray"]
+	},
+	"projectile_team_blue": {
+		"layer": 9,
+		"layer_mask": [2, 3, 4, 6],
+		"target_groups": ["team_red", "team_green", "team_gray"]
+	},
+	"projectile_team_gray": {
+		"layer": 10,
+		"layer_mask": [2, 3, 4, 5],
+		"target_groups": ["team_red", "team_green", "team_blue"]
 	}
 }
 
