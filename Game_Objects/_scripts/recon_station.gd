@@ -38,6 +38,13 @@ static func color_for_team(team: String) -> StationColor:
 		"team_gray": return StationColor.GRAY
 		_: return StationColor.NONE
 
+# Public wrapper around color_for_team + _RENDER_COLORS for anything outside
+# this script that just wants "what color paint goes on this team's stuff"
+# (base_gun.gd's team tint, say) without needing its own copy of the
+# team<->color table or reaching into the underscore-prefixed const directly.
+static func render_color_for_team(team: String) -> Color:
+	return _RENDER_COLORS.get(color_for_team(team), Color.WHITE)
+
 # Once false, captured_color is permanent - set only from a map-authored
 # fixed-color marker (see _apply_fixed_color_from_marker), never by whatever
 # capture mechanic reads/writes this later. That mechanic should check this

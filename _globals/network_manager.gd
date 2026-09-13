@@ -53,13 +53,6 @@ var day_night_enabled: bool = true
 
 var _heartbeat_timer: Timer
 
-# Temporary instrumentation for the "connecting/loading takes forever, no
-# errors" investigation - gives every later [JOIN] print a shared t=0 so the
-# console output shows one clean timeline (connect -> scene ready -> map
-# mount -> parse -> instantiate -> own craft spawned) instead of guessing
-# again which stage is actually slow. Remove once this is root-caused.
-var _debug_join_start_ms: int = 0
-
 
 func _ready() -> void:
 	multiplayer.peer_connected.connect(_on_peer_connected)
@@ -67,7 +60,6 @@ func _ready() -> void:
 
 
 func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] = [], day_night: bool = true, host_address_override: String = "", host_team: String = "team_red", port: int = DEFAULT_PORT, max_players: int = 20) -> Error:
-	_debug_join_start_ms = Time.get_ticks_msec()
 	peer = ENetMultiplayerPeer.new()
 	var err = peer.create_server(port, max_players)
 	if err != OK:
@@ -97,8 +89,6 @@ func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] 
 
 
 func join_game(address: String, port: int, map_file_id: int) -> Error:
-	_debug_join_start_ms = Time.get_ticks_msec()
-	print("[JOIN] t=0ms connecting to %s:%d" % [address, port])
 	peer = ENetMultiplayerPeer.new()
 	var err = peer.create_client(address, port)
 	if err != OK:
@@ -108,10 +98,6 @@ func join_game(address: String, port: int, map_file_id: int) -> Error:
 	is_host = false
 	current_map_file_id = map_file_id
 	return OK
-
-
-func _debug_join_elapsed_ms() -> int:
-	return Time.get_ticks_msec() - _debug_join_start_ms
 
 
 func stop_hosting() -> void:

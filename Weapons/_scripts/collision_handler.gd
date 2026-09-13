@@ -465,6 +465,11 @@ func _play_hit_effect() -> void:
 		var explosion_instance = weapon_settings.explosion_prefab.instantiate()
 		get_parent().add_child(explosion_instance)
 		explosion_instance.transform = global_transform
+		# Same duck-typed walk _apply_projectile_color uses on this projectile
+		# itself - sparks.tscn's Clash/Spark answer to apply_projectile_color
+		# too, so the explosion picks up the weapon's color with no extra
+		# wiring here.
+		_apply_projectile_color_to(explosion_instance, weapon_settings.projectile_color)
 
 
 func destroy_self() -> void:

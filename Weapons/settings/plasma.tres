@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="WeaponSettings" format=3 uid="uid://bryidariyxws7"]
+
+[ext_resource type="Script" uid="uid://defwrtblkx02f" path="res://Weapons/_scripts/weapon_settings.gd" id="1_hmjdw"]
+[ext_resource type="PackedScene" uid="uid://dqu4r8p4yt5jp" path="res://Weapons/Scenes/explosions/sparks.tscn" id="1_ynubh"]
+[ext_resource type="PackedScene" uid="uid://vdbvupiqax74" path="res://Weapons/Scenes/projectiles/plasma.tscn" id="2_vb3si"]
+
+[resource]
+script = ExtResource("1_hmjdw")
+weapon_name = "Plasma"
+hit_points = 5.0
+cool_down = 1.0
+projectile_prefab = ExtResource("2_vb3si")
+projectile_color = Color(0, 1, 1, 1)
+explosion_prefab = ExtResource("1_ynubh")
+targeting_system = true
+target_rotation_speed = 12.0
+target_system_scan_radius = 55.0
+projectile_range = 55.0
+projectile_speed = 25.0
+metadata/_custom_type_script = "uid://defwrtblkx02f"

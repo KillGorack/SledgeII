@@ -233,7 +233,6 @@ func _on_join_pressed():
 
 
 func _on_joined_match():
-	print("[JOIN] t=%dms ENet connected_to_server fired" % NetworkManager._debug_join_elapsed_ms())
 	set_ui_feedback("Connected! Choose your team.", "OK")
 	# Hold here instead of jumping straight to match.tscn (like this used to)
 	# until the host actually confirms a team - see _on_player_registered,
@@ -417,14 +416,15 @@ func populate_levels_tree(response_data):
 	firstrow.set_selectable(1, false)
 	firstrow.set_selectable(2, false)
 	for map_item in response_data.data:
-		var row = world_list.create_item()
-		row.set_text(0, map_item.tan_title)
-		row.set_text(1, map_item.tan_author)
-		row.set_text(2, map_item.tan_genre)
-		row.set_meta("description", map_item.tan_description)
-		row.set_meta("fil_id", map_item.file_id)
-		row.set_meta("tan_id", map_item.tan_id)
-		row.set_meta("thm_id", map_item.thm_id)
+		if map_item.tan_prepared == 1:
+			var row = world_list.create_item()
+			row.set_text(0, map_item.tan_title)
+			row.set_text(1, map_item.tan_author)
+			row.set_text(2, map_item.tan_genre)
+			row.set_meta("description", map_item.tan_description)
+			row.set_meta("fil_id", map_item.file_id)
+			row.set_meta("tan_id", map_item.tan_id)
+			row.set_meta("thm_id", map_item.thm_id)
 
 
 

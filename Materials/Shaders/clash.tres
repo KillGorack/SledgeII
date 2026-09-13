@@ -16,7 +16,6 @@ expanded_output_ports = [0]
 source = 5
 
 [sub_resource type="VisualShaderNodeBillboard" id="VisualShaderNodeBillboard_k00hi"]
-billboard_type = 3
 keep_scale = true
 
 [resource]
