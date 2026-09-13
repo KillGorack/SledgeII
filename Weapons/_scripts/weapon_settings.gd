@@ -11,6 +11,10 @@ class_name WeaponSettings
 @export var crit_chance: float = 0.0
 @export var crit_multiplier: float = 1.0
 @export var cool_down: float = 0.5
+# Deducted from the firing craft's power_node on each shot - see
+# weapon_node.gd::request_fire(). 0 means free to fire, same convention as
+# projectile_count_capacity's "0 is infinite".
+@export var power_consumption: float = 0.0
 
 @export var projectile_prefab: PackedScene
 # Tint for this weapon's projectile - see collision_handler.gd::_apply_projectile_color.
@@ -51,6 +55,12 @@ class_name WeaponSettings
 
 @export var projectile_range: float = 100.0
 @export var projectile_speed: float = 45.0
+# When true, collision_handler.gd only sets the launch velocity once instead
+# of resetting it to a constant straight line every physics tick - the
+# projectile's own gravity_scale then curves the trajectory naturally, same
+# as any other RigidBody3D. False (the default) keeps lasers/missiles exactly
+# as they are, dead straight regardless of gravity.
+@export var affected_by_gravity: bool = false
 
 @export var launch_offset: float = -0.5
 @export var projectile_destruction_delay: float = 0.0

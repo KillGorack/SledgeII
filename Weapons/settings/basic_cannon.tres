@@ -1,7 +1,7 @@
 [gd_resource type="Resource" script_class="WeaponSettings" format=3 uid="uid://cra5ynqajpxse"]
 
-[ext_resource type="PackedScene" uid="uid://dqu4r8p4yt5jp" path="res://Weapons/Scenes/explosions/sparks.tscn" id="1_3f7l5"]
 [ext_resource type="PackedScene" uid="uid://b3f44mlsxoif8" path="res://Weapons/Scenes/hitmarks/crater.tscn" id="1_y8gcj"]
+[ext_resource type="PackedScene" uid="uid://c5y6qmv3cggb6" path="res://Weapons/Scenes/explosions/shockwave.tscn" id="2_i4pwi"]
 [ext_resource type="PackedScene" uid="uid://b4qwbkxy8u1u6" path="res://Weapons/Scenes/projectiles/shell.tscn" id="2_y8gcj"]
 [ext_resource type="Script" uid="uid://defwrtblkx02f" path="res://Weapons/_scripts/weapon_settings.gd" id="3_y8gcj"]
 
@@ -13,9 +13,12 @@ crit_chance = 0.05
 crit_multiplier = 2.0
 cool_down = 2.0
 projectile_prefab = ExtResource("2_y8gcj")
-explosion_prefab = ExtResource("1_3f7l5")
+explosion_prefab = ExtResource("2_i4pwi")
 bullet_hole_prefab = ExtResource("1_y8gcj")
+projectile_count_capacity = 15
+projectile_count_actual = 15
 projectile_recoil = 2.0
-projectile_range = 150.0
-projectile_speed = 60.0
+projectile_range = 300.0
+projectile_speed = 25.0
+affected_by_gravity = true
 launch_offset = 0.0

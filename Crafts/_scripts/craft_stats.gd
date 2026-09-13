@@ -23,3 +23,8 @@ class_name CraftStats
 @export var life: float = 100.0
 @export var regeneration_delay: float = 5.0
 @export var regeneration_rate: float = 10.0
+
+# Power (per-instance mutable state duplicates this - see power_node.gd)
+@export var power_capacity: float = 100.0
+@export var power_gain_rate: float = 10.0
+@export var max_effect_distance: float = 25.0

@@ -14,8 +14,20 @@ const GROUND_SUNSET := Color(0.25, 0.12, 0.10)
 
 const floor_dim_min: float = 0.5
 const HUE_TRANSITION_WIDTH: float = 0.25
+# How often the server re-broadcasts its own time_of_day to every already-
+# connected peer (see _process/sync_time_to). Every peer was independently
+# integrating delta/day_length_seconds on their own before this - no cross-
+# peer correction at all, so any per-frame timing difference (which peer's
+# frame landed exactly when, physics catching up after a hitch, etc.)
+# compounded for the rest of the match into a visibly different sun position
+# on different screens. Clients still integrate locally between syncs too
+# (see _process) so the sun keeps moving smoothly rather than visibly
+# stepping every SYNC_INTERVAL - this periodic broadcast is just the
+# correction that keeps that local guess from ever drifting far.
+const SYNC_INTERVAL := 5.0
 
 var time_of_day: float
+var _sync_elapsed := 0.0
 
 @onready var world_environment: WorldEnvironment = $WorldEnvironment
 @onready var sun: DirectionalLight3D = $Sun
@@ -39,10 +51,30 @@ func _process(delta: float) -> void:
 	# When the host disabled the cycle, time_of_day just stays pinned at
 	# start_time_of_day forever - _update_sun() still runs every frame so the
 	# lighting stays consistent, it just keeps recomputing the same fixed
-	# position instead of a moving one.
+	# position instead of a moving one. Every peer (server included) keeps
+	# integrating this locally, purely so the sun visibly keeps moving
+	# smoothly between syncs instead of stepping once every SYNC_INTERVAL -
+	# the server's version of this local guess IS the authoritative one, and
+	# clients' guesses get corrected back onto it below.
 	if NetworkManager.day_night_enabled:
 		time_of_day = fmod(time_of_day + delta / day_length_seconds, 1.0)
 	_update_sun()
+	if multiplayer.is_server():
+		_sync_elapsed += delta
+		if _sync_elapsed >= SYNC_INTERVAL:
+			_sync_elapsed = 0.0
+			sync_time_to.rpc(time_of_day)
+
+
+# Broadcast (server) or targeted at one newly-ready peer (see
+# match.gd::_notify_ready) - either way, this is the one thing that actually
+# keeps every peer's own independently-integrated time_of_day (see _process)
+# from drifting apart over the course of a match: each peer's local guess is
+# just smoothing between these authoritative corrections, never the source
+# of truth itself.
+@rpc("authority", "reliable")
+func sync_time_to(server_time_of_day: float) -> void:
+	time_of_day = server_time_of_day
 
 
 func _update_sun() -> void:

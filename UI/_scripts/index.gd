@@ -29,6 +29,10 @@ var feedback_base_x: float
 @onready var day_night_check: CheckBox = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn/DayNightCheck"
 @onready var host_address_override: LineEdit = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn/HostAddressOverride"
 @onready var weapon_checklist: VBoxContainer = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn/WeaponChecklistScroll/WeaponChecklist"
+@onready var host_team_picker: OptionButton = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn/HostTeamPicker"
+@onready var team_select_group: Control = $"Screen_layout/VBoxContainer/MarginContainer/Team Select"
+@onready var team_roster: VBoxContainer = $"Screen_layout/VBoxContainer/MarginContainer/Team Select/MarginContainer/VBoxContainer/TeamRoster"
+@onready var team_select_feedback: Label = $"Screen_layout/VBoxContainer/MarginContainer/Team Select/MarginContainer/VBoxContainer/TeamSelectFeedback"
 
 # "Create Game" is tab 0, "Join Game" is tab 1 (see index.tscn) - only poll
 # the lobby API while the player is actually looking at the Join Game list,
@@ -71,6 +75,8 @@ func _ready() -> void:
 	game_list_poll_timer.timeout.connect(func(): NetworkManager.list_open_games())
 	load_game_tabs.tab_changed.connect(_on_load_game_tab_changed)
 	_build_weapon_checklist()
+	for team in NetworkManager.TEAM_NAMES:
+		host_team_picker.add_item(team.trim_prefix("team_").capitalize())
 	feedback_base_x = ui_feedback.position.x + 25
 	login_timer.connect("timeout", Callable(self, "_on_cooldown_finished"))
 	http_request.connect("request_completed", Callable(self, "_on_request_completed"))
@@ -88,6 +94,9 @@ func _ready() -> void:
 	NetworkManager.host_failed.connect(func(reason): set_ui_feedback(reason, "NOK"))
 	NetworkManager.join_failed.connect(func(reason): set_ui_feedback(reason, "NOK"))
 	NetworkManager.api_error.connect(func(reason): set_ui_feedback(reason, "NOK"))
+	NetworkManager.player_registered.connect(_on_player_registered)
+	NetworkManager.player_unregistered.connect(func(_peer_id): _build_team_roster())
+	NetworkManager.team_request_rejected.connect(_on_team_request_rejected)
 	multiplayer.connected_to_server.connect(_on_joined_match)
 	multiplayer.connection_failed.connect(func(): set_ui_feedback("Could not reach host - connection failed.", "NOK"))
 	api_params = {
@@ -197,7 +206,8 @@ func _on_host_pressed():
 		selected_map_file_id,
 		_get_checked_weapon_paths(),
 		day_night_check.button_pressed,
-		host_address_override.text
+		host_address_override.text,
+		NetworkManager.TEAM_NAMES[host_team_picker.selected]
 	)
 	set_ui_feedback("Hosting \"%s\"..." % selected_map_title, "INFO")
 
@@ -224,8 +234,67 @@ func _on_join_pressed():
 
 func _on_joined_match():
 	print("[JOIN] t=%dms ENet connected_to_server fired" % NetworkManager._debug_join_elapsed_ms())
-	set_ui_feedback("Connected!", "OK")
-	get_tree().change_scene_to_file("res://Networking/match.tscn")
+	set_ui_feedback("Connected! Choose your team.", "OK")
+	# Hold here instead of jumping straight to match.tscn (like this used to)
+	# until the host actually confirms a team - see _on_player_registered,
+	# which is what does the real transition once that happens.
+	login_group.visible = false
+	load_group.visible = false
+	team_select_group.visible = true
+	_build_team_roster()
+
+
+# Fires for EVERY peer's assignment, not just ours (match.gd listens too, for
+# spawning) - that's what keeps the roster live while this screen is up.
+# Only actually transitions the scene when the confirmed assignment is our
+# own AND we're still sitting on the team-select screen waiting for it (the
+# host never sees this screen at all - see _on_host_started for that path).
+func _on_player_registered(peer_id: int, _team: String) -> void:
+	_build_team_roster()
+	if team_select_group.visible and peer_id == NetworkManager.multiplayer.get_unique_id():
+		get_tree().change_scene_to_file("res://Networking/match.tscn")
+
+
+func _on_team_request_rejected(reason: String) -> void:
+	set_ui_feedback(reason, "NOK")
+	team_select_feedback.text = reason
+
+
+# Rebuilt from scratch on every roster change rather than patched in place -
+# same reasoning as _build_weapon_checklist: the whole list is cheap to
+# regenerate and this is only ever a handful of rows (4 teams), so there's no
+# real cost to not tracking a diff.
+func _build_team_roster() -> void:
+	for child in team_roster.get_children():
+		child.queue_free()
+	var my_id := NetworkManager.multiplayer.get_unique_id()
+	for team in NetworkManager.TEAM_NAMES:
+		var members: Array[String] = []
+		for peer_id in NetworkManager.peer_teams.keys():
+			if NetworkManager.peer_teams[peer_id] == team:
+				members.append("You" if peer_id == my_id else "Peer %d" % peer_id)
+		var row := HBoxContainer.new()
+		var label := Label.new()
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		label.text = "%s (%d/%d): %s" % [
+			team.trim_prefix("team_").capitalize(),
+			members.size(),
+			NetworkManager.MAX_PLAYERS_PER_TEAM,
+			", ".join(members) if not members.is_empty() else "empty"
+		]
+		row.add_child(label)
+		var join_button := Button.new()
+		join_button.text = "Join"
+		join_button.disabled = members.size() >= NetworkManager.MAX_PLAYERS_PER_TEAM
+		join_button.pressed.connect(_on_team_join_pressed.bind(team))
+		row.add_child(join_button)
+		team_roster.add_child(row)
+
+
+func _on_team_join_pressed(team: String) -> void:
+	team_select_feedback.text = ""
+	set_ui_feedback("Requesting %s..." % team.trim_prefix("team_").capitalize(), "INFO")
+	NetworkManager.request_team(team)
 
 
 func _on_games_listed(games: Array):

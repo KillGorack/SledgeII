@@ -7,11 +7,13 @@
 
 [resource]
 script = ExtResource("1_k3735")
-weapon_name = "Repulsor Missile"
+weapon_name = "Repulsor"
 projectile_prefab = ExtResource("2_icuoo")
 projectile_color = Color(0, 1, 0, 1)
 explosion_prefab = ExtResource("1_icuoo")
 bullet_hole_prefab = ExtResource("1_egv2f")
+projectile_count_capacity = 4
+projectile_count_actual = 4
 projectile_ricochet_count = 3
 projectile_force = 225.0
 launch_offset = 0.0

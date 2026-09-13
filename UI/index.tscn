@@ -326,6 +326,38 @@ grow_vertical = 2
 text = "Submit"
 horizontal_alignment = 1
 
+[node name="Team Select" type="Control" parent="Screen_layout/VBoxContainer/MarginContainer" unique_id=708923305]
+visible = false
+layout_mode = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Team Select" unique_id=708923306]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 15
+theme_override_constants/margin_top = 15
+theme_override_constants/margin_right = 15
+theme_override_constants/margin_bottom = 15
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Team Select/MarginContainer" unique_id=708923307]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="TeamSelectTitle" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Team Select/MarginContainer/VBoxContainer" unique_id=708923308]
+layout_mode = 2
+text = "Choose Your Team"
+
+[node name="TeamRoster" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Team Select/MarginContainer/VBoxContainer" unique_id=708923309]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 6
+
+[node name="TeamSelectFeedback" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Team Select/MarginContainer/VBoxContainer" unique_id=708923310]
+layout_mode = 2
+
 [node name="Load Game" type="Control" parent="Screen_layout/VBoxContainer/MarginContainer" unique_id=708923304]
 layout_mode = 2
 
@@ -358,12 +390,12 @@ theme_override_constants/margin_bottom = 15
 [node name="VBoxContainer" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer" unique_id=449342672]
 layout_mode = 2
 
-[node name="HBoxContainer" type="HBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer"]
+[node name="HBoxContainer" type="HBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer" unique_id=1257192962]
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/separation = 20
 
-[node name="LeftColumn" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer"]
+[node name="LeftColumn" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer" unique_id=1137782532]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
@@ -379,38 +411,45 @@ enable_drag_unfolding = false
 hide_root = true
 select_mode = 1
 
-[node name="RightColumn" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer"]
+[node name="RightColumn" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer" unique_id=1091158251]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="HostAddressLabel" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn"]
+[node name="TeamLabel" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn" unique_id=1031031522]
+layout_mode = 2
+text = "Your Team"
+
+[node name="HostTeamPicker" type="OptionButton" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn" unique_id=1031031523]
+layout_mode = 2
+
+[node name="HostAddressLabel" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn" unique_id=1031031521]
 layout_mode = 2
 text = "Host Address (optional)"
 
-[node name="HostAddressOverride" type="LineEdit" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn"]
+[node name="HostAddressOverride" type="LineEdit" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn" unique_id=1662140324]
 layout_mode = 2
-placeholder_text = "auto-detect"
 tooltip_text = "Leave blank to auto-detect. Set this if joins are ever slow to connect - auto-detection can pick the wrong network adapter when more than one is active."
+placeholder_text = "auto-detect"
 
-[node name="RulesLabel" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn"]
+[node name="RulesLabel" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn" unique_id=1991429278]
 layout_mode = 2
 text = "Match Rules"
 
-[node name="DayNightCheck" type="CheckBox" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn"]
+[node name="DayNightCheck" type="CheckBox" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn" unique_id=1588332884]
 layout_mode = 2
 button_pressed = true
 text = "Day/Night Cycle"
 
-[node name="WeaponsLabel" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn"]
+[node name="WeaponsLabel" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn" unique_id=979455328]
 layout_mode = 2
 text = "Available Weapons"
 
-[node name="WeaponChecklistScroll" type="ScrollContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn"]
+[node name="WeaponChecklistScroll" type="ScrollContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn" unique_id=1458581358]
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="WeaponChecklist" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn/WeaponChecklistScroll"]
+[node name="WeaponChecklist" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn/WeaponChecklistScroll" unique_id=950287975]
 layout_mode = 2
 size_flags_horizontal = 3
 

@@ -2,7 +2,7 @@ extends Node3D
 
 
 @export var stats: CraftStats
-@export var team: String = "team_a"
+@export var team: String = "team_red"
 
 const SELF_RENDER_LAYER := 20
 
@@ -48,6 +48,14 @@ func _ready() -> void:
 
 func setFreezeState(frozen: bool) -> void:
 	stop_forces = frozen
+
+
+# Public so hud_controller.gd can drive the speedometer without reaching
+# into body/stats directly - same reasoning as weapon_node's is_on_cooldown().
+func get_speed_ratio() -> float:
+	if body == null or stats == null or stats.max_speed <= 0.0:
+		return 0.0
+	return clamp(body.linear_velocity.length() / stats.max_speed, 0.0, 1.0)
 
 
 # Called from health_node when an external hit lands (repulsor and friends).
