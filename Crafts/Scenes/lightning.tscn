@@ -371,6 +371,12 @@ shadow_mesh = SubResource("ArrayMesh_lvbs3")
 properties/0/path = NodePath(".:shields")
 properties/0/spawn = true
 properties/0/replication_mode = 1
+properties/1/path = NodePath(".:armor")
+properties/1/spawn = true
+properties/1/replication_mode = 1
+properties/2/path = NodePath(".:life")
+properties/2/spawn = true
+properties/2/replication_mode = 1
 
 [sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_power"]
 properties/0/path = NodePath(".:current_power")

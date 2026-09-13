@@ -23,6 +23,11 @@ class_name CraftStats
 @export var life: float = 100.0
 @export var regeneration_delay: float = 5.0
 @export var regeneration_rate: float = 10.0
+# Armor-then-life heal rate while parked inside a recon station captured by
+# this craft's own team (see health_node.gd::_process_station_healing) -
+# shields already regen on their own via regeneration_rate above, so this
+# never touches shields.
+@export var station_heal_rate: float = 10.0
 
 # Power (per-instance mutable state duplicates this - see power_node.gd)
 @export var power_capacity: float = 100.0

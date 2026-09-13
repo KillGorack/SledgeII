@@ -71,6 +71,7 @@ func _process(delta: float) -> void:
 	# own instead of only in response to a discrete, already-broadcast event.
 	if _is_regenerating and shields < _shields_max:
 		shields = min(_shields_max, shields + stats.regeneration_rate * delta)
+	_process_station_healing(delta)
 	# _is_destroyed guard matters here specifically: destroy_self() itself is
 	# already safe to call more than once (see its own guard), but without
 	# this the craft sits below FALL_DEATH_Y for the entire respawn delay -
@@ -107,6 +108,42 @@ func apply_damage(damage: float) -> void:
 		life -= damage
 	if life <= 0:
 		destroy_self()
+
+
+# Armor-then-life heal while parked inside a recon station captured by this
+# craft's own team - shields already regen on their own via
+# _regeneration_timer above, so this never touches shields. Same fall-through
+# shape as apply_damage() above, just reversed: fill armor first, then
+# whatever's left over this frame spills into life.
+func _process_station_healing(delta: float) -> void:
+	if _is_destroyed or (armor >= _armor_max and life >= _life_max):
+		return
+	if not _at_own_captured_station():
+		return
+	var heal := stats.station_heal_rate * delta
+	if armor < _armor_max:
+		var to_armor = min(heal, _armor_max - armor)
+		armor += to_armor
+		heal -= to_armor
+	if heal > 0.0 and life < _life_max:
+		life = min(_life_max, life + heal)
+
+
+# team lives on weapon_node (see recon_station.gd::color_for_team for the
+# string<->enum translation, and power_node.gd for the same lookup pattern) -
+# is_body_inside is the same boolean containment check match.gd's capture
+# input already relies on, so "healing" and "capturable" always agree.
+func _at_own_captured_station() -> bool:
+	var weapon_node = body.get_node_or_null("weapon_node")
+	if weapon_node == null:
+		return false
+	var my_color = ReconStation.color_for_team(weapon_node.team)
+	if my_color == ReconStation.StationColor.NONE:
+		return false
+	for recon in get_tree().get_nodes_in_group("Recon"):
+		if recon.captured_color == my_color and recon.is_body_inside(body):
+			return true
+	return false
 
 
 # apply_damage() above is already broadcast to every peer (rpc + call_local),

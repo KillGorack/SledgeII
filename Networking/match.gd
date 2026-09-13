@@ -125,14 +125,12 @@ var _pending_unfreeze: Array = []
 
 
 func _ready() -> void:
-	print("[JOIN] t=%dms match.tscn _ready() started" % NetworkManager._debug_join_elapsed_ms())
 	add_to_group("match")
 	local_camera.current = true
 	local_camera.cull_mask = ((1 << 20) - 1) & ~(1 << (SELF_RENDER_LAYER - 1))
 	spawner.spawn_function = _spawn_craft
 	projectile_spawner.spawn_function = _spawn_projectile
 	await _load_map()
-	print("[JOIN] t=%dms _load_map() finished" % NetworkManager._debug_join_elapsed_ms())
 	_map_ready = true
 	for craft in _pending_unfreeze:
 		if is_instance_valid(craft):
@@ -240,10 +238,8 @@ func _load_map() -> void:
 			if not FileAccess.file_exists(pck_path):
 				push_warning("Match: map %d unavailable, download failed" % target_file_id)
 				return
-			print("[JOIN] t=%dms map file ready (was_cached=%s)" % [NetworkManager._debug_join_elapsed_ms(), was_cached])
 			ProjectSettings.load_resource_pack(pck_path)
 			NetworkManager.mounted_map_file_id = target_file_id
-			print("[JOIN] t=%dms load_resource_pack() done" % NetworkManager._debug_join_elapsed_ms())
 	elif not ResourceLoader.exists(MAP_SCENE_PATH):
 		# No map selected (e.g. match.tscn opened directly for testing) -
 		# fall back to whatever local test pack is sitting in the project.
@@ -255,18 +251,14 @@ func _load_map() -> void:
 	# map mounted over the same virtual path would still return the first
 	# map's already-cached scene instead of the new one. Note: this forces a
 	# full re-parse from the .pck every time regardless of file-level
-	# caching above - if the [JOIN] prints show this specific step as the
-	# slow one, that's the next thing worth optimizing (skip CACHE_MODE_REPLACE
-	# entirely when mounted_map_file_id didn't actually change).
+	# caching above - worth optimizing (skip CACHE_MODE_REPLACE entirely when
+	# mounted_map_file_id didn't actually change) if this step ever turns out
+	# to be the slow one.
 	var map_scene: PackedScene = ResourceLoader.load(MAP_SCENE_PATH, "", ResourceLoader.CACHE_MODE_REPLACE)
-	print("[JOIN] t=%dms ResourceLoader.load() (parse) done" % NetworkManager._debug_join_elapsed_ms())
 	var map_instance := map_scene.instantiate()
-	print("[JOIN] t=%dms map_scene.instantiate() done" % NetworkManager._debug_join_elapsed_ms())
 	add_child(map_instance)
 	_apply_custom_environment(map_instance)
-	print("[JOIN] t=%dms _apply_custom_environment() done" % NetworkManager._debug_join_elapsed_ms())
 	_spawn_recon_stations(map_instance)
-	print("[JOIN] t=%dms _spawn_recon_stations() done" % NetworkManager._debug_join_elapsed_ms())
 	for team in BASE_PAD_GROUPS:
 		_spawn_points_by_team[team] = get_tree().get_nodes_in_group(BASE_PAD_GROUPS[team])
 		_spawn_base_guns(team, _spawn_points_by_team[team])
@@ -549,6 +541,8 @@ func _spawn_base_guns(team: String, pads: Array) -> void:
 			# (the origin), not its actual grid slot.
 			gun.position = center + offset
 			base_guns_container.add_child(gun)
+			gun.team = team
+			gun.set_team_color(ReconStation.render_color_for_team(team))
 			guns.append(gun)
 	_base_guns_by_team[team] = guns
 
@@ -715,7 +709,6 @@ func _spawn_craft(data: Dictionary) -> Node:
 	# not just "the map finished loading", which for a joining client can
 	# happen well before their own craft has replicated in.
 	if data["peer_id"] == multiplayer.get_unique_id():
-		print("[JOIN] t=%dms own craft spawned, loading screen hidden" % NetworkManager._debug_join_elapsed_ms())
 		loading_screen.hide()
 		_attach_local_camera(craft)
 		_my_craft = craft

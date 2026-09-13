@@ -1,65 +1,25 @@
 [gd_scene format=3 uid="uid://dqu4r8p4yt5jp"]
 
-[ext_resource type="Script" uid="uid://c6e2d0hsfw6gk" path="res://_globals/_gc.gd" id="1_cst8e"]
-[ext_resource type="Shader" uid="uid://n1kaoh7j33ja" path="res://Materials/Shaders/clash.tres" id="2_m68om"]
-[ext_resource type="Texture2D" uid="uid://d24a1wpkenydh" path="res://Materials/Textures/Particles/Sun.png" id="3_t7wat"]
-[ext_resource type="Shader" uid="uid://c05kf2yj5tshy" path="res://Materials/Shaders/clash_spark.tres" id="4_pc3rc"]
-[ext_resource type="Texture2D" uid="uid://cglf5hd5udewc" path="res://Materials/Textures/Particles/T_circle42.PNG" id="5_pv2p6"]
+[ext_resource type="Script" uid="uid://d3dnrh2nn12bj" path="res://Weapons/Scenes/explosions/_scripts/sparks.gd" id="1_script"]
+[ext_resource type="Texture2D" uid="uid://d24a1wpkenydh" path="res://Materials/Textures/Particles/Sun.png" id="2_flash_tex"]
+[ext_resource type="Texture2D" uid="uid://cglf5hd5udewc" path="res://Materials/Textures/Particles/T_circle42.PNG" id="3_spark_tex"]
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_wjwvo"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_spark"]
+resource_name = "spark_streak"
+transparency = 1
+blend_mode = 1
+cull_mode = 2
+shading_mode = 0
+albedo_texture = ExtResource("3_spark_tex")
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_664fv"]
-render_priority = 0
-shader = ExtResource("2_m68om")
-shader_parameter/Clash_Texture = ExtResource("3_t7wat")
-
-[sub_resource type="Curve" id="Curve_1017u"]
-_data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(0.492308, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
-point_count = 3
-
-[sub_resource type="CurveTexture" id="CurveTexture_hduwy"]
-curve = SubResource("Curve_1017u")
-
-[sub_resource type="Gradient" id="Gradient_cdd1f"]
-colors = PackedColorArray(8, 8, 8, 1, 1, 1, 1, 1)
-
-[sub_resource type="GradientTexture1D" id="GradientTexture1D_l33s6"]
-gradient = SubResource("Gradient_cdd1f")
-use_hdr = true
-
-[sub_resource type="Curve" id="Curve_2fm80"]
+[sub_resource type="Curve" id="Curve_spark_alpha"]
 _data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
 point_count = 2
 
-[sub_resource type="CurveTexture" id="CurveTexture_476dw"]
-curve = SubResource("Curve_2fm80")
+[sub_resource type="CurveTexture" id="CurveTexture_spark_alpha"]
+curve = SubResource("Curve_spark_alpha")
 
-[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_yqtbl"]
-angle_min = -180.0
-angle_max = 180.0
-gravity = Vector3(0, 0, 0)
-scale_min = 0.8
-scale_max = 1.5
-scale_curve = SubResource("CurveTexture_476dw")
-color_ramp = SubResource("GradientTexture1D_l33s6")
-alpha_curve = SubResource("CurveTexture_hduwy")
-
-[sub_resource type="QuadMesh" id="QuadMesh_cwf0f"]
-size = Vector2(0.25, 0.25)
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_cjbug"]
-render_priority = 0
-shader = ExtResource("4_pc3rc")
-shader_parameter/Clash_Texture = ExtResource("5_pv2p6")
-
-[sub_resource type="Curve" id="Curve_fbq8r"]
-_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
-point_count = 2
-
-[sub_resource type="CurveTexture" id="CurveTexture_3qomh"]
-curve = SubResource("Curve_fbq8r")
-
-[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_ombod"]
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_spark"]
 particle_flag_align_y = true
 direction = Vector3(0, 1, 0)
 spread = 180.0
@@ -68,29 +28,62 @@ initial_velocity_max = 12.0
 gravity = Vector3(0, 0, 0)
 scale_min = 0.3
 scale_max = 0.5
-color = Color(8, 8, 8, 1)
-alpha_curve = SubResource("CurveTexture_3qomh")
+alpha_curve = SubResource("CurveTexture_spark_alpha")
 
-[sub_resource type="QuadMesh" id="QuadMesh_28if2"]
-size = Vector2(0.1, 0.6)
+[sub_resource type="QuadMesh" id="QuadMesh_spark"]
+size = Vector2(0.08, 0.5)
 
-[node name="Sparks" type="Node3D" unique_id=872271042]
-script = ExtResource("1_cst8e")
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pvu3t"]
+transparency = 1
+shading_mode = 0
+albedo_texture = ExtResource("2_flash_tex")
+billboard_mode = 3
+billboard_keep_scale = true
+particles_anim_h_frames = 1
+particles_anim_v_frames = 1
+particles_anim_loop = false
 
-[node name="Clash" type="GPUParticles3D" parent="." unique_id=636701449]
-material_override = SubResource("ShaderMaterial_wjwvo")
-material_overlay = SubResource("ShaderMaterial_664fv")
-transparency = 1.0
+[sub_resource type="Curve" id="Curve_clash_alpha"]
+_data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(0.4, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_clash_alpha"]
+curve = SubResource("Curve_clash_alpha")
+
+[sub_resource type="Curve" id="Curve_clash_scale"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_clash_scale"]
+curve = SubResource("Curve_clash_scale")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_r1wdx"]
+gravity = Vector3(0, 0, 0)
+scale_curve = SubResource("CurveTexture_clash_scale")
+alpha_curve = SubResource("CurveTexture_clash_alpha")
+
+[sub_resource type="QuadMesh" id="QuadMesh_bc0ym"]
+size = Vector2(0.6, 0.6)
+
+[node name="Sparks" type="Node3D" unique_id=46227431]
+script = ExtResource("1_script")
+
+[node name="Spark" type="GPUParticles3D" parent="." unique_id=1385271461]
+material_override = SubResource("StandardMaterial3D_spark")
+emitting = false
+amount = 40
+lifetime = 0.25
+one_shot = true
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_spark")
+draw_pass_1 = SubResource("QuadMesh_spark")
+
+[node name="Clash" type="GPUParticles3D" parent="." unique_id=167378744]
+material_override = SubResource("StandardMaterial3D_pvu3t")
+emitting = false
 amount = 1
 lifetime = 0.25
+one_shot = true
 explosiveness = 1.0
-process_material = SubResource("ParticleProcessMaterial_yqtbl")
-draw_pass_1 = SubResource("QuadMesh_cwf0f")
-
-[node name="Spark" type="GPUParticles3D" parent="." unique_id=1002322592]
-material_override = SubResource("ShaderMaterial_cjbug")
-amount = 50
-lifetime = 0.25
-explosiveness = 1.0
-process_material = SubResource("ParticleProcessMaterial_ombod")
-draw_pass_1 = SubResource("QuadMesh_28if2")
+process_material = SubResource("ParticleProcessMaterial_r1wdx")
+draw_pass_1 = SubResource("QuadMesh_bc0ym")

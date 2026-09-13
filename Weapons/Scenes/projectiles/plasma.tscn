@@ -1,0 +1,40 @@
+[gd_scene format=3 uid="uid://vdbvupiqax74"]
+
+[ext_resource type="Script" uid="uid://75sa32sebpqn" path="res://Weapons/_scripts/collision_handler.gd" id="1_bsdoy"]
+[ext_resource type="Texture2D" uid="uid://d24a1wpkenydh" path="res://Materials/Textures/Particles/Sun.png" id="1_k3wgm"]
+[ext_resource type="Script" uid="uid://l07kt7adidgn" path="res://Materials/Shaders/colorable_light.gd" id="2_4o3dw"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_4o3dw"]
+radius = 0.1
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_bsdoy"]
+properties/0/path = NodePath(".:position")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+properties/1/path = NodePath(".:rotation")
+properties/1/spawn = true
+properties/1/replication_mode = 1
+
+[node name="Plasma" type="RigidBody3D" unique_id=1436627964]
+script = ExtResource("1_bsdoy")
+
+[node name="Sprite3D" type="Sprite3D" parent="." unique_id=921365862]
+modulate = Color(0.1764706, 1, 1, 1)
+pixel_size = 0.001
+billboard = 1
+double_sided = false
+texture = ExtResource("1_k3wgm")
+
+[node name="Collider" type="CollisionShape3D" parent="." unique_id=1839391670]
+shape = SubResource("SphereShape3D_4o3dw")
+
+[node name="RayCast3D" type="RayCast3D" parent="." unique_id=1625071662]
+target_position = Vector3(0, 0, -1)
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="." unique_id=1245884911]
+replication_config = SubResource("SceneReplicationConfig_bsdoy")
+
+[node name="OmniLight3D" type="OmniLight3D" parent="." unique_id=1026172983]
+light_color = Color(0.2901961, 1, 1, 1)
+omni_range = 2.0
+script = ExtResource("2_4o3dw")
