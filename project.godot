@@ -119,6 +119,9 @@ capture_recon={
 [physics]
 
 common/physics_ticks_per_second=120
+3d/physics_engine="Jolt Physics"
+jolt_physics_3d/queries/use_enhanced_internal_edge_removal=true
+3d/solver/default_contact_bias=0.3
 common/physics_interpolation=true
 
 [rendering]

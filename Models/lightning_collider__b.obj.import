@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://d3ibx2dshep2k"
+path="res://.godot/imported/lightning_collider__b.obj-7d85f72a4fc4d02827c0e323d936f4ee.mesh"
+
+[deps]
+
+files=["res://.godot/imported/lightning_collider__b.obj-7d85f72a4fc4d02827c0e323d936f4ee.mesh"]
+
+source_file="res://Models/lightning_collider__b.obj"
+dest_files=["res://.godot/imported/lightning_collider__b.obj-7d85f72a4fc4d02827c0e323d936f4ee.mesh", "res://.godot/imported/lightning_collider__b.obj-7d85f72a4fc4d02827c0e323d936f4ee.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false
