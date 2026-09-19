@@ -56,12 +56,13 @@ func _ready() -> void:
 # as local as the mesh and material this projectile scene already ships with.
 #
 # Deliberately duck-typed rather than reaching for named child paths: rocket,
-# laser and shell are three different scene shapes (rocket has a tinted mesh,
-# laser has none, shell's mesh stays its own Gun_Metal on purpose) sharing
-# this one script, so it asks each descendant whether it knows how to color
-# itself instead of assuming any particular one exists. See
-# colorable_light.gd, colorable_mesh.gd and Trail3D.gd::apply_projectile_color
-# for the nodes that currently answer yes.
+# laser, plasma and shell are all different scene shapes (rocket has a
+# tinted mesh, laser has none, plasma has a tinted sprite, shell's mesh
+# stays its own Gun_Metal on purpose) sharing this one script, so it asks
+# each descendant whether it knows how to color itself instead of assuming
+# any particular one exists. See colorable_light.gd, colorable_mesh.gd,
+# colorable_sprite.gd and Trail3D.gd::apply_projectile_color for the nodes
+# that currently answer yes.
 func _apply_projectile_color(color: Color) -> void:
 	_apply_projectile_color_to(self, color)
 

@@ -1,0 +1,18 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://mcg6sqo4c1ig"]
+
+[ext_resource type="Texture2D" uid="uid://dxcgxmoebla4g" path="res://Materials/Textures/Digicamo/DigiCamo_diffuseOriginal.bmp" id="1_0usnw"]
+[ext_resource type="Texture2D" uid="uid://b3eqjcsy74sux" path="res://Materials/Textures/Digicamo/REVERSE_EMMITION.png" id="2_m2xmn"]
+[ext_resource type="Texture2D" uid="uid://bvni0rpqi2j03" path="res://Materials/Textures/Digicamo/DigiCamo_normal.bmp" id="3_ho0dd"]
+
+[resource]
+albedo_color = Color(0, 0.9607843, 0.39607844, 1)
+albedo_texture = ExtResource("1_0usnw")
+metallic = 1.0
+metallic_specular = 1.0
+roughness = 0.35
+emission_enabled = true
+emission_energy_multiplier = 2.0
+emission_texture = ExtResource("2_m2xmn")
+normal_enabled = true
+normal_scale = -3.16
+normal_texture = ExtResource("3_ho0dd")

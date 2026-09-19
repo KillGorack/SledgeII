@@ -14,9 +14,10 @@ const DOWNLOAD_URL := "https://www.killgorack.com/PX4/downloader.php?ap=tanarusm
 # each downloaded map ships with its own - no need to touch or re-export any
 # map file for this.
 const CUSTOM_ENVIRONMENT_SCENE := preload("res://Materials/Environments/env.tscn")
-# Maps mark recon station spots with bare Marker3D placeholders (grouped under
-# a "recon_locations" folder node) rather than shipping the actual station
-# scene in every map pck - see _spawn_recon_stations.
+# Maps mark recon station spots with anchor placeholders (bare Marker3D or a
+# lit recon_placeholder.tscn instance, grouped under a "recon_locations"
+# folder node) rather than shipping the actual station scene in every map
+# pck - see _spawn_recon_stations.
 const RECON_STATION_SCENE := preload("res://Game_Objects/recon_station.tscn")
 const RECON_LOCATIONS_NODE_NAME := "recon_locations"
 const RESPAWN_DELAY := 4.0
@@ -82,6 +83,19 @@ const SPAWN_HEIGHT_OFFSET := 0.3
 const BASE_GUN_SCENE := preload("res://Game_Objects/base_gun.tscn")
 const BASE_GUN_GRID_SPACING := 3.0
 const BASE_GUN_HEIGHT_ABOVE_PAD := 4.0
+
+# Per-team hull/turret material for lightning.tscn's Hull and Turret meshes
+# (see _spawn_craft) - deliberately separate resources rather than one shared
+# material tinted per team at spawn (contrast base_gun.gd/colorable_mesh.gd's
+# duplicate-then-tint pattern elsewhere), since these are expected to grow
+# into genuinely different per-team designs later, not just different colors
+# of the same texture.
+const TEAM_CRAFT_MATERIALS := {
+	"team_red": preload("res://Materials/PBR/digi_red.tres"),
+	"team_green": preload("res://Materials/PBR/digi_green.tres"),
+	"team_blue": preload("res://Materials/PBR/digi_blue.tres"),
+	"team_gray": preload("res://Materials/PBR/digi_gray.tres"),
+}
 
 @onready var base_guns_container: Node3D = $BaseGuns
 
@@ -303,21 +317,24 @@ func _find_directional_light(node: Node) -> DirectionalLight3D:
 	return null
 
 
-# Replaces each Marker3D placeholder under the map's "recon_locations" folder
-# with a real recon station, parented to the marker so it inherits the
-# marker's transform with no manual math. Maps aren't required to have the
-# folder (e.g. older test packs) - just skip silently if it's absent.
+# Replaces each anchor under the map's "recon_locations" folder with a real
+# recon station, parented to the anchor so it inherits its transform with no
+# manual math. An anchor is either a bare Marker3D (older test packs) or a
+# recon_placeholder.tscn instance (its own transform matches where the
+# Marker3D it replaced used to sit - see MaulGrounds' _replace_recon_markers.gd)
+# - either way, everything directly under recon_locations is a spot to fill,
+# so no type check needed. Maps aren't required to have the folder at all -
+# just skip silently if it's absent.
 func _spawn_recon_stations(map_instance: Node) -> void:
 	var recon_locations := _find_named_node(map_instance, RECON_LOCATIONS_NODE_NAME)
 	if not recon_locations:
 		return
-	for marker in recon_locations.get_children():
-		if marker is Marker3D:
-			var station := RECON_STATION_SCENE.instantiate()
-			# power_node.gd charges craft near any node in this group - see
-			# Crafts/_scripts/power_node.gd.
-			station.add_to_group("Recon")
-			marker.add_child(station)
+	for anchor in recon_locations.get_children():
+		var station := RECON_STATION_SCENE.instantiate()
+		# power_node.gd charges craft near any node in this group - see
+		# Crafts/_scripts/power_node.gd.
+		station.add_to_group("Recon")
+		anchor.add_child(station)
 
 
 func _find_named_node(node: Node, target_name: String) -> Node:
@@ -543,6 +560,9 @@ func _spawn_base_guns(team: String, pads: Array) -> void:
 			base_guns_container.add_child(gun)
 			gun.team = team
 			gun.set_team_color(ReconStation.render_color_for_team(team))
+			# radar_controller.gd finds these the same generic group-based way
+			# it finds crafts/recon stations.
+			gun.add_to_group("BaseGun")
 			guns.append(gun)
 	_base_guns_by_team[team] = guns
 
@@ -619,12 +639,13 @@ func _run_capture(gun_path: NodePath, recon_path: NodePath, team: String) -> voi
 	)
 
 
-func spawn_projectile(weapon_settings_path: String, team: String, muzzle_transform: Transform3D) -> void:
+func spawn_projectile(weapon_settings_path: String, team: String, muzzle_transform: Transform3D, use_team_color: bool = false) -> void:
 	projectile_spawner.spawn({
 		"weapon_settings_path": weapon_settings_path,
 		"team": team,
 		"position": muzzle_transform.origin,
-		"basis": muzzle_transform.basis
+		"basis": muzzle_transform.basis,
+		"use_team_color": use_team_color,
 	})
 
 
@@ -634,6 +655,28 @@ func _spawn_projectile(data: Dictionary) -> Node:
 	# default. Every peer has the same .tres file locally, so each side just
 	# loads it independently instead of sending the Resource over the wire.
 	var settings: WeaponSettings = load(data["weapon_settings_path"])
+	if data.get("use_team_color", false):
+		# load() caches and shares this exact Resource across every shot of
+		# this weapon by every peer and every player, so mutating
+		# projectile_color directly on it would repaint every other shot
+		# using the same .tres, including a player firing this same weapon
+		# right after. Duplicating first scopes the change to just this
+		# shot. Shallow is enough - projectile_color is the only field this
+		# ever changes, and it's a plain Color; explosion_prefab and
+		# projectile_prefab are meant to keep pointing at the same shared
+		# PackedScene either way (nothing here mutates those, and each shot
+		# already gets its own instantiate() from them regardless).
+		#
+		# Doing this here, before weapon_settings is ever handed to the
+		# projectile, means every consumer that reads
+		# weapon_settings.projectile_color for the rest of this shot's
+		# life - collision_handler.gd's own _ready() tint AND the separate
+		# spark tint in _play_hit_effect(), spawned much later on impact -
+		# picks up the team color automatically, with no per-consumer flag
+		# to keep in sync by hand (a base_gun-fired shot previously missed
+		# the spark tint this way).
+		settings = settings.duplicate()
+		settings.projectile_color = ReconStation.render_color_for_team(data["team"])
 	var projectile := settings.projectile_prefab.instantiate()
 	projectile.weapon_settings = settings
 	projectile.team = data["team"]
@@ -657,9 +700,26 @@ func _attach_local_camera(craft: Node) -> void:
 func _spawn_craft(data: Dictionary) -> Node:
 	var craft := LIGHTNING_SCENE.instantiate()
 	craft.name = "Craft_%d" % data["peer_id"]
+	# radar_controller.gd finds other crafts the same generic group-based way
+	# it finds anything else in its target_defs table.
+	craft.add_to_group("Craft")
 	craft.get_node("movement_node").team = data["team"]
 	var weapon_node = craft.get_node("weapon_node")
 	weapon_node.team = data["team"]
+	# Runs identically on every peer, same as the team assignments above -
+	# purely a local visual, no authority/RPC involved.
+	var team_material: Material = TEAM_CRAFT_MATERIALS.get(data["team"])
+	if team_material:
+		craft.get_node("Hull").material_override = team_material
+		craft.get_node("Turret").material_override = team_material
+	# Hover Pad and Lights share one material (emitting_stuff.tres) across
+	# every team - unlike Hull/Turret above, this one isn't expected to grow
+	# into different per-team designs, just different colors, so it gets
+	# duplicated-then-tinted per craft instead of swapped for a separate
+	# resource (same pattern as base_gun.gd/colorable_mesh.gd elsewhere).
+	var team_color := ReconStation.render_color_for_team(data["team"])
+	_tint_emissive(craft.get_node("Hover Pad"), team_color)
+	_tint_emissive(craft.get_node("Lights"), team_color)
 	# lightning.tscn bakes in the full weapon catalog - filter it down to this
 	# match's ruleset here so it's identical on every peer (this function runs
 	# locally on all of them, same as team above). Empty means unrestricted -
@@ -717,6 +777,16 @@ func _spawn_craft(data: Dictionary) -> Node:
 	# on every peer is harmless - it simply never fires on client copies.
 	craft.get_node("health_node").craft_defeated.connect(_on_craft_defeated)
 	return craft
+
+
+func _tint_emissive(mesh_instance: MeshInstance3D, color: Color) -> void:
+	var mat := mesh_instance.material_override
+	if not (mat is StandardMaterial3D):
+		return
+	mat = mat.duplicate()
+	mat.albedo_color = color
+	mat.emission = color
+	mesh_instance.material_override = mat
 
 
 func _on_craft_defeated(peer_id: int) -> void:

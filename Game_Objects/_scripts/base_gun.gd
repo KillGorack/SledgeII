@@ -1,16 +1,10 @@
 extends Node3D
 class_name BaseGun
-
-# Movement/timing only - the actual capture-beam/particle look lives on
-# Capture_Effect's own children (see set_effect_active) and is expected to
-# get built out further; this just turns whatever's there on and off at the
-# right moments.
-
 const ASCEND_HEIGHT := 5.0
 const HOVER_HEIGHT_ABOVE_RECON := 2.0
 const CAPTURE_DURATION := 10.0
-const TRAVEL_SPEED := 12.0  # units/sec, horizontal cruise legs only
-const VERTICAL_SPEED := 1.0  # units/sec, ascend/descend legs only
+const TRAVEL_SPEED := 12.0
+const VERTICAL_SPEED := 1.0
 
 # Turret settings for the (unrelated to capture) auto-fire behavior below -
 # no barrel to aim, ever, so every shot is a straight line from this node's
@@ -117,7 +111,11 @@ func _obstruction_mask() -> int:
 # (see collision_handler.gd, which launches every projectile along its own
 # -global_transform.basis.z). Goes through match.gd::spawn_projectile, the
 # same replicated spawn path weapon_node.gd's request_fire uses, so these
-# shots deal damage and show up for every peer exactly like any player's.
+# shots deal damage and show up for every peer exactly like any player's -
+# the trailing `true` is the one difference: it tells the projectile to
+# recolor itself to this base's team color (matching set_team_color() below)
+# instead of keeping weapon_settings.projectile_color, which is what a
+# player firing the same weapon still gets.
 func _fire_at(target: Node3D) -> void:
 	var match_node := get_tree().get_first_node_in_group("match")
 	if match_node == null or not match_node.has_method("spawn_projectile"):
@@ -128,7 +126,7 @@ func _fire_at(target: Node3D) -> void:
 		return
 	var direction := (target.global_position - global_position).normalized()
 	var muzzle := Transform3D(Basis.looking_at(direction, Vector3.UP), global_position)
-	match_node.spawn_projectile(path, team, muzzle)
+	match_node.spawn_projectile(path, team, muzzle, true)
 
 
 # Called once from match.gd right after spawning (see _spawn_base_guns) -
