@@ -6,6 +6,7 @@ extends Control
 @onready var movement_node: Node3D = get_node("../movement_node")
 @onready var power_node: Node3D = get_node("../power_node")
 @onready var weapon_label: Label = $Weapon
+@onready var fps_label: Label = $FPS
 @onready var speedometer: Control = $Speedometer
 @onready var health_rings: Control = $HealthRings
 @onready var resourcemeter: Control = $Resourcemeter
@@ -48,6 +49,10 @@ func _process(_delta: float) -> void:
 	# always changing while driving, so there'd be nothing to skip most frames.
 	speedometer.set_speed_ratio(movement_node.get_speed_ratio())
 	resourcemeter.set_resource_ratio(power_node.get_power_ratio())
+	# The needle this whole lighting/light-count pass is trying to move -
+	# Engine.get_frames_per_second() is the engine's own already-computed
+	# rolling average, not something worth recomputing by hand here.
+	fps_label.text = "%d FPS" % Engine.get_frames_per_second()
 
 
 func _on_team_juice_changed(team: String, _amount: float) -> void:

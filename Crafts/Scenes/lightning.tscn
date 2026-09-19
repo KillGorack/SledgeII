@@ -1,6 +1,6 @@
 [gd_scene format=4 uid="uid://wo657mkxalrd"]
 
-[ext_resource type="Material" uid="uid://bgh0ehawiffev" path="res://Materials/PBR/head_light.tres" id="1_75qxs"]
+[ext_resource type="Material" uid="uid://bgh0ehawiffev" path="res://Materials/PBR/emitting_stuff.tres" id="1_75qxs"]
 [ext_resource type="Material" uid="uid://cu6i37pttdjcl" path="res://Materials/PBR/Red_Metal.tres" id="1_gfhax"]
 [ext_resource type="Script" uid="uid://b32whv15op7uy" path="res://Crafts/_scripts/movement.gd" id="1_nm6mo"]
 [ext_resource type="Material" uid="uid://bvk3h5cf6p6nq" path="res://Materials/PBR/digi_cammo.tres" id="1_nv2sd"]
@@ -16,6 +16,7 @@
 [ext_resource type="Resource" uid="uid://qqc2vwxrscfy" path="res://Weapons/settings/Repulsor.tres" id="13_repulsor"]
 [ext_resource type="Resource" uid="uid://b5trap215xo20" path="res://Weapons/settings/Detno.tres" id="14_detno"]
 [ext_resource type="Resource" uid="uid://d2bcvfd5dw7pj" path="res://Weapons/settings/MKIV_CEB.tres" id="15_mkiv"]
+[ext_resource type="Resource" uid="uid://bryidariyxws7" path="res://Weapons/settings/plasma.tres" id="16_8hncv"]
 [ext_resource type="Script" uid="uid://ccjvxuanm2neh" path="res://Crafts/_scripts/speedometer.gd" id="16_speedo"]
 [ext_resource type="Texture2D" uid="uid://davch07lrofb0" path="res://Crafts/Images/hud_bezel_resize.png" id="17_jva1l"]
 [ext_resource type="Texture2D" uid="uid://clajwwr25kbxg" path="res://Crafts/Images/speedo_hole_fill_resize.png" id="19_jva1l"]
@@ -25,12 +26,17 @@
 [ext_resource type="Script" uid="uid://cyck4l7d4j2ln" path="res://Crafts/_scripts/power_node.gd" id="22_power"]
 [ext_resource type="Script" uid="uid://mepex6j2kosh" path="res://Crafts/_scripts/team_juice_bar.gd" id="23_juice"]
 [ext_resource type="Texture2D" uid="uid://bmlkfo0a5b7jw" path="res://UI/images/Juice_Bar.png" id="24_g7gqi"]
+[ext_resource type="Script" uid="uid://bhb2fc32wr4yj" path="res://Crafts/_scripts/radar_controller.gd" id="27_i28qn"]
+[ext_resource type="Texture2D" uid="uid://d2fcmxoatss3r" path="res://UI/images/Radar_Ring.png" id="28_i28qn"]
+[ext_resource type="Script" uid="uid://dc7nvy010cc26" path="res://Crafts/_scripts/radar_target_def.gd" id="29_kqlfo"]
+[ext_resource type="Resource" uid="uid://c5rwld4fk2qvr" path="res://Crafts/Settings/blip_recon.tres" id="30_qkbj0"]
+[ext_resource type="Resource" uid="uid://dsxm45xl6xbcy" path="res://Crafts/Settings/blip_base_gun.tres" id="31_qkbj0"]
 
 [sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_g7gqi"]
 points = PackedVector3Array(0.359591, 0.08753002, 0.36253202, -0.359594, 0.08753002, 0.36253202, 0.359591, -0.2351391, 0.36253202, 0.359591, 0.08753002, -1.233568, -0.359594, -0.2351391, 0.36253202, -0.359594, 0.08753002, -1.233568, 0.35677505, -0.25258067, 0.35971975, 0.359591, -0.2351391, -1.233568, -0.359594, -0.2351391, -1.233568, -0.35684848, -0.25258067, 0.35971975, 0.3487497, -0.2683152, 0.35159552, 0.35677505, -0.25258067, -1.230912, -0.35684848, -0.25258067, -1.230912, -0.3488231, -0.2683152, 0.35159552, 0.3362893, -0.28082117, 0.33909667, 0.3487497, -0.2683152, -1.2229439, -0.3488231, -0.2683152, -1.2229439, -0.3363627, -0.28082117, 0.33909667, 0.32052016, -0.2888369, 0.32347322, 0.3362893, -0.28082117, -1.2104452, -0.3363627, -0.28082117, -1.2104452, -0.32059354, -0.2888369, 0.32347322, 0.3030615, -0.291583, 0.30597484, 0.32052016, -0.2888369, -1.1946653, -0.32059354, -0.2888369, -1.1946653, -0.30313486, -0.291583, 0.30597484, 0.3030615, -0.291583, -1.177167, -0.30313486, -0.291583, -1.177167)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_r1wdx"]
-size = Vector3(0.7373047, 0.079833984, 1.6203003)
+size = Vector3(0.7373047, 0.35, 1.6203003)
 
 [sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_lightning"]
 properties/0/path = NodePath(".:position")
@@ -387,14 +393,18 @@ properties/0/replication_mode = 1
 mass = 5.0
 physics_material_override = ExtResource("5_physmat")
 center_of_mass_mode = 1
-center_of_mass = Vector3(0, -0.3, 0)
+center_of_mass = Vector3(0, -0.3, -0.44)
 can_sleep = false
 
 [node name="movement_node" type="Node3D" parent="." unique_id=1513453241]
 script = ExtResource("1_nm6mo")
 stats = ExtResource("4_stats")
+SUSPENSION_RAY_LENGTH = 0.02
+SUSPENSION_SPRING_STRENGTH = 10000.0
+SUSPENSION_DAMPING = 75.0
 
 [node name="Collider" type="CollisionShape3D" parent="." unique_id=517869810]
+visible = false
 shape = SubResource("ConvexPolygonShape3D_g7gqi")
 
 [node name="FloorDetection" type="Area3D" parent="." unique_id=1417860519]
@@ -402,8 +412,30 @@ visible = false
 collision_mask = 2
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="FloorDetection" unique_id=2106407594]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0014648438, -0.26330566, -0.43850708)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0014648438, -0.35, -0.43850708)
 shape = SubResource("BoxShape3D_r1wdx")
+
+[node name="Suspension" type="Node3D" parent="." unique_id=885553309]
+
+[node name="FrontLeft" type="RayCast3D" parent="Suspension" unique_id=1867380839]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.28, -0.291583, 0.15)
+target_position = Vector3(0, -0.2, 0)
+collision_mask = 2
+
+[node name="FrontRight" type="RayCast3D" parent="Suspension" unique_id=1052375616]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.28, -0.291583, 0.15)
+target_position = Vector3(0, -0.2, 0)
+collision_mask = 2
+
+[node name="RearLeft" type="RayCast3D" parent="Suspension" unique_id=1041660743]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.28, -0.291583, -1.05)
+target_position = Vector3(0, -0.2, 0)
+collision_mask = 2
+
+[node name="RearRight" type="RayCast3D" parent="Suspension" unique_id=1962439744]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.28, -0.291583, -1.05)
+target_position = Vector3(0, -0.2, 0)
+collision_mask = 2
 
 [node name="Engine Sound" type="AudioStreamPlayer3D" parent="." unique_id=208324712]
 
@@ -481,7 +513,7 @@ public_visibility = false
 
 [node name="weapon_node" type="Node3D" parent="." unique_id=1782664371]
 script = ExtResource("7_weapon")
-weapon_settings = Array[ExtResource("10_4qjx5")]([ExtResource("12_cannon"), ExtResource("14_detno"), ExtResource("15_mkiv"), ExtResource("13_repulsor")])
+weapon_settings = Array[ExtResource("10_4qjx5")]([ExtResource("12_cannon"), ExtResource("14_detno"), ExtResource("15_mkiv"), ExtResource("13_repulsor"), ExtResource("16_8hncv")])
 
 [node name="Hud_InGame" type="Control" parent="." unique_id=1814334772]
 layout_mode = 3
@@ -590,14 +622,20 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 4.0
-offset_top = 4.0
-offset_right = -4.0
-offset_bottom = -4.0
+offset_left = 5.5
+offset_top = 5.0
+offset_right = -4.5
+offset_bottom = -5.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("23_juice")
+
+[node name="FPS" type="Label" parent="Hud_InGame" unique_id=457254272]
+layout_mode = 1
+offset_right = 102.0
+offset_bottom = 23.0
+horizontal_alignment = 2
 
 [node name="Weapon" type="Label" parent="Hud_InGame" unique_id=1301515584]
 layout_mode = 1
@@ -612,3 +650,31 @@ offset_right = -110.0
 offset_bottom = -22.0
 grow_horizontal = 2
 grow_vertical = 0
+
+[node name="Radar_Bezel" type="TextureRect" parent="Hud_InGame" unique_id=640715911]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -310.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = 310.0
+grow_horizontal = 0
+texture = ExtResource("28_i28qn")
+expand_mode = 1
+
+[node name="Radar" type="Control" parent="Hud_InGame/Radar_Bezel" unique_id=2004694216]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 9.0
+offset_top = 9.0
+offset_right = -9.0
+offset_bottom = -9.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("27_i28qn")
+target_defs = Array[ExtResource("29_kqlfo")]([ExtResource("30_qkbj0"), ExtResource("31_qkbj0")])
+self_size = Vector2(8, 8)

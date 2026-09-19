@@ -110,6 +110,23 @@ func apply_damage(damage: float) -> void:
 		destroy_self()
 
 
+# Client-requested, same shape as weapon_node.gd's request_fire(): movement.gd
+# is the one that actually detects a landing and measures impact speed
+# (that craft's physics are simulated locally by whoever owns it, not the
+# server), but only the server gets to decide what that does to HP - this
+# just turns an impact speed into real damage through the normal apply_damage
+# path above, so fall damage drains shields/armor/life in the same order any
+# other hit does.
+@rpc("any_peer", "reliable")
+func request_fall_damage(impact_speed: float) -> void:
+	if not multiplayer.is_server():
+		return
+	if stats == null or impact_speed <= stats.fall_damage_safe_speed:
+		return
+	var excess = impact_speed - stats.fall_damage_safe_speed
+	apply_damage.rpc(stats.fall_damage_coefficient * excess * excess)
+
+
 # Armor-then-life heal while parked inside a recon station captured by this
 # craft's own team - shields already regen on their own via
 # _regeneration_timer above, so this never touches shields. Same fall-through

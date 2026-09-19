@@ -359,6 +359,7 @@ theme_override_constants/separation = 6
 layout_mode = 2
 
 [node name="Load Game" type="Control" parent="Screen_layout/VBoxContainer/MarginContainer" unique_id=708923304]
+visible = false
 layout_mode = 2
 
 [node name="TabContainer" type="TabContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game" unique_id=1882045376]
@@ -368,10 +369,9 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-current_tab = 1
+current_tab = 0
 
 [node name="Create Game" type="TabBar" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer" unique_id=760376868]
-visible = false
 layout_mode = 2
 metadata/_tab_index = 0
 
@@ -438,7 +438,6 @@ text = "Match Rules"
 
 [node name="DayNightCheck" type="CheckBox" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn" unique_id=1588332884]
 layout_mode = 2
-button_pressed = true
 text = "Day/Night Cycle"
 
 [node name="WeaponsLabel" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn" unique_id=979455328]
@@ -458,6 +457,7 @@ layout_mode = 2
 text = "Host Selected Map"
 
 [node name="Join Game" type="TabBar" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer" unique_id=160290931]
+visible = false
 layout_mode = 2
 metadata/_tab_index = 1
 
