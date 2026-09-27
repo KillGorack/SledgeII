@@ -1,0 +1,62 @@
+[gd_scene format=3 uid="uid://ccxhqgq7uepr2"]
+
+[ext_resource type="Texture2D" uid="uid://cejojjg67d8af" path="res://Materials/Textures/Particles/T_smoke_flipbook.png" id="1_smoke"]
+[ext_resource type="Script" uid="uid://ddmidc2iqmn0o" path="res://Weapons/_scripts/smoke_trail.gd" id="2_smoke"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_smoke"]
+transparency = 1
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("1_smoke")
+billboard_mode = 3
+particles_anim_h_frames = 8
+particles_anim_v_frames = 8
+particles_anim_loop = false
+
+[sub_resource type="Gradient" id="Gradient_smoke"]
+colors = PackedColorArray(0.55, 0.55, 0.55, 0.5, 0.3, 0.3, 0.3, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_smoke"]
+gradient = SubResource("Gradient_smoke")
+
+[sub_resource type="Curve" id="Curve_smoke_scale"]
+_data = [Vector2(0, 0.35), 0.0, 0.0, 0, 0, Vector2(1, 1), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_smoke_scale"]
+curve = SubResource("Curve_smoke_scale")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_smoke"]
+particle_flag_rotate_y = true
+emission_shape = 1
+emission_sphere_radius = 0.08
+angle_min = -180.0
+angle_max = 180.0
+direction = Vector3(0, 1, 0)
+spread = 40.0
+initial_velocity_min = 0.15
+initial_velocity_max = 0.5
+angular_velocity_min = -30.0
+angular_velocity_max = 30.0
+gravity = Vector3(0, 0.18, 0)
+damping_min = 0.4
+damping_max = 0.9
+scale_min = 0.18
+scale_max = 0.35
+scale_curve = SubResource("CurveTexture_smoke_scale")
+color_ramp = SubResource("GradientTexture1D_smoke")
+anim_speed_min = 0.8
+anim_speed_max = 1.3
+
+[sub_resource type="QuadMesh" id="QuadMesh_smoke"]
+size = Vector2(0.6, 0.6)
+
+[node name="SmokeTrail" type="GPUParticles3D" unique_id=2069336196]
+material_override = SubResource("StandardMaterial3D_smoke")
+emitting = false
+amount = 128
+lifetime = 1.3
+randomness = 0.4
+fixed_fps = 60
+process_material = SubResource("ParticleProcessMaterial_smoke")
+draw_pass_1 = SubResource("QuadMesh_smoke")
+script = ExtResource("2_smoke")

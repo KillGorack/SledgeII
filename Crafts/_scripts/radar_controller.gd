@@ -1,43 +1,15 @@
 extends Control
 
-# Minimap-style radar, visually modeled on the predecessor project's (Sledge)
-# radar_detection.gd - one blip per node found in each target_defs[] entry's
-# group_name, sized/shaped/colored per that entry, plus a fixed self blip at
-# center. zoom_radar cycles range via zoom_levels. No projectile tracking.
-#
-# target_defs is the whole point: add a new trackable kind (a mine, loot,
-# whatever) by tagging it with a group in the scene and adding one row here
-# in the Inspector - group_name/color/size/shape, no script editing needed.
-# The one thing that table CAN'T hold is dynamic color - a recon station's
-# color depends on which team captured it (captured_color, changes mid-match)
-# and a craft's depends on which team it is (weapon_node.team) - neither is a
-# fact the Inspector can know ahead of time, so those two group names are
-# special-cased in _color_for() to compute color live instead of using the
-# entry's static color. Everything else just uses the table as-is.
-#
-# Entirely client-local, no networking of its own needed: a craft's team and
-# a station's captured_color are already correct on every peer (team's baked
-# in at spawn from replicated spawn data - see match.gd::_spawn_craft; a
-# station's captured_color comes from a map-authored group tag, see
-# recon_station.gd::_apply_fixed_color_from_marker) - this just polls scene
-# state every peer already has locally, the same way power_node.gd does.
+
 @export var target_defs: Array[RadarTargetDef] = []
 @export var self_size: Vector2 = Vector2(5, 5)
 @export var radar_range: float = 100.0
-# radar_range above is the 1.0x entry's baseline - zoom_radar cycles through
-# these multipliers, same idea as the predecessor's zoom_scale array.
 @export var zoom_levels: Array[float] = [2.0, 1.0, 0.75, 0.5, 0.25]
 var _zoom_index: int = 1
-
-# Two levels up: this Control -> Hud_InGame -> the craft root.
 @onready var _craft: Node3D = get_node("../../..")
-# Facing comes from the turret, not the hull - the turret (and the camera
-# mounted on its Barrel) yaws independently of the craft's own movement (see
-# movement.gd::_physics_process setting Turret.rotation_degrees.y from look
-# input), so this is "the direction we're actually looking", same reason the
-# predecessor's radar_detection.gd was parented under Turret instead of the
-# vehicle root.
+
 @onready var _turret: Node3D = _find_turret()
+@onready var _chat: Control = get_node("../../Chat")
 
 const RadarDotScript := preload("res://Crafts/_scripts/radar_dot.gd")
 
@@ -70,7 +42,9 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	if Input.is_action_just_pressed("zoom_radar"):
+	# "z" is a live key while typing a chat message - see
+	# chat_controller.gd::is_open, same reasoning as movement.gd.
+	if not _chat.is_open and Input.is_action_just_pressed("zoom_radar"):
 		_zoom_index = (_zoom_index + 1) % zoom_levels.size()
 	var effective_range: float = radar_range * zoom_levels[_zoom_index]
 
@@ -134,13 +108,17 @@ func _update_blip(target: Node3D, color: Color, target_def: RadarTargetDef, orig
 			_blips.erase(target)
 		return
 
+	var blip: Control = null
 	if not _blips.has(target):
-		var blip: Control = RadarDotScript.new() if target_def.shape == RadarTargetDef.Shape.DOT else ColorRect.new()
+		if target_def.shape == RadarTargetDef.Shape.DOT:
+			blip = RadarDotScript.new()
+		else:
+			blip = ColorRect.new()
 		blip.mouse_filter = MOUSE_FILTER_IGNORE
 		add_child(blip)
 		_blips[target] = blip
 
-	var blip: Control = _blips[target]
+	blip = _blips[target]
 	if target_def.shape == RadarTargetDef.Shape.DOT:
 		blip.dot_color = color
 	else:

@@ -25,7 +25,7 @@ func apply_projectile_color(color: Color) -> void:
 
 
 func _ready():
-	_oldPos = get_global_transform().origin
+	_oldPos = get_global_transform_interpolated().origin
 	mesh = ImmediateMesh.new()
 	layers = 4
 	
@@ -34,9 +34,17 @@ func _ready():
 	
 	
 func _process(delta):
-	if (_oldPos - get_global_transform().origin).length() > _motionDelta and _trailEnabled:
+	# get_global_transform_interpolated(), not get_global_transform() - this
+	# runs every render frame, but a projectile on a remote peer isn't
+	# locally simulated, so its raw transform only actually changes at the
+	# (much coarser) network replication rate: several _process() calls in a
+	# row would sample the exact same stale position, then jump when the
+	# next update lands, baking that jump straight into the trail's point
+	# history. The interpolated transform is the same continuously-smoothed
+	# value the renderer itself displays, local or replicated either way.
+	if (_oldPos - get_global_transform_interpolated().origin).length() > _motionDelta and _trailEnabled:
 		AppendPoint()
-		_oldPos = get_global_transform().origin
+		_oldPos = get_global_transform_interpolated().origin
 	var p = 0
 	var max_points = _points.size()
 	while p < max_points:
@@ -69,10 +77,11 @@ func _process(delta):
 
 
 func AppendPoint():
-	_points.append(get_global_transform().origin)	
+	var xform := get_global_transform_interpolated()
+	_points.append(xform.origin)
 	_widths.append([
-		get_global_transform().basis.x * _fromWidth,
-		get_global_transform().basis.x * _fromWidth - get_global_transform().basis.x * _toWidth])
+		xform.basis.x * _fromWidth,
+		xform.basis.x * _fromWidth - xform.basis.x * _toWidth])
 	_lifePoints.append(0.0)
 	
 	

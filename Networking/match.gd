@@ -20,6 +20,17 @@ const CUSTOM_ENVIRONMENT_SCENE := preload("res://Materials/Environments/env.tscn
 # pck - see _spawn_recon_stations.
 const RECON_STATION_SCENE := preload("res://Game_Objects/recon_station.tscn")
 const RECON_LOCATIONS_NODE_NAME := "recon_locations"
+# Every weapon's explosion_prefab, deduplicated - see _prewarm_effect_shaders.
+# sparks.tscn covers the bulk of weapons (Detno, MKIV_CEB, plasma, Repulsor,
+# plasma_base); shockwave.tscn is basic_cannon's own. This is a separate,
+# hand-kept list rather than scanned from WEAPON_CATALOG_DIRS (index.gd) -
+# that list is about which weapons a host can pick, this is about which
+# distinct shaders actually need warming, and a prefab five weapons share
+# only needs warming once regardless of how many weapons use it.
+const PREWARM_EFFECT_SCENES: Array[PackedScene] = [
+	preload("res://Weapons/Scenes/explosions/sparks.tscn"),
+	preload("res://Weapons/Scenes/explosions/shockwave.tscn"),
+]
 const RESPAWN_DELAY := 4.0
 # Must match movement.gd's SELF_RENDER_LAYER - whichever craft is currently
 # locally-owned puts its own body meshes on this layer (see
@@ -152,6 +163,10 @@ func _ready() -> void:
 	_pending_unfreeze.clear()
 	NetworkManager.player_registered.connect(_on_player_registered)
 	NetworkManager.player_unregistered.connect(_on_player_unregistered)
+	# Godot only ever fires this on clients (never on the host about its own
+	# connection), so no is_host check needed - this can't fire for the one
+	# player it wouldn't make sense for.
+	multiplayer.server_disconnected.connect(_on_server_disconnected)
 	# Tell the server our own scene (and CraftSpawner) genuinely exists now -
 	# see _ready_peers above and _notify_ready/_on_player_registered below.
 	# The host doesn't need the round trip; it already knows its own state.
@@ -171,7 +186,8 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	if not multiplayer.is_server():
+	# has_multiplayer_peer() first - see power_node.gd's _process() for why.
+	if not multiplayer.has_multiplayer_peer() or not multiplayer.is_server():
 		return
 	_generate_juice(delta)
 	_juice_sync_elapsed += delta
@@ -205,9 +221,63 @@ func _unhandled_input(event: InputEvent) -> void:
 		_try_start_capture()
 
 
+# Client -> server -> broadcast, same shape as _request_capture/_assign_team.
+# any_peer + call_local: a client's call routes to the server as normal; the
+# host calling this on itself (rpc_id(1, ...) targeting its own id) only
+# actually runs anything locally because of call_local, and is_server() is
+# true there too, so both cases fall through to the same broadcast below -
+# one path, not two.  Trusting the client-supplied sender name here since
+# chat is display-only, not worth a server-side peer_id->username registry
+# for - the same reasoning as this file no longer validating team requests
+# on this being cosmetic (see e.g. base_gun.gd for what IS trusted).
+@rpc("any_peer", "call_local", "reliable")
+func _send_chat_message(sender: String, text: String) -> void:
+	if not multiplayer.is_server():
+		return
+	_broadcast_chat_message.rpc(sender, text)
+
+
+@rpc("authority", "call_local", "reliable")
+func _broadcast_chat_message(sender: String, text: String) -> void:
+	# Each peer only has its OWN craft's Chat visible (see hud_controller.gd
+	# hiding the whole HUD for every non-owning copy) - find and deliver to
+	# just that one rather than every craft's (mostly invisible) chat log.
+	var my_craft := craft_container.get_node_or_null("Craft_%d" % multiplayer.get_unique_id())
+	if not my_craft:
+		return
+	var chat := my_craft.get_node_or_null("Hud_InGame/Chat")
+	if chat:
+		chat.receive_message(sender, text)
+
+
 func _exit_to_main_menu() -> void:
 	NetworkManager.leave_game()
 	get_tree().change_scene_to_file("res://UI/index.tscn")
+
+
+# Host rage-quit/crash - built plainly with code instead of a scene, this is
+# a one-shot message with nothing else going on. Held for a few seconds
+# (instead of exiting immediately, same reasoning as index.gd's host-start
+# feedback hold) so it's actually readable before the scene changes out from
+# under it.
+func _on_server_disconnected() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 100
+	add_child(layer)
+	var background := ColorRect.new()
+	background.color = Color(0, 0, 0, 0.85)
+	background.set_anchors_preset(Control.PRESET_FULL_RECT)
+	background.mouse_filter = Control.MOUSE_FILTER_STOP
+	layer.add_child(background)
+	var label := Label.new()
+	label.text = "Host has left the game..."
+	label.add_theme_font_size_override("font_size", 32)
+	label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	background.add_child(label)
+	await get_tree().create_timer(3.0).timeout
+	_exit_to_main_menu()
 
 
 # Client-side only - just finds a plausible target and asks the server,
@@ -271,6 +341,7 @@ func _load_map() -> void:
 	var map_scene: PackedScene = ResourceLoader.load(MAP_SCENE_PATH, "", ResourceLoader.CACHE_MODE_REPLACE)
 	var map_instance := map_scene.instantiate()
 	add_child(map_instance)
+	await _prewarm_effect_shaders()
 	_apply_custom_environment(map_instance)
 	_spawn_recon_stations(map_instance)
 	for team in BASE_PAD_GROUPS:
@@ -278,6 +349,33 @@ func _load_map() -> void:
 		_spawn_base_guns(team, _spawn_points_by_team[team])
 	var overrides = get_tree().get_nodes_in_group("PlayerSpawnOverride")
 	_fallback_spawn_points = overrides if overrides.size() > 0 else get_tree().get_nodes_in_group("PlayerSpawn")
+
+
+# A fresh machine has no shader cache, so the GPU driver has to actually
+# compile a material's shader the first time it's rendered - that compile is
+# what caused the visible hitch on someone's first explosion. Godot 4.4+
+# precompiles a pipeline as soon as its scene is instantiated anywhere in the
+# tree, even off-screen, so spawning one hidden copy of each effect here -
+# while LoadingScreen is still covering the screen (see _spawn_craft, the
+# only place it gets hidden) - pays that one-time cost during a moment a
+# hitch is already invisible, instead of during a player's first real hit.
+# Placed far outside the map rather than just visible=false - the pipeline
+# still needs to actually be eligible for rendering, not skipped entirely.
+# Runs once per peer per match (every peer's own GPU needs its own warm-up,
+# this isn't something the host can do on anyone else's behalf).
+func _prewarm_effect_shaders() -> void:
+	var far_away := Vector3(0.0, -100000.0, 0.0)
+	var instances: Array[Node] = []
+	for scene in PREWARM_EFFECT_SCENES:
+		var instance := scene.instantiate()
+		add_child(instance)
+		if instance is Node3D:
+			instance.global_position = far_away
+		instances.append(instance)
+	for i in 3:
+		await get_tree().process_frame
+	for instance in instances:
+		instance.queue_free()
 
 
 # These are auto-generated/community maps - neither their baked environment
@@ -417,6 +515,15 @@ func _notify_ready() -> void:
 			_grant_visibility(craft, requester_id)
 	if is_instance_valid(_env):
 		_env.sync_time_to.rpc_id(requester_id, _env.time_of_day)
+	# Catch up on every recon someone else already captured before this peer
+	# connected - see _sync_recon_capture. Fixed map-authored stations are
+	# skipped: recon.changeable is false for those, and they already came out
+	# of this peer's own _spawn_recon_stations with the right color for free,
+	# no network round trip needed.
+	for recon in get_tree().get_nodes_in_group("Recon"):
+		if recon.changeable and recon.captured_color != ReconStation.StationColor.NONE:
+			var team := ReconStation.team_for_color(recon.captured_color)
+			_sync_recon_capture.rpc_id(requester_id, get_path_to(recon), team)
 
 
 # MultiplayerSpawner defers to a spawned node's own MultiplayerSynchronizer to
@@ -637,6 +744,22 @@ func _run_capture(gun_path: NodePath, recon_path: NodePath, team: String) -> voi
 		if multiplayer.is_server():
 			_capturing_recons.erase(recon)
 	)
+
+
+# _run_capture's "no separate sync needed" only holds for peers who were
+# actually connected to receive that broadcast. A peer who joins afterward
+# never ran it, so their own recon_station instance sits at StationColor.NONE
+# forever regardless of what the rest of the match already captured - this is
+# the catch-up path for exactly that case, called once per already-captured
+# station from _notify_ready below. Runs recon.capture() directly rather than
+# gun.begin_capture()'s flight - a late joiner should just see the pad already
+# owned, not watch a capture animation replay for something that finished
+# before they connected.
+@rpc("authority", "reliable")
+func _sync_recon_capture(recon_path: NodePath, team: String) -> void:
+	var recon = get_node_or_null(recon_path)
+	if recon is ReconStation:
+		recon.capture(team)
 
 
 func spawn_projectile(weapon_settings_path: String, team: String, muzzle_transform: Transform3D, use_team_color: bool = false) -> void:

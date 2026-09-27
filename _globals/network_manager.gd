@@ -4,6 +4,12 @@ signal player_registered(peer_id: int, team: String)
 signal player_unregistered(peer_id: int)
 signal host_started(address: String)
 signal host_failed(reason: String)
+# Hosting itself still succeeds when this fires - port_forwarding just
+# couldn't open the port automatically (UPnP unsupported/disabled on the
+# router, or no real public IP at all behind CGNAT), so the UI can tell the
+# host to forward the port by hand instead of leaving them wondering why
+# nobody outside their LAN can join.
+signal port_forward_failed(reason: String)
 signal join_failed(reason: String)
 signal games_listed(games: Array)
 signal api_error(message: String)
@@ -33,6 +39,10 @@ const TEAM_NAMES: Array[String] = ["team_red", "team_green", "team_blue", "team_
 const MAX_PLAYERS_PER_TEAM := 5
 
 var peer: ENetMultiplayerPeer
+# Non-null only while a port_forwarding host is up - holds the mapping open
+# to delete on stop_hosting(), see _try_forward_port/stop_hosting.
+var _upnp: UPNP
+var _upnp_port: int = -1
 var is_host: bool = false
 var peer_teams: Dictionary = {}
 var team_juice: Dictionary = {}
@@ -59,7 +69,7 @@ func _ready() -> void:
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 
 
-func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] = [], day_night: bool = true, host_address_override: String = "", host_team: String = "team_red", port: int = DEFAULT_PORT, max_players: int = 20) -> Error:
+func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] = [], day_night: bool = true, host_address_override: String = "", host_team: String = "team_red", port: int = DEFAULT_PORT, max_players: int = 20, public_game: bool = false) -> Error:
 	peer = ENetMultiplayerPeer.new()
 	var err = peer.create_server(port, max_players)
 	if err != OK:
@@ -79,9 +89,14 @@ func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] 
 	# so what actually got used is visible instead of a silent guess, and a
 	# host can override it directly if it ever picks wrong.
 	var host_address = host_address_override.strip_edges()
+	if host_address.is_empty() and public_game:
+		# Only for public_game - a LAN host has no reason to touch the
+		# router, and _get_local_ip()'s private-range address is already the
+		# correct thing for anyone joining from the same LAN.
+		host_address = _try_forward_port(port)
 	if host_address.is_empty():
 		host_address = _get_local_ip()
-	_register_host(game_name, map_file_id, port, max_players, host_address)
+	_register_host(game_name, map_file_id, port, max_players, host_address, _build_manifest(weapon_paths, day_night))
 	_start_heartbeat()
 	host_started.emit(host_address)
 	player_registered.emit(1, host_team)
@@ -105,6 +120,12 @@ func stop_hosting() -> void:
 		return
 	_stop_heartbeat()
 	_unregister_host()
+	if _upnp:
+		# Otherwise the mapping just sits on the router until it reboots -
+		# harmless but pointless once nobody's listening on this port anymore.
+		_upnp.delete_port_mapping(_upnp_port)
+		_upnp = null
+		_upnp_port = -1
 	if multiplayer.multiplayer_peer:
 		multiplayer.multiplayer_peer.close()
 	multiplayer.multiplayer_peer = null
@@ -245,6 +266,38 @@ func _stop_heartbeat() -> void:
 # still picks wrong.
 const _PRIVATE_RANGE_PREFIXES := ["192.168.", "10.", "172.16.", "172.17.", "172.18.", "172.19.", "172.2", "172.30.", "172.31."]
 
+# Best-effort: asks the router to forward `port` (UDP, since that's what
+# ENetMultiplayerPeer uses) straight to this machine, so an internet host
+# doesn't have to touch their router manually. Returns the router-reported
+# public IP on success, "" on any failure - a router with UPnP off/unsupported,
+# or an ISP doing CGNAT (no real public IP handed to the router at all), can't
+# be helped this way regardless; host_game() just falls back to the LAN
+# address and port_forward_failed lets the UI explain why strangers can't
+# join. _upnp is kept around (not a local var) so stop_hosting() can remove
+# the mapping again instead of leaving it on the router indefinitely.
+func _try_forward_port(port: int) -> String:
+	_upnp = UPNP.new()
+	if _upnp.discover() != UPNP.UPNP_RESULT_SUCCESS:
+		port_forward_failed.emit("No UPnP-capable router found on this network")
+		_upnp = null
+		return ""
+	var gateway := _upnp.get_gateway()
+	if not gateway or not gateway.is_valid_gateway():
+		port_forward_failed.emit("Router found but isn't a valid UPnP gateway")
+		_upnp = null
+		return ""
+	var map_result := _upnp.add_port_mapping(port, port, "Sledge 2", "UDP")
+	if map_result != UPNP.UPNP_RESULT_SUCCESS:
+		port_forward_failed.emit("Router refused the port mapping (%d)" % map_result)
+		_upnp = null
+		return ""
+	_upnp_port = port
+	var external_ip := _upnp.query_external_address()
+	if external_ip.is_empty():
+		port_forward_failed.emit("Port mapped, but couldn't read the router's public IP")
+	return external_ip
+
+
 func _get_local_ip() -> String:
 	var candidates: Array[String] = []
 	for addr in IP.get_local_addresses():
@@ -260,15 +313,36 @@ func _get_local_ip() -> String:
 	return "127.0.0.1"
 
 
-func _register_host(game_name: String, map_file_id: int, port: int, max_players: int, host_address: String) -> void:
+func _register_host(game_name: String, map_file_id: int, port: int, max_players: int, host_address: String, manifest: Dictionary) -> void:
 	_api_request("register_host", {
 		"hst_game_name": game_name,
 		"hst_map_file_id": map_file_id,
 		"hst_ip_address": host_address,
 		"hst_port": port,
 		"hst_max_players": max_players,
-		"hst_password_protected": 0
+		"hst_password_protected": 0,
+		# Opaque blob (lobbyAPI.php just stores/returns this string as-is,
+		# never parses it) - the point is being able to add fields here later
+		# (game mode, ruleset, whatever) without ever touching the DB schema
+		# or the PHP again, only this dictionary and whatever reads it in
+		# index.gd::_on_games_listed.
+		"hst_manifest": JSON.stringify(manifest)
 	}, func(_data): pass)
+
+
+# weapon_paths are WeaponSettings resource paths (see host_game) - resolved
+# to their display names here since that's what the join-list actually wants
+# to show, not a path nobody joining would recognize.
+func _build_manifest(weapon_paths: Array[String], day_night: bool) -> Dictionary:
+	var weapon_names: Array[String] = []
+	for path in weapon_paths:
+		var settings: WeaponSettings = load(path)
+		if settings:
+			weapon_names.append(settings.weapon_name)
+	return {
+		"weapons": weapon_names,
+		"day_night": day_night
+	}
 
 
 func _send_heartbeat() -> void:

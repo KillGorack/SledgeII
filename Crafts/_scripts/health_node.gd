@@ -34,6 +34,8 @@ var _stored_collision_mask: int = 0
 @onready var body: Node3D = get_parent()
 
 
+
+
 func _ready() -> void:
 	if stats == null:
 		return
@@ -55,7 +57,10 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	if not multiplayer.is_server():
+	# has_multiplayer_peer() first - see power_node.gd's _process() for why
+	# (is_server() alone spams "Condition is_active() is true" errors every
+	# frame while this peer's connection isn't fully up yet).
+	if not multiplayer.has_multiplayer_peer() or not multiplayer.is_server():
 		return
 	# apply_damage()/respawn_at() below broadcast shields/armor/life correctly
 	# on their own (RPCs, so every peer computes the same result whenever a
@@ -72,13 +77,24 @@ func _process(delta: float) -> void:
 	if _is_regenerating and shields < _shields_max:
 		shields = min(_shields_max, shields + stats.regeneration_rate * delta)
 	_process_station_healing(delta)
-	# _is_destroyed guard matters here specifically: destroy_self() itself is
-	# already safe to call more than once (see its own guard), but without
-	# this the craft sits below FALL_DEATH_Y for the entire respawn delay -
-	# it doesn't get teleported back up until respawn_at() actually fires -
-	# so this would otherwise re-fire every frame for the whole 4 seconds.
+	# _is_destroyed guard matters here specifically: without it, the craft
+	# sits below FALL_DEATH_Y for the entire respawn delay - it doesn't get
+	# teleported back up until respawn_at() actually fires - so this would
+	# otherwise re-fire every tick for the whole 4 seconds.
+	#
+	# Routed through apply_damage.rpc(), not a direct destroy_self() call -
+	# this whole block only ever runs on the server (see the guard above),
+	# and destroy_self() is a plain function specifically because every
+	# other caller (apply_damage() itself) already broadcasts before
+	# reaching it. Calling it directly here skipped that broadcast entirely:
+	# the host (the server, in any host-and-play session) would correctly
+	# see itself explode, but no other peer was ever told, leaving that
+	# craft alive and healthy on every other screen forever - stuck, since
+	# a respawn nobody else witnessed never arrives for them either.
+	# shields + armor + life guarantees lethality through all three layers
+	# regardless of current HP, same as a real overkill hit would.
 	if not _is_destroyed and body.global_position.y < FALL_DEATH_Y:
-		destroy_self()
+		apply_damage.rpc(shields + armor + life)
 
 
 # Only the server should ever decide damage - the collision handler that
@@ -117,7 +133,13 @@ func apply_damage(damage: float) -> void:
 # just turns an impact speed into real damage through the normal apply_damage
 # path above, so fall damage drains shields/armor/life in the same order any
 # other hit does.
-@rpc("any_peer", "reliable")
+#
+# call_local matters here specifically: rpc_id(1, ...) is a complete no-op,
+# not just "runs remotely," when the calling peer's own id IS 1 - i.e.
+# whenever the HOST owns the craft that's landing, since the host is always
+# peer 1. Without call_local, the host's own hard landings silently never
+# dealt fall damage at all; only a client's landings ever reached here.
+@rpc("any_peer", "call_local", "reliable")
 func request_fall_damage(impact_speed: float) -> void:
 	if not multiplayer.is_server():
 		return
@@ -133,9 +155,10 @@ func request_fall_damage(impact_speed: float) -> void:
 # shape as apply_damage() above, just reversed: fill armor first, then
 # whatever's left over this frame spills into life.
 func _process_station_healing(delta: float) -> void:
-	if _is_destroyed or (armor >= _armor_max and life >= _life_max):
+	if _is_destroyed:
 		return
-	if not _at_own_captured_station():
+	var at_own_station := _at_own_captured_station()
+	if (armor >= _armor_max and life >= _life_max) or not at_own_station:
 		return
 	var heal := stats.station_heal_rate * delta
 	if armor < _armor_max:
@@ -144,8 +167,6 @@ func _process_station_healing(delta: float) -> void:
 		heal -= to_armor
 	if heal > 0.0 and life < _life_max:
 		life = min(_life_max, life + heal)
-
-
 # team lives on weapon_node (see recon_station.gd::color_for_team for the
 # string<->enum translation, and power_node.gd for the same lookup pattern) -
 # is_body_inside is the same boolean containment check match.gd's capture

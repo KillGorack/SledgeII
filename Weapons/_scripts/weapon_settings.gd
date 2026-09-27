@@ -25,6 +25,16 @@ class_name WeaponSettings
 @export_color_no_alpha var projectile_color: Color = Color.WHITE
 @export var explosion_prefab: PackedScene
 @export var bullet_hole_prefab: PackedScene
+# Continuous smoke trail (e.g. AP Shell) rather than explosion/bullet_hole's
+# one-shot cosmetics - spawned as a sibling of the projectile, not a child of
+# it, and tracks it every frame via smoke_trail.gd's own follow() rather than
+# normal scene-tree transform inheritance. See collision_handler.gd::_ready -
+# a GPUParticles3D actually parented under the projectile only sees its raw,
+# stepped replicated transform (unlike Trail3D, which samples
+# get_global_transform_interpolated() itself), so puffs would clump and jump
+# with every network update instead of trailing smoothly. Being a sibling
+# also lets the trail keep fading out after the projectile itself is freed.
+@export var smoke_trail_prefab: PackedScene
 
 @export var launch_sound: AudioStream
 @export var hit_sound: AudioStream

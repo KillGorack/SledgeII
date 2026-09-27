@@ -60,10 +60,23 @@ const GROUP_LAYER_SCOPE = {
 const MAX_AUDIO_PLAYERS = 32
 var audio_pool: Array = []
 
+# Godot's own AudioStreamPlayer3D defaults (unit_size=10, max_distance=0 i.e.
+# unlimited) are sized for room-scale games, not a craft combat arena where
+# basic_cannon alone has a 300-unit projectile_range - left untouched, every
+# sound stayed near full volume way past where it should have started fading
+# and never fully cut off at range. unit_size=15 keeps close-range (muzzle
+# right at the listener) sounds at full volume; max_distance=350 (just past
+# the longest weapon range) means distant fire actually fades out instead of
+# lingering audibly forever.
+const AUDIO_UNIT_SIZE := 15.0
+const AUDIO_MAX_DISTANCE := 350.0
+
 func _ready() -> void:
 	for i in range(MAX_AUDIO_PLAYERS):
 		var player = AudioStreamPlayer3D.new()
 		player.name = "AudioStreamPlayer3D_%d" % i
+		player.unit_size = AUDIO_UNIT_SIZE
+		player.max_distance = AUDIO_MAX_DISTANCE
 		player.finished.connect(_on_audio_finished.bind(player))
 		add_child(player)
 		audio_pool.append(player)

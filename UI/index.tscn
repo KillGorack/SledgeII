@@ -440,6 +440,11 @@ text = "Match Rules"
 layout_mode = 2
 text = "Day/Night Cycle"
 
+[node name="PublicGameCheck" type="CheckBox" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn" unique_id=1700000001]
+layout_mode = 2
+tooltip_text = "Tries to auto-forward the port on your router (UPnP) and list your real public IP, so people outside your LAN can join. Leave off for LAN-only games."
+text = "Public Game (allow internet players)"
+
 [node name="WeaponsLabel" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn" unique_id=979455328]
 layout_mode = 2
 text = "Available Weapons"
@@ -479,7 +484,7 @@ layout_mode = 2
 [node name="GameList" type="Tree" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Join Game/MarginContainer/VBoxContainer" unique_id=1990540562]
 layout_mode = 2
 size_flags_vertical = 3
-columns = 3
+columns = 4
 allow_search = false
 hide_folding = true
 enable_recursive_folding = false
