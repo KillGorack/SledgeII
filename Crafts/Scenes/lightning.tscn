@@ -29,8 +29,11 @@
 [ext_resource type="Script" uid="uid://bhb2fc32wr4yj" path="res://Crafts/_scripts/radar_controller.gd" id="27_i28qn"]
 [ext_resource type="Texture2D" uid="uid://d2fcmxoatss3r" path="res://UI/images/Radar_Ring.png" id="28_i28qn"]
 [ext_resource type="Script" uid="uid://dc7nvy010cc26" path="res://Crafts/_scripts/radar_target_def.gd" id="29_kqlfo"]
+[ext_resource type="Script" uid="uid://b8ja1utj1l0jw" path="res://Crafts/_scripts/chat_controller.gd" id="30_chat"]
 [ext_resource type="Resource" uid="uid://c5rwld4fk2qvr" path="res://Crafts/Settings/blip_recon.tres" id="30_qkbj0"]
 [ext_resource type="Resource" uid="uid://dsxm45xl6xbcy" path="res://Crafts/Settings/blip_base_gun.tres" id="31_qkbj0"]
+[ext_resource type="Texture2D" uid="uid://weqhjf5tdahr" path="res://UI/images/CP_Back.png" id="32_a75n7"]
+[ext_resource type="Resource" uid="uid://bo28uys4u40w8" path="res://Crafts/Settings/Player.tres" id="32_xb8dm"]
 
 [sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_g7gqi"]
 points = PackedVector3Array(0.359591, 0.08753002, 0.36253202, -0.359594, 0.08753002, 0.36253202, 0.359591, -0.2351391, 0.36253202, 0.359591, 0.08753002, -1.233568, -0.359594, -0.2351391, 0.36253202, -0.359594, 0.08753002, -1.233568, 0.35677505, -0.25258067, 0.35971975, 0.359591, -0.2351391, -1.233568, -0.359594, -0.2351391, -1.233568, -0.35684848, -0.25258067, 0.35971975, 0.3487497, -0.2683152, 0.35159552, 0.35677505, -0.25258067, -1.230912, -0.35684848, -0.25258067, -1.230912, -0.3488231, -0.2683152, 0.35159552, 0.3362893, -0.28082117, 0.33909667, 0.3487497, -0.2683152, -1.2229439, -0.3488231, -0.2683152, -1.2229439, -0.3363627, -0.28082117, 0.33909667, 0.32052016, -0.2888369, 0.32347322, 0.3362893, -0.28082117, -1.2104452, -0.3363627, -0.28082117, -1.2104452, -0.32059354, -0.2888369, 0.32347322, 0.3030615, -0.291583, 0.30597484, 0.32052016, -0.2888369, -1.1946653, -0.32059354, -0.2888369, -1.1946653, -0.30313486, -0.291583, 0.30597484, 0.3030615, -0.291583, -1.177167, -0.30313486, -0.291583, -1.177167)
@@ -399,7 +402,7 @@ can_sleep = false
 [node name="movement_node" type="Node3D" parent="." unique_id=1513453241]
 script = ExtResource("1_nm6mo")
 stats = ExtResource("4_stats")
-SUSPENSION_RAY_LENGTH = 0.02
+SUSPENSION_RAY_LENGTH = 0.05
 SUSPENSION_SPRING_STRENGTH = 10000.0
 SUSPENSION_DAMPING = 75.0
 
@@ -633,9 +636,10 @@ script = ExtResource("23_juice")
 
 [node name="FPS" type="Label" parent="Hud_InGame" unique_id=457254272]
 layout_mode = 1
+offset_left = 5.0
 offset_right = 102.0
 offset_bottom = 23.0
-horizontal_alignment = 2
+text = "116 FPS"
 
 [node name="Weapon" type="Label" parent="Hud_InGame" unique_id=1301515584]
 layout_mode = 1
@@ -650,6 +654,23 @@ offset_right = -110.0
 offset_bottom = -22.0
 grow_horizontal = 2
 grow_vertical = 0
+text = "Repulsor"
+
+[node name="Weapon2" type="Label" parent="Hud_InGame" unique_id=1927917682]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = 115.0
+offset_top = -45.0
+offset_right = 225.0
+offset_bottom = -22.0
+grow_horizontal = 2
+grow_vertical = 0
+text = "0 / 4"
+horizontal_alignment = 2
 
 [node name="Radar_Bezel" type="TextureRect" parent="Hud_InGame" unique_id=640715911]
 layout_mode = 1
@@ -676,5 +697,52 @@ offset_bottom = -9.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("27_i28qn")
-target_defs = Array[ExtResource("29_kqlfo")]([ExtResource("30_qkbj0"), ExtResource("31_qkbj0")])
+target_defs = Array[ExtResource("29_kqlfo")]([ExtResource("30_qkbj0"), ExtResource("31_qkbj0"), ExtResource("32_xb8dm")])
 self_size = Vector2(8, 8)
+
+[node name="Chat" type="Control" parent="Hud_InGame" unique_id=1427117481]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = -160.0
+offset_right = 410.0
+offset_bottom = -10.0
+grow_vertical = 0
+script = ExtResource("30_chat")
+
+[node name="Background" type="TextureRect" parent="Hud_InGame/Chat" unique_id=156771628]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("32_a75n7")
+expand_mode = 1
+
+[node name="Margin" type="MarginContainer" parent="Hud_InGame/Chat" unique_id=1593695201]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="VBox" type="VBoxContainer" parent="Hud_InGame/Chat/Margin" unique_id=29147259]
+layout_mode = 2
+
+[node name="TextEdit" type="TextEdit" parent="Hud_InGame/Chat/Margin/VBox" unique_id=1382944740]
+layout_mode = 2
+size_flags_vertical = 3
+editable = false
+wrap_mode = 1
+indent_wrapped_lines = true
+
+[node name="LineEdit" type="LineEdit" parent="Hud_InGame/Chat/Margin/VBox" unique_id=1571506855]
+layout_mode = 2

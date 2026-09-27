@@ -16,19 +16,44 @@ var _client_next_fire_time: float = 0.0
 # what the client claims - a modified client spamming request_fire still
 # gets rejected here.
 var _server_next_fire_time: Dictionary = {}
-# Server-only, per-weapon-index remaining ammo for physical (non-power)
-# weapons - see request_fire() below for why this can't live on the shared
-# WeaponSettings resource itself.
-var _ammo_remaining: Dictionary = {}
+# Server-authoritative, per-weapon-index remaining ammo for physical
+# (non-power) weapons - see request_fire() below for why this can't live on
+# the shared WeaponSettings resource itself.
+#
+# Pushed to the owning client explicitly via _sync_ammo.rpc_id() below,
+# NOT via a MultiplayerSynchronizer on this array - that was tried first and
+# failed three different ways in a row (restricted visibility silently
+# blocking every RPC on this node including request_fire itself; Array[int]
+# specifically not replicating changes at all, a documented Godot bug,
+# godot#74391; and finally a "Node not found" race on the synchronizer's own
+# node path on spawn). A plain rpc_id() call is the same mechanism already
+# proven reliable all over this project (request_fire, _play_launch_sound,
+# apply_damage) - passing the array as an RPC argument sidesteps the whole
+# automatic-property-replication machinery that kept breaking, rather than
+# continuing to debug it. Pre-sized to weapon_settings.size() in _ready() so
+# every valid index always has a real value, no .get()-with-fallback needed.
+var _ammo_remaining: Array = []
 
 @onready var barrel: Node3D = get_node("../Turret/Barrel")
 @onready var power_node: Node3D = get_node("../power_node")
+@onready var chat: Control = get_node("../Hud_InGame/Chat")
+
+
+func _ready() -> void:
+	_ammo_remaining.resize(weapon_settings.size())
+	for i in range(weapon_settings.size()):
+		var settings := weapon_settings[i]
+		_ammo_remaining[i] = settings.projectile_count_actual if settings else 0
 
 
 func _physics_process(_delta: float) -> void:
 	if not is_multiplayer_authority():
 		return
 	if weapon_settings.is_empty():
+		return
+	# Space/Enter are live keys while typing a chat message - see
+	# chat_controller.gd::is_open, same reasoning as movement.gd.
+	if chat.is_open:
 		return
 	if Input.is_action_just_pressed("weapon_change"):
 		switch_weapon()
@@ -57,10 +82,9 @@ func _physics_process(_delta: float) -> void:
 # equipped, since cool_down is re-read from that weapon's settings every time
 # a shot fires (see request below). Also true while there isn't enough power
 # for the current weapon, for the same reason - the reticle shouldn't just go
-# quiet. Ammo isn't checked here (unlike power) - remaining count only lives
-# server-side right now (see _ammo_remaining), so a remote client has no
-# accurate number to predict against yet; a guess here would be wrong exactly
-# as often as it's right.
+# quiet. Ammo isn't factored in here (unlike power) - out of scope for this
+# check, not because the client can't see it (see _ammo_remaining, now
+# replicated for the HUD's own ammo readout).
 func is_on_cooldown() -> bool:
 	if Time.get_ticks_msec() / 1000.0 < _client_next_fire_time:
 		return true
@@ -75,11 +99,24 @@ func is_on_cooldown() -> bool:
 # its capacity. Power isn't touched here, same reason as ammo not being
 # checked in is_on_cooldown(): the station already charges that continuously
 # via power_node.gd just from being nearby.
-func refill_ammo() -> void:
+#
+# Returns whether any weapon's ammo actually went up, so recon_station.gd can
+# gate its resupply sound on it - a weapon already sitting at capacity
+# contributes nothing, and projectile_count_capacity == 0 ("unlimited", same
+# convention as power_consumption == 0) is skipped entirely below, same as it
+# always was, so power weapons never count toward this either.
+func refill_ammo() -> bool:
+	var refilled: Array = _ammo_remaining.duplicate()
+	var gained_ammo := false
 	for i in range(weapon_settings.size()):
 		var settings := weapon_settings[i]
 		if settings and settings.projectile_count_capacity != 0:
-			_ammo_remaining[i] = settings.projectile_count_capacity
+			if refilled[i] < settings.projectile_count_capacity:
+				gained_ammo = true
+			refilled[i] = settings.projectile_count_capacity
+	_ammo_remaining = refilled
+	_sync_ammo.rpc_id(get_multiplayer_authority(), _ammo_remaining)
+	return gained_ammo
 
 
 func switch_weapon() -> void:
@@ -118,17 +155,22 @@ func request_fire(weapon_index: int) -> void:
 		return
 	# Physical weapons (missiles, shells) spend ammo instead of power -
 	# capacity 0 means unlimited, same convention as the old game. This has to
-	# be its own Dictionary rather than decrementing settings.projectile_count_actual
+	# be its own Array rather than decrementing settings.projectile_count_actual
 	# directly: weapon_settings entries are the same shared .tres Resource
 	# referenced by every craft using this weapon, so writing the live count
 	# onto the resource itself would drain one shared ammo pool across every
 	# player instead of a separate one per craft. projectile_count_actual is
-	# only ever read here, as the starting amount.
+	# only ever read at _ready(), as the starting amount.
 	if settings.projectile_count_capacity != 0:
-		var ammo_left: int = _ammo_remaining.get(weapon_index, settings.projectile_count_actual)
+		var ammo_left: int = _ammo_remaining[weapon_index]
 		if ammo_left < settings.projectile_count:
 			return
-		_ammo_remaining[weapon_index] = ammo_left - settings.projectile_count
+		# Reassigns the whole array rather than mutating this element in
+		# place - see _ammo_remaining's own comment for why.
+		var updated: Array = _ammo_remaining.duplicate()
+		updated[weapon_index] = ammo_left - settings.projectile_count
+		_ammo_remaining = updated
+		_sync_ammo.rpc_id(get_multiplayer_authority(), _ammo_remaining)
 	_server_next_fire_time[weapon_index] = now + settings.cool_down
 	var match_node = get_tree().get_first_node_in_group("match")
 	if match_node and match_node.has_method("spawn_projectile"):
@@ -136,6 +178,12 @@ func request_fire(weapon_index: int) -> void:
 		var forward = -muzzle.basis.z.normalized()
 		muzzle.origin += forward * settings.launch_offset
 		_fire_volley(match_node, path, muzzle, settings)
+		# Once per fire request, not once per projectile - _fire_volley
+		# spawns a separate collision_handler instance per shot in the
+		# count, so playing this from there (or from each projectile's own
+		# _ready()) would stack N overlapping copies of the same sound for
+		# one press on a multi-shot weapon.
+		_play_launch_sound.rpc(weapon_index, muzzle.origin)
 		if settings.projectile_recoil > 0 and get_parent() is RigidBody3D:
 			get_parent().apply_central_impulse(-forward * settings.projectile_recoil)
 
@@ -167,3 +215,18 @@ func _fire_volley(match_node: Node, weapon_settings_path: String, muzzle: Transf
 		var offset = (right * cos(angle) + up * sin(angle)) * settings.projectile_spacing
 		var shot_transform := Transform3D(muzzle.basis, muzzle.origin + offset)
 		match_node.spawn_projectile(weapon_settings_path, team, shot_transform)
+
+
+@rpc("any_peer", "call_local", "reliable")
+func _play_launch_sound(weapon_index: int, cur_position: Vector3) -> void:
+	if weapon_index < 0 or weapon_index >= weapon_settings.size():
+		return
+	var settings := weapon_settings[weapon_index]
+	if settings and settings.launch_sound:
+		Utilities.play_sound(settings.launch_sound, cur_position, 0.015)
+
+
+
+@rpc("any_peer", "call_local", "reliable")
+func _sync_ammo(ammo: Array) -> void:
+	_ammo_remaining = ammo

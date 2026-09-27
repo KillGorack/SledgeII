@@ -47,7 +47,11 @@ func _ready() -> void:
 # there's no player input or RPC involved here, the server decides on its
 # own when to fire.
 func _physics_process(_delta: float) -> void:
-	if not multiplayer.is_server():
+	# has_multiplayer_peer() first - see power_node.gd's _process() for why
+	# (this is the one that first surfaced the spam: 4 base guns per map,
+	# every one running this every physics tick, so it was the loudest of
+	# several scripts with the exact same latent issue).
+	if not multiplayer.has_multiplayer_peer() or not multiplayer.is_server():
 		return
 	if weapon_settings == null or team == "":
 		return

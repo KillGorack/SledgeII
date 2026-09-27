@@ -8,6 +8,7 @@
 [ext_resource type="Shader" uid="uid://n1kaoh7j33ja" path="res://Materials/Shaders/clash.tres" id="6_7o1g6"]
 [ext_resource type="Texture2D" uid="uid://cglf5hd5udewc" path="res://Materials/Textures/Particles/T_circle42.PNG" id="7_04cjh"]
 [ext_resource type="Shader" uid="uid://c05kf2yj5tshy" path="res://Materials/Shaders/clash_spark.tres" id="8_65rut"]
+[ext_resource type="AudioStream" uid="uid://ddn0qisytl3nm" path="res://Weapons/Sounds/Explosion.wav" id="9_04cjh"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_yj4eb"]
 transparency = 1
@@ -121,6 +122,10 @@ size = Vector2(0.1, 0.6)
 [node name="Explosion_Main" type="Node3D" unique_id=2133547461]
 script = ExtResource("4_4h2r5")
 duration = 1.0
+
+[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." unique_id=801616076]
+stream = ExtResource("9_04cjh")
+autoplay = true
 
 [node name="Explosion" type="GPUParticles3D" parent="." unique_id=1636963669]
 material_override = SubResource("StandardMaterial3D_yj4eb")

@@ -2,6 +2,7 @@
 
 [ext_resource type="Material" uid="uid://usbec12og0vy" path="res://Materials/PBR/recon_pad_nuetral.tres" id="1_1mwv1"]
 [ext_resource type="Script" uid="uid://bwb0wgwyq48c7" path="res://Game_Objects/_scripts/recon_station.gd" id="1_recon"]
+[ext_resource type="AudioStream" uid="uid://qfptgv7toxx3" path="res://Game_Objects/Sounds/up.wav" id="2_1jvxj"]
 [ext_resource type="Shader" uid="uid://b0sjwigstviso" path="res://Materials/Shaders/recon_pad_energy.gdshader" id="2_energy"]
 [ext_resource type="Script" uid="uid://bwdrqy4iifec4" path="res://_globals/twirl.gd" id="4_ltmg8"]
 [ext_resource type="Shader" uid="uid://6eo3tlh2yq3k" path="res://Materials/Shaders/Shield.gdshader" id="5_lhe11"]
@@ -41,6 +42,7 @@ size = Vector3(0.25, 0.25, 0.05)
 
 [node name="Recon_Station" type="Node3D" unique_id=2055148646]
 script = ExtResource("1_recon")
+resupply_sound = ExtResource("2_1jvxj")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1470913182]
 transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 0, 0, 0)

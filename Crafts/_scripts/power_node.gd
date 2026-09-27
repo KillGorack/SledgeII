@@ -24,7 +24,13 @@ var current_power: float = 0.0
 
 
 func _process(delta: float) -> void:
-	if not multiplayer.is_server():
+	# has_multiplayer_peer() first - is_server() reaches into the peer's own
+	# get_unique_id(), which errors ("Condition is_active() is true") if a
+	# peer object exists but isn't actually connected yet/anymore, instead
+	# of just returning false like a not-yet-ready check normally would.
+	# _process() runs every frame on every peer unconditionally, so without
+	# this it spams that error the entire time a peer is mid-connecting.
+	if not multiplayer.has_multiplayer_peer() or not multiplayer.is_server():
 		return
 	if stats == null:
 		return

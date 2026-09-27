@@ -46,6 +46,7 @@ func _ready() -> void:
 		Utilities.set_allegiance(self, allegiance_group)
 	if weapon_settings:
 		_apply_projectile_color(weapon_settings.projectile_color)
+		_spawn_smoke_trail()
 
 
 # Runs identically on every peer - weapon_settings is assigned by
@@ -72,6 +73,21 @@ func _apply_projectile_color_to(node: Node, color: Color) -> void:
 		node.apply_projectile_color(color)
 	for child in node.get_children():
 		_apply_projectile_color_to(child, color)
+
+
+# Added as a sibling under get_parent() (same parent explosion/bullet-hole
+# effects use below), NOT as a child of this projectile - see
+# smoke_trail_prefab's own comment in weapon_settings.gd for why a
+# GPUParticles3D child would jitter with the replicated transform where
+# Trail3D doesn't. follow() makes the trail sample this projectile's
+# interpolated transform itself every frame instead, and keeps fading out
+# on its own after this projectile is gone.
+func _spawn_smoke_trail() -> void:
+	if not weapon_settings.smoke_trail_prefab or not get_parent():
+		return
+	var trail_instance = weapon_settings.smoke_trail_prefab.instantiate()
+	get_parent().add_child(trail_instance)
+	trail_instance.follow(self)
 
 
 # Same duck-typed walk as color above, for the same reason: rocket/laser/

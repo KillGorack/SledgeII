@@ -27,6 +27,12 @@ var feedback_base_x: float
 @onready var load_game_tabs: TabContainer = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer"
 @onready var game_list_poll_timer := Timer.new()
 @onready var day_night_check: CheckBox = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn/DayNightCheck"
+@onready var public_game_check: CheckBox = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn/PublicGameCheck"
+
+# Set by NetworkManager.port_forward_failed, read by _on_host_started - see
+# _on_host_pressed's comment for why this can't just be a set_ui_feedback()
+# call at the point it fires.
+var _pending_port_forward_warning: String = ""
 @onready var host_address_override: LineEdit = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn/HostAddressOverride"
 @onready var weapon_checklist: VBoxContainer = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn/WeaponChecklistScroll/WeaponChecklist"
 @onready var host_team_picker: OptionButton = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn/HostTeamPicker"
@@ -92,6 +98,10 @@ func _ready() -> void:
 	NetworkManager.games_listed.connect(_on_games_listed)
 	NetworkManager.host_started.connect(_on_host_started)
 	NetworkManager.host_failed.connect(func(reason): set_ui_feedback(reason, "NOK"))
+	# Hosting still succeeds when this fires - fires synchronously inside
+	# host_game(), before host_started, before this scene gets replaced - see
+	# _on_host_started for where this actually gets shown.
+	NetworkManager.port_forward_failed.connect(func(reason): _pending_port_forward_warning = "Couldn't auto-forward your port: %s. Forward UDP %d manually for internet players." % [reason, NetworkManager.DEFAULT_PORT])
 	NetworkManager.join_failed.connect(func(reason): set_ui_feedback(reason, "NOK"))
 	NetworkManager.api_error.connect(func(reason): set_ui_feedback(reason, "NOK"))
 	NetworkManager.player_registered.connect(_on_player_registered)
@@ -125,9 +135,7 @@ func _enter_load_screen(feedback_message: String) -> void:
 	load_game_tabs.current_tab = 0
 	set_ui_feedback(feedback_message, "OK")
 	getLevels()
-	# Refresh the Join Game list at the same moment, not just the Create Game
-	# one - previously this stayed empty until the player manually hit the
-	# refresh button, even though a login is exactly when it's stalest.
+	await get_tree().create_timer(1).timeout
 	NetworkManager.list_open_games()
 
 
@@ -166,27 +174,29 @@ func _on_game_selected():
 # WEAPON_CATALOG_DIRS and it shows up here with no other changes needed.
 # default_available (see weapon_settings.gd) seeds each checkbox's starting
 # state; the host can still check it back on or off from there.
+#
+# ResourceLoader.list_directory(), not DirAccess - Godot converts .tres files
+# to binary .res on export by default (editor/export/convert_text_resources_
+# to_binary, on by default, not overridden in this project), so a DirAccess
+# scan filtering on ".tres" found every weapon in the editor and NONE of them
+# in an exported build, silently. ResourceLoader.list_directory() reports
+# each file's original pre-export extension regardless of how it's actually
+# stored, so this filter works identically in both.
 func _build_weapon_checklist() -> void:
 	for child in weapon_checklist.get_children():
 		child.queue_free()
 	for dir_path in WEAPON_CATALOG_DIRS:
-		var dir := DirAccess.open(dir_path)
-		if dir == null:
-			continue
-		dir.list_dir_begin()
-		var file_name := dir.get_next()
-		while file_name != "":
-			if not dir.current_is_dir() and file_name.ends_with(".tres"):
-				var weapon_path := dir_path.path_join(file_name)
-				var settings: WeaponSettings = load(weapon_path)
-				if settings:
-					var check := CheckBox.new()
-					check.text = settings.weapon_name
-					check.button_pressed = settings.default_available
-					check.set_meta("weapon_path", weapon_path)
-					weapon_checklist.add_child(check)
-			file_name = dir.get_next()
-		dir.list_dir_end()
+		for file_name in ResourceLoader.list_directory(dir_path):
+			if file_name.ends_with("/") or not file_name.ends_with(".tres"):
+				continue
+			var weapon_path := dir_path.path_join(file_name)
+			var settings: WeaponSettings = load(weapon_path)
+			if settings:
+				var check := CheckBox.new()
+				check.text = settings.weapon_name
+				check.button_pressed = settings.default_available
+				check.set_meta("weapon_path", weapon_path)
+				weapon_checklist.add_child(check)
 
 
 func _get_checked_weapon_paths() -> Array[String]:
@@ -201,23 +211,36 @@ func _on_host_pressed():
 	if selected_map_title == "":
 		set_ui_feedback("Select a map to host first.", "COK")
 		return
+	# host_game() is synchronous (UPnP's discover()/add_port_mapping() block
+	# until they finish) - by the time it returns, port_forward_failed has
+	# already fired (if it was going to) and _on_host_started has already run
+	# and changed the scene. Nothing useful is left to say here afterward -
+	# see _pending_port_forward_warning for where that message actually goes.
+	_pending_port_forward_warning = ""
 	NetworkManager.host_game(
 		selected_map_title,
 		selected_map_file_id,
 		_get_checked_weapon_paths(),
 		day_night_check.button_pressed,
 		host_address_override.text,
-		NetworkManager.TEAM_NAMES[host_team_picker.selected]
+		NetworkManager.TEAM_NAMES[host_team_picker.selected],
+		NetworkManager.DEFAULT_PORT,
+		20,
+		public_game_check.button_pressed
 	)
-	set_ui_feedback("Hosting \"%s\"..." % selected_map_title, "INFO")
 
 
-func _on_host_started(address: String):
+func _on_host_started(address: String) -> void:
 	# Surfacing the actual address, not just "hosted" - auto-detection can
 	# pick a slow/wrong adapter silently when more than one is active (see
 	# NetworkManager._get_local_ip); this at least makes it visible instead
-	# of a guess nobody can check.
-	set_ui_feedback("Hosting on %s, waiting for players..." % address, "OK")
+	# of a guess nobody can check. Note: match.tscn replaces this whole scene
+	# (ui_feedback included) right after, so this message is only ever
+	# visible for an instant - see git history if that needs revisiting.
+	if _pending_port_forward_warning != "":
+		set_ui_feedback("Hosting on %s (LAN only). %s" % [address, _pending_port_forward_warning], "NOK")
+	else:
+		set_ui_feedback("Hosting on %s, waiting for players..." % address, "OK")
 	get_tree().change_scene_to_file("res://Networking/match.tscn")
 
 
@@ -304,19 +327,31 @@ func _on_games_listed(games: Array):
 	var root = game_list.create_item()
 	root.set_text(0, "")
 	var header = game_list.create_item()
-	header.set_text(0, "Game")
-	header.set_text(1, "Host")
+	header.set_text(0, "Arena")
+	header.set_text(1, "Hosted by")
 	header.set_text(2, "Players")
+	header.set_text(3, "Day/Night")
 	header.set_selectable(0, false)
 	header.set_selectable(1, false)
 	header.set_selectable(2, false)
+	header.set_selectable(3, false)
 	for game in games:
 		var row = game_list.create_item()
 		row.set_text(0, game.get("hst_game_name", ""))
 		# hst_user is just the numeric account id (see lobbyAPI.php) - the
 		# actual display name is the joined hst_username field.
 		row.set_text(1, str(game.get("hst_username", "")))
-		row.set_text(2, "%s/%s" % [game.get("hst_current_players", "?"), game.get("hst_max_players", "?")])
+		# int() regardless of whether the API handed back "3" or "3.0" -
+		# player counts should never read as a decimal either way.
+		row.set_text(2, "%d/%d" % [int(game.get("hst_current_players", 0)), int(game.get("hst_max_players", 0))])
+		# hst_manifest is an opaque JSON blob (see NetworkManager._build_manifest) -
+		# add more fields to it later without ever touching the API/DB again,
+		# just what's read out of it here.
+		var manifest: Dictionary = JSON.parse_string(game.get("hst_manifest", "")) if game.get("hst_manifest", "") else {}
+		row.set_text(3, "Yes" if manifest.get("day_night", true) else "No")
+		var weapons: Array = manifest.get("weapons", [])
+		if not weapons.is_empty():
+			row.set_tooltip_text(0, "Weapons: %s" % ", ".join(weapons))
 		row.set_meta("hst_ip_address", game.get("hst_ip_address", ""))
 		row.set_meta("hst_port", game.get("hst_port", 0))
 		row.set_meta("hst_map_file_id", game.get("hst_map_file_id", 0))

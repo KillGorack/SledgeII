@@ -36,6 +36,7 @@ var pitch = 0.0
 var recentering = false
 @onready var barrel = $"../Turret/Barrel"
 @onready var turret = $"../Turret"
+@onready var chat: Control = get_node("../Hud_InGame/Chat")
 
 
 func _ready() -> void:
@@ -91,10 +92,15 @@ func _handle_landing() -> void:
 	var impact_speed = max(0.0, -_airborne_velocity.dot(result.normal))
 	if impact_speed <= 0.0:
 		return
-	if multiplayer.is_server():
-		health_node.request_fall_damage(impact_speed)
-	else:
-		health_node.request_fall_damage.rpc_id(1, impact_speed)
+	# One path, not two - this used to branch (direct local call if already
+	# the server, rpc_id() otherwise), almost certainly because rpc_id(1,...)
+	# used to be a no-op when the caller's own peer id is 1 (i.e. whenever
+	# the HOST owns the landing craft) without call_local on
+	# request_fall_damage's own @rpc annotation. Now that it has call_local,
+	# a single rpc_id() call is correct either way - no reason for two
+	# different code paths to stay in sync for what's supposed to be one
+	# event.
+	health_node.request_fall_damage.rpc_id(1, impact_speed)
 
 
 
@@ -139,12 +145,25 @@ func _find_mesh_instances(node: Node) -> Array:
 func _physics_process(delta: float) -> void:
 	if not is_multiplayer_authority():
 		return
+	var health_node = body.get_node_or_null("health_node")
+	if health_node and health_node.has_method("_is_destroyed"):
+		if health_node._is_destroyed:
+			return
 	if stop_forces or stats == null:
 		return
 	if not target_pitch:
 		target_pitch = stats.target_audio_pitch
-	var forward_input = Input.get_action_strength("ui_down") - Input.get_action_strength("ui_up")
-	var turn_input = Input.get_action_strength("ui_left") - Input.get_action_strength("ui_right")
+	# While chatting, arrow keys/WASD/etc. are being typed, not driving the
+	# craft - see chat_controller.gd::is_open. Physics below (suspension,
+	# grounding, landing, engine sound) still runs as normal either way; only
+	# the actual input reads freeze, so a chatting player still falls/lands
+	# normally instead of the craft just stopping dead.
+	var chatting: bool = chat.is_open
+	var forward_input = 0.0
+	var turn_input = 0.0
+	if not chatting:
+		forward_input = Input.get_action_strength("ui_down") - Input.get_action_strength("ui_up")
+		turn_input = Input.get_action_strength("ui_left") - Input.get_action_strength("ui_right")
 	var was_grounded := isGrounded
 	isGrounded = ground_check_area.get_overlapping_bodies().size() > 0
 	if isGrounded and not was_grounded:
@@ -152,12 +171,13 @@ func _physics_process(delta: float) -> void:
 	elif not isGrounded:
 		_airborne_velocity = body.linear_velocity
 	_apply_suspension_forces(forward_input)
-	handle_turret_barrel_look()
-	if Input.is_action_just_pressed("ui_recenter"):
-		recentering = true
+	if not chatting:
+		handle_turret_barrel_look()
+		if Input.is_action_just_pressed("ui_recenter"):
+			recentering = true
 	if recentering:
 		recenter_turret_barrel()
-	if Input.is_action_pressed("unturtle"):
+	if not chatting and Input.is_action_pressed("unturtle"):
 		activate_thrusters(delta)
 	else:
 		if is_right_side_up() and isGrounded:

@@ -4,6 +4,8 @@
 [ext_resource type="Script" uid="uid://defwrtblkx02f" path="res://Weapons/_scripts/weapon_settings.gd" id="1_lj0dn"]
 [ext_resource type="PackedScene" uid="uid://dqu4r8p4yt5jp" path="res://Weapons/Scenes/explosions/sparks.tscn" id="1_qca65"]
 [ext_resource type="PackedScene" uid="uid://byxqkihhw08gb" path="res://Weapons/Scenes/projectiles/rocket.tscn" id="2_qca65"]
+[ext_resource type="AudioStream" uid="uid://driqxc5owy7sw" path="res://Weapons/Sounds/hit.wav" id="3_ihveb"]
+[ext_resource type="AudioStream" uid="uid://okwlv5f3uhgb" path="res://Weapons/Sounds/Launch.mp3" id="4_b2xoo"]
 
 [resource]
 script = ExtResource("1_lj0dn")
@@ -16,6 +18,8 @@ projectile_prefab = ExtResource("2_qca65")
 projectile_color = Color(1, 0, 0, 1)
 explosion_prefab = ExtResource("1_qca65")
 bullet_hole_prefab = ExtResource("1_7qxki")
+launch_sound = ExtResource("4_b2xoo")
+hit_sound = ExtResource("3_ihveb")
 projectile_count_capacity = 4
 projectile_count_actual = 4
 explosive_force = 125.0

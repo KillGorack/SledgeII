@@ -6,6 +6,7 @@ extends Control
 @onready var movement_node: Node3D = get_node("../movement_node")
 @onready var power_node: Node3D = get_node("../power_node")
 @onready var weapon_label: Label = $Weapon
+@onready var ammo_label: Label = $Weapon2
 @onready var fps_label: Label = $FPS
 @onready var speedometer: Control = $Speedometer
 @onready var health_rings: Control = $HealthRings
@@ -45,6 +46,7 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	_update_health()
 	_update_weapon()
+	_update_ammo()
 	# No change-detection cache here like the two above - speed is basically
 	# always changing while driving, so there'd be nothing to skip most frames.
 	speedometer.set_speed_ratio(movement_node.get_speed_ratio())
@@ -53,8 +55,6 @@ func _process(_delta: float) -> void:
 	# Engine.get_frames_per_second() is the engine's own already-computed
 	# rolling average, not something worth recomputing by hand here.
 	fps_label.text = "%d FPS" % Engine.get_frames_per_second()
-
-
 func _on_team_juice_changed(team: String, _amount: float) -> void:
 	if team == weapon_node.team:
 		_update_team_juice_bar()
@@ -91,3 +91,33 @@ func _update_weapon() -> void:
 	_last_weapon_index = index
 	var settings: WeaponSettings = weapon_node.weapon_settings[index] if index >= 0 and index < weapon_node.weapon_settings.size() else null
 	weapon_label.text = settings.weapon_name
+
+
+# No change-detection cache like _update_weapon()'s - unlike the weapon
+# name, this changes on every shot fired, not just on switching weapons, so
+# there'd be nothing to skip most of the time. Three states, same
+# power-vs-ammo distinction request_fire() itself uses (power_consumption >
+# 0.0 means this weapon spends power_node's shared pool, not per-weapon
+# ammo): energy weapons show current/max power (rounded - the HUD doesn't
+# need fractional power), ammo weapons show current/max count, and
+# projectile_count_capacity == 0 (request_fire()'s own "unlimited" sentinel)
+# skips the ratio entirely.
+func _update_ammo() -> void:
+	var index = weapon_node.current_weapon_index
+	if index < 0 or index >= weapon_node.weapon_settings.size():
+		return
+	var settings: WeaponSettings = weapon_node.weapon_settings[index]
+	if settings == null:
+		return
+	if settings.power_consumption > 0.0:
+		var capacity: float = power_node.stats.power_capacity if power_node.stats else 0.0
+		ammo_label.text = "%d / %d" % [roundi(power_node.current_power), roundi(capacity)]
+	elif settings.projectile_count_capacity == 0:
+		ammo_label.text = "Unlimited"
+	else:
+		# Bounds-checked, not a plain index - on a freshly-joined client the
+		# replicated Array may not have arrived yet (starts empty, unlike the
+		# old Dictionary's safe .get() fallback), so this still needs a
+		# fallback for that brief window before the first sync lands.
+		var remaining: int = weapon_node._ammo_remaining[index] if index < weapon_node._ammo_remaining.size() else settings.projectile_count_actual
+		ammo_label.text = "%d / %d" % [remaining, settings.projectile_count_capacity]

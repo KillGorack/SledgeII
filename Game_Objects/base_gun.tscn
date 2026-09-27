@@ -1,6 +1,6 @@
 [gd_scene format=4 uid="uid://b850mj6gqjmtp"]
 
-[ext_resource type="Resource" uid="uid://cooha1e6ktvx5" path="res://Weapons/settings/plasma_base.tres" id="2_imy8k"]
+[ext_resource type="Resource" uid="uid://cooha1e6ktvx5" path="res://Weapons/settings_object/plasma_base.tres" id="2_imy8k"]
 [ext_resource type="Texture2D" uid="uid://d24a1wpkenydh" path="res://Materials/Textures/Particles/Sun.png" id="2_v7i05"]
 [ext_resource type="Script" uid="uid://cy8aref4hqitw" path="res://Game_Objects/_scripts/base_gun.gd" id="3_gun"]
 [ext_resource type="Script" uid="uid://bwdrqy4iifec4" path="res://_globals/twirl.gd" id="3_puwfg"]
