@@ -53,6 +53,10 @@ var net_id: int = -1
 const GUIDED_CORRECTION_INTERVAL := 0.05
 const CORRECTION_SNAP_DISTANCE := 5.0
 const CORRECTION_BLEND_RATE := 15.0
+# Cosmetic copies turn toward their own direction of travel at this rate
+# (1/time-constant) instead of taking the server's facing verbatim - see
+# _face_travel_direction.
+const COSMETIC_TURN_RATE := 20.0
 var _correction_elapsed := 0.0
 var _destroying := false
 # Cosmetic copies only.
@@ -280,10 +284,32 @@ func _cosmetic_step(delta: float) -> void:
 			return
 	global_position = end
 	distance_traveled += motion.length()
+	_face_travel_direction(delta)
 	# The server's end event normally arrives first - this is only a fallback
 	# so a lost/late one can never leave a projectile flying forever.
 	if distance_traveled >= weapon_settings.projectile_range * 1.2:
 		_park()
+
+
+# Cosmetic copies only. Guided corrections land ~20x a second, and snapping
+# the basis to each one stepped the facing in visible jerks - and since the
+# Trail3D ribbons hang off-center on the Spinner and take their width from
+# its basis, every step kinked the trail even when the path itself was
+# smooth. Easing toward the velocity this copy is actually flying along also
+# makes ballistic shells pitch down their arc, which they never did here.
+func _face_travel_direction(delta: float) -> void:
+	if _cosmetic_velocity.is_zero_approx():
+		return
+	var target := _basis_facing(_cosmetic_velocity).get_rotation_quaternion()
+	var current := global_basis.get_rotation_quaternion()
+	var t := 1.0 - exp(-COSMETIC_TURN_RATE * delta)
+	global_basis = Basis(current.slerp(target, t))
+
+
+# -Z along direction, with a fallback up for straight-up/down shots.
+func _basis_facing(direction: Vector3) -> Basis:
+	var up := Vector3.UP if absf(direction.normalized().dot(Vector3.UP)) < 0.99 else Vector3.FORWARD
+	return Basis.looking_at(direction, up)
 
 
 # Cosmetic copies only - stop and hide, then free shortly after if the
@@ -308,9 +334,12 @@ func apply_correction(server_transform: Transform3D, velocity: Vector3, latency:
 	if _cosmetic_ended:
 		return
 	var target := server_transform.origin + velocity * latency
-	global_transform.basis = server_transform.basis
 	_cosmetic_velocity = velocity
 	if snap or global_position.distance_to(target) > CORRECTION_SNAP_DISTANCE:
+		# A discrete course change (ricochet etc.) - turn instantly too, the
+		# trail gets cleared below anyway. Otherwise _face_travel_direction
+		# eases into the new heading.
+		global_basis = _basis_facing(velocity) if not velocity.is_zero_approx() else server_transform.basis
 		global_position = target
 		_position_error = Vector3.ZERO
 		reset_physics_interpolation()
