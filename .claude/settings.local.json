@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -n \"class_name\\\\|extends\\\\|team\\\\b\" \"/mnt/ssd450/Game Projects/Godot/Sledge/crafts\" -r 2>/dev/null | head -20; echo \"---\"; find \"/mnt/ssd450/Game Projects/Godot/Sledge/crafts\" -iname \"*.gd\" 2>/dev/null)",
+      "Read(//mnt/ssd450/Game Projects/Godot/Sledge/crafts/**)",
+      "Bash(cd \"/mnt/ssd450/Game Projects/Godot/Sledge\" && grep -rln \"collision_layer\\\\|set_allegiance\\\\|\\\\\"world\\\\\"\" --include=\"*.gd\" . 2>/dev/null)",
+      "Read(//mnt/ssd450/Game Projects/Godot/Sledge/**)"
+    ]
+  }
+}
