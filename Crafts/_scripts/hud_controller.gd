@@ -8,6 +8,7 @@ extends Control
 @onready var weapon_label: Label = $Weapon
 @onready var ammo_label: Label = $Weapon2
 @onready var fps_label: Label = $FPS
+@onready var arena_label: Label = $Arena
 @onready var speedometer: Control = $Speedometer
 @onready var health_rings: Control = $HealthRings
 @onready var resourcemeter: Control = $Resourcemeter
@@ -39,6 +40,7 @@ func _ready() -> void:
 		set_process(false)
 		return
 	_match_node = get_tree().get_first_node_in_group("match")
+	arena_label.text = NetworkManager.current_map_title
 	NetworkManager.team_juice_changed.connect(_on_team_juice_changed)
 	_update_team_juice_bar()
 

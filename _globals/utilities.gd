@@ -99,6 +99,16 @@ func GarbageCollection(node: Node, delay: float) -> void:
 	)
 	timer.start()
 
+# Duck-typed walk for projectile/explosion tinting - see
+# collision_handler.gd::_apply_projectile_color for why it asks each node
+# rather than assuming any particular child exists.
+func apply_projectile_color_recursive(node: Node, color: Color) -> void:
+	if node.has_method("apply_projectile_color"):
+		node.apply_projectile_color(color)
+	for child in node.get_children():
+		apply_projectile_color_recursive(child, color)
+
+
 func set_allegiance(body: Node3D, group_name: String):
 	if body and GROUP_LAYER_SCOPE.has(group_name):
 		var layer_data = GROUP_LAYER_SCOPE[group_name]
@@ -165,6 +175,7 @@ func select_target(origin: Vector3, forward_direction: Vector3, radius: float, m
 
 
 func play_sound(audio_input: Variant, position: Vector3 = Vector3.ZERO, vol: float = 1.0):
+	vol = vol / 5
 	var stream = null
 	if typeof(audio_input) == TYPE_STRING:
 		stream = load(audio_input)

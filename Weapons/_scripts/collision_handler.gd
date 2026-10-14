@@ -4,13 +4,24 @@ extends RigidBody3D
 # client happened to be simulating a projectile called apply_damage()
 # directly and locally - fine single-player, not safe for real multiplayer
 # (clients could disagree on hits, or a modified client could deal extra
-# damage). Here the projectile is always spawned by the server (see
-# Weapons/weapon_node.gd), so its default multiplayer_authority is already
-# the server - _physics_process/_integrate_forces below only do real work
-# when is_multiplayer_authority() is true, exactly like movement.gd already
-# gates craft input. Every other peer just sees the replicated transform.
+# damage). Here the server's copy is the only real one - its default
+# multiplayer_authority is the server, and _physics_process/_integrate_forces
+# below only do hit resolution when is_multiplayer_authority() is true.
+#
+# Nothing about a projectile is streamed per frame. Every peer spawns its
+# own copy from one spawn event (match.gd::spawn_projectile /
+# _spawn_projectile_event) and simulates it locally - straight, ballistic
+# and guided flight are all predictable from launch state - and the server
+# only speaks up again for the things a client can't predict: guided
+# course changes and ricochets (corrections, see apply_correction) and the
+# end of the projectile's life (end_cosmetic). Non-server copies are
+# "cosmetic": frozen, collision-free, moved by _cosmetic_step.
 
 var weapon_settings: WeaponSettings
+# The .tres path weapon_settings came from - kept separately because a
+# team-tinted shot's weapon_settings is a duplicate() (see
+# match.gd::_create_volley), and a duplicate's own resource_path is empty.
+var weapon_settings_path: String = ""
 var team: String = "" # shooter's team, e.g. "team_red" - kept for reference
 var allegiance_group: String = "" # projectile's own group, e.g. "projectile_team_red"
 
@@ -35,22 +46,97 @@ var max_distance: float
 # alone so gravity_scale can curve it from there. See _physics_process().
 var _ballistic_launched: bool = false
 
+# Network identity, shared by every peer's copy of this one projectile - see
+# match.gd's _projectiles registry. -1 until assigned (a shooter's own
+# predicted shot gets its id when the server confirms it).
+var net_id: int = -1
+const GUIDED_CORRECTION_INTERVAL := 0.05
+const CORRECTION_SNAP_DISTANCE := 5.0
+const CORRECTION_BLEND_RATE := 15.0
+var _correction_elapsed := 0.0
+var _destroying := false
+# Cosmetic copies only.
+var _cosmetic_velocity := Vector3.ZERO
+var _position_error := Vector3.ZERO
+var _cosmetic_ended := false
+var _match_node: Node = null
+
 @onready var raycast: RayCast3D = $RayCast3D
 
 
 func _ready() -> void:
-	contact_monitor = true
-	max_contacts_reported = 5
+	_match_node = get_tree().get_first_node_in_group("match")
+	if is_multiplayer_authority():
+		contact_monitor = true
+		max_contacts_reported = 5
 	if team != "":
 		allegiance_group = "projectile_" + team
 		Utilities.set_allegiance(self, allegiance_group)
+	if not is_multiplayer_authority():
+		# Cosmetic copy - see the header comment. Frozen so the physics engine
+		# never moves it (_cosmetic_step does), and collision-free so it can't
+		# shove anything in this peer's own world: a solid mass-50 shell used
+		# to physically knock the local player's craft around on their own
+		# machine, on top of the server's real knockback.
+		freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
+		freeze = true
+		contact_monitor = false
+		collision_layer = 0
+		collision_mask = 0
+		if weapon_settings:
+			_cosmetic_velocity = -global_transform.basis.z.normalized() * weapon_settings.projectile_speed
 	if weapon_settings:
 		_apply_projectile_color(weapon_settings.projectile_color)
 		_spawn_smoke_trail()
 
 
+func _gravity() -> Vector3:
+	var strength: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
+	var direction: Vector3 = ProjectSettings.get_setting("physics/3d/default_gravity_vector", Vector3.DOWN)
+	return direction * strength * gravity_scale
+
+
+func _world_mask() -> int:
+	return 1 << (Utilities.GROUP_LAYER_SCOPE["world"]["layer"] - 1)
+
+
+# Advances a freshly spawned projectile `seconds` along its launch
+# trajectory - latency compensation. The server advances its own copy by the
+# shooter's one-way latency (the shot really left their barrel that long
+# ago), and every other peer additionally by its own one-way latency (the
+# spawn event took that long to get here) - see match.gd. Raycast first so a
+# point-blank shot can't be skipped clean through a wall or a craft; it stops
+# just short and lets the normal collision path take it from there.
+func fast_forward(seconds: float) -> void:
+	if seconds <= 0.0 or weapon_settings == null:
+		return
+	var velocity := -global_transform.basis.z.normalized() * weapon_settings.projectile_speed
+	var gravity := _gravity() if weapon_settings.affected_by_gravity else Vector3.ZERO
+	var start := global_position
+	var end := start + velocity * seconds + 0.5 * gravity * seconds * seconds
+	var query := PhysicsRayQueryParameters3D.create(start, end)
+	query.collision_mask = collision_mask if is_multiplayer_authority() else _world_mask()
+	query.exclude = [get_rid()]
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if not hit.is_empty():
+		var back_off: Vector3 = (end - start).normalized() * 0.2
+		end = hit.position - back_off
+		if (end - start).dot(velocity) < 0.0:
+			end = start
+	global_position = end
+	distance_traveled += start.distance_to(end)
+	var launch_velocity := velocity + gravity * seconds
+	if is_multiplayer_authority():
+		if weapon_settings.affected_by_gravity:
+			linear_velocity = launch_velocity
+			_ballistic_launched = true
+	else:
+		_cosmetic_velocity = launch_velocity
+	reset_physics_interpolation()
+
+
 # Runs identically on every peer - weapon_settings is assigned by
-# match.gd::_spawn_projectile before this node is added to the tree (same
+# match.gd::_create_volley before this node is added to the tree (same
 # ordering apply_damage()/respawn_at() already rely on elsewhere), and every
 # peer loads its own copy of the same weapon_settings.tres by path, so there
 # is nothing here that needs authority gating or a network trip; it's exactly
@@ -65,14 +151,7 @@ func _ready() -> void:
 # colorable_sprite.gd and Trail3D.gd::apply_projectile_color for the nodes
 # that currently answer yes.
 func _apply_projectile_color(color: Color) -> void:
-	_apply_projectile_color_to(self, color)
-
-
-func _apply_projectile_color_to(node: Node, color: Color) -> void:
-	if node.has_method("apply_projectile_color"):
-		node.apply_projectile_color(color)
-	for child in node.get_children():
-		_apply_projectile_color_to(child, color)
+	Utilities.apply_projectile_color_recursive(self, color)
 
 
 # Added as a sibling under get_parent() (same parent explosion/bullet-hole
@@ -106,9 +185,10 @@ func _clear_trails_on(node: Node) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if not is_multiplayer_authority():
-		return
 	if weapon_settings == null:
+		return
+	if not is_multiplayer_authority():
+		_cosmetic_step(delta)
 		return
 
 	max_distance = weapon_settings.projectile_range
@@ -146,6 +226,98 @@ func _physics_process(delta: float) -> void:
 				scope_targets
 			)
 		handle_guided(delta)
+		# Guided flight depends on a target only the server picks, so it's
+		# the one kind of course change clients can't predict on their own.
+		_correction_elapsed += delta
+		if _correction_elapsed >= GUIDED_CORRECTION_INTERVAL:
+			_correction_elapsed = 0.0
+			_send_correction(false)
+
+
+# Server-only. snap=true for discrete course changes (ricochet/pierce/bounce),
+# sent reliably; false for the periodic guided stream, sent unreliably.
+func _send_correction(snap: bool) -> void:
+	if net_id < 0 or _match_node == null or _destroying:
+		return
+	_match_node.send_projectile_correction(net_id, global_transform, _authoritative_velocity(), snap)
+
+
+# What the server's copy will actually be moving at from here on - for
+# non-gravity weapons _physics_process re-derives velocity from the facing
+# every tick, so that (not whatever linear_velocity happens to hold right
+# now) is what a client should extrapolate.
+func _authoritative_velocity() -> Vector3:
+	if weapon_settings.affected_by_gravity:
+		return linear_velocity
+	return -global_transform.basis.z.normalized() * weapon_settings.projectile_speed
+
+
+# Cosmetic copies only - local flight between (rare) server corrections.
+# Runs in _physics_process so physics interpolation smooths the render, and
+# Trail3D/smoke trails sample that interpolated transform.
+func _cosmetic_step(delta: float) -> void:
+	if _cosmetic_ended:
+		return
+	if weapon_settings.affected_by_gravity:
+		_cosmetic_velocity += _gravity() * delta
+	var start := global_position
+	var motion := _cosmetic_velocity * delta
+	if not _position_error.is_zero_approx():
+		var blend := _position_error * minf(1.0, CORRECTION_BLEND_RATE * delta)
+		motion += blend
+		_position_error -= blend
+	var end := start + motion
+	# A weapon that never bounces off the world can safely stop at the first
+	# wall it reaches here, rather than visibly flying on into it until the
+	# server's end event arrives a half-RTT later. Bouncing weapons keep
+	# going and wait for the server's correction instead.
+	if weapon_settings.projectile_ricochet_count == 0 and weapon_settings.bounce_count == 0:
+		var query := PhysicsRayQueryParameters3D.create(start, end, _world_mask())
+		var hit := get_world_3d().direct_space_state.intersect_ray(query)
+		if not hit.is_empty():
+			global_position = hit.position
+			_park()
+			return
+	global_position = end
+	distance_traveled += motion.length()
+	# The server's end event normally arrives first - this is only a fallback
+	# so a lost/late one can never leave a projectile flying forever.
+	if distance_traveled >= weapon_settings.projectile_range * 1.2:
+		_park()
+
+
+# Cosmetic copies only - stop and hide, then free shortly after if the
+# server's end event (end_cosmetic) never comes to do it.
+func _park() -> void:
+	_cosmetic_ended = true
+	visible = false
+	get_tree().create_timer(1.0).timeout.connect(queue_free)
+
+
+# Cosmetic copies only - the server says this projectile is gone.
+func end_cosmetic() -> void:
+	_cosmetic_ended = true
+	visible = false
+	get_tree().create_timer(weapon_settings.projectile_destruction_delay if weapon_settings else 0.0).timeout.connect(queue_free)
+
+
+# Cosmetic copies only. latency = this peer's one-way latency, so the
+# server's position is projected forward to where it is "now". Small errors
+# blend out over a few ticks; big ones (or snap) jump outright.
+func apply_correction(server_transform: Transform3D, velocity: Vector3, latency: float, snap: bool) -> void:
+	if _cosmetic_ended:
+		return
+	var target := server_transform.origin + velocity * latency
+	global_transform.basis = server_transform.basis
+	_cosmetic_velocity = velocity
+	if snap or global_position.distance_to(target) > CORRECTION_SNAP_DISTANCE:
+		global_position = target
+		_position_error = Vector3.ZERO
+		reset_physics_interpolation()
+		if snap:
+			_clear_trails()
+	else:
+		_position_error = target - global_position
 
 
 func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
@@ -231,8 +403,7 @@ func handle_collision() -> void:
 	if weapon_settings.projectile_ricochet_count > 0:
 		destroy = handle_ricochet()
 
-	set_hit_scene()
-	create_bullet_hole()
+	set_hit_scene(true)
 
 	if destroy:
 		destroy_self()
@@ -306,15 +477,15 @@ func apply_aoe_damage(bodies) -> void:
 
 
 # Damage is only ever decided here, on the server (this whole script only
-# runs its real logic when is_multiplayer_authority() is true). health_node's
-# apply_damage is an authority-only RPC with call_local, so this both applies
-# the damage locally on the server and pushes the same result to every client.
+# runs its real logic when is_multiplayer_authority() is true). HP itself is
+# server-only state - see health_node.gd::apply_damage for how the owner and
+# everyone else hear about the result.
 func _apply_damage_to(body: Object, damage: float) -> void:
 	if not is_instance_valid(body):
 		return
 	var health_node = body.get_node_or_null("health_node")
 	if health_node and health_node.has_method("apply_damage"):
-		health_node.apply_damage.rpc(damage)
+		health_node.apply_damage(damage)
 
 
 # Routed through the target's health_node instead of being applied straight
@@ -371,6 +542,7 @@ func handle_ricochet() -> bool:
 		angular_velocity = Vector3.ZERO
 		_clear_trails()
 		_reset_one_offs()
+		_send_correction(true)
 		return false
 	return true
 
@@ -386,6 +558,7 @@ func handle_pierce() -> bool:
 		linear_velocity = current_direction.normalized() * weapon_settings.projectile_speed
 		angular_velocity = Vector3.ZERO
 		_reset_one_offs()
+		_send_correction(true)
 		return false
 	return true
 
@@ -397,6 +570,7 @@ func handle_bounce(bodies) -> bool:
 		var direction = (body.global_transform.origin - global_transform.origin).normalized()
 		linear_velocity = direction * weapon_settings.projectile_speed
 		_reset_one_offs()
+		_send_correction(true)
 		return false
 	return true
 
@@ -437,59 +611,42 @@ func guide_to_target(delta: float) -> void:
 	linear_velocity = -global_transform.basis.z * weapon_settings.projectile_speed
 
 
-# These three are called from handle_collision(), which only ever runs on
-# the server. Each wrapper below still decides ON THE SERVER whether to fire
-# (respecting the one-off flags), but the actual instantiate+add_child work
-# happens inside an RPC so every peer plays the same cosmetic effect locally
-# - not just whichever machine happens to be the host.
-
-func create_bullet_hole() -> void:
-	if bullet_hole_one_off:
-		return
-	if collided_layer == 2: # world
-		_play_bullet_hole_effect.rpc(collision_point, collision_normal)
-	bullet_hole_one_off = true
-
-
-@rpc("authority", "call_local", "reliable")
-func _play_bullet_hole_effect(hit_point: Vector3, hit_normal: Vector3) -> void:
-	if not weapon_settings.bullet_hole_prefab or not get_parent():
-		return
-	var bullet_hole_instance = weapon_settings.bullet_hole_prefab.instantiate()
-	get_parent().add_child(bullet_hole_instance)
-	var offset_position = hit_point + hit_normal * 0.01
-	bullet_hole_instance.global_transform.origin = offset_position
-	var up_vector = Vector3.UP
-	if hit_normal.dot(up_vector) > 0.999:
-		up_vector = Vector3.RIGHT
-	up_vector = up_vector.rotated(hit_normal, randf() * TAU)
-	var direction = (offset_position + hit_normal) - offset_position
-	if not direction.is_zero_approx() and not up_vector.cross(direction).is_zero_approx():
-		bullet_hole_instance.look_at_from_position(offset_position, offset_position + hit_normal, up_vector)
-
-
-func set_hit_scene() -> void:
-	if hit_scene_one_off:
-		return
-	_play_hit_effect.rpc()
+# Called from handle_collision()/destroy_self(), which only ever run on the
+# server. Decides ON THE SERVER whether anything should play (respecting the
+# one-off flags), then sends ONE unreliable cosmetic message for the
+# explosion and the bullet hole together - see match.gd::_play_impact_fx.
+# Routed through match.gd rather than an RPC on this projectile, so the
+# effect doesn't depend on this node still existing on the receiving peer
+# when it arrives (it's on a different channel than the despawn).
+func set_hit_scene(include_bullet_hole: bool = false) -> void:
+	var show_hit := not hit_scene_one_off
+	var show_hole := include_bullet_hole and not bullet_hole_one_off and collided_layer == 2 # world
 	hit_scene_one_off = true
-
-
-@rpc("authority", "call_local", "reliable")
-func _play_hit_effect() -> void:
-	play_hit_sound()
-	if weapon_settings.explosion_prefab and get_parent():
-		var explosion_instance = weapon_settings.explosion_prefab.instantiate()
-		get_parent().add_child(explosion_instance)
-		explosion_instance.transform = global_transform
-		# Same duck-typed walk _apply_projectile_color uses on this projectile
-		# itself - sparks.tscn's Clash/Spark answer to apply_projectile_color
-		# too, so the explosion picks up the weapon's color with no extra
-		# wiring here.
-		_apply_projectile_color_to(explosion_instance, weapon_settings.projectile_color)
+	if include_bullet_hole:
+		bullet_hole_one_off = true
+	if not show_hit and not show_hole:
+		return
+	var match_node = get_tree().get_first_node_in_group("match")
+	if match_node == null:
+		return
+	match_node._play_impact_fx.rpc(
+		weapon_settings_path,
+		weapon_settings.projectile_color,
+		global_transform,
+		show_hit,
+		show_hole,
+		collision_point,
+		collision_normal
+	)
 
 
 func destroy_self() -> void:
+	# Range-out and a collision can both land in the same tick.
+	if _destroying:
+		return
+	_destroying = true
 	set_hit_scene()
+	if is_multiplayer_authority() and net_id >= 0 and _match_node:
+		_match_node.notify_projectile_ended(net_id)
 	await get_tree().create_timer(weapon_settings.projectile_destruction_delay).timeout
 	queue_free()

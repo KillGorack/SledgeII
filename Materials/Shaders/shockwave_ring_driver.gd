@@ -19,7 +19,7 @@ extends MeshInstance3D
 # Y axis is alpha; default curve (set in the .tscn) reproduces the old
 # linear falloff so existing instances look unchanged until edited.
 @export var fade_curve: Curve
-# _play_hit_effect() (collision_handler.gd) spawns the whole explosion at the
+# _play_impact_fx() (match.gd) spawns the whole explosion at the
 # PROJECTILE's own transform, which is right for its particles/sound but not
 # for this ring: a shell's contact point can sit a little above the actual
 # ground mesh (its collision shape's radius, or a shallow embed on impact),
@@ -45,7 +45,7 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	if not _flattened:
-		# _play_hit_effect() (collision_handler.gd) calls add_child() and
+		# _play_impact_fx() (match.gd) calls add_child() and
 		# THEN sets .transform on this same node, both synchronously, before
 		# _ready() ever runs - reading/writing global_transform (or
 		# global_basis) that early, on a node just added and reparented in

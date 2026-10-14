@@ -33,6 +33,17 @@ var _server_next_fire_time: Dictionary = {}
 # continuing to debug it. Pre-sized to weapon_settings.size() in _ready() so
 # every valid index always has a real value, no .get()-with-fallback needed.
 var _ammo_remaining: Array = []
+# Owner-side counter tagging each fire request, so the server's spawn event
+# (or rejection) can be matched back to the shot this client already
+# predicted locally - see match.gd::predict_shot.
+var _shot_seq: int = 0
+# How far a client's claimed muzzle may sit from where the server thinks
+# that barrel is before the server ignores the claim and uses its own. The
+# server's view of a remote craft trails by roughly half an RTT plus the
+# smoothing in movement.gd, and craft top out around 4 m/s - so this is
+# generous for honest lag, while still keeping a shot from being fired from
+# somewhere the craft plainly isn't.
+const MUZZLE_TOLERANCE := 4.0
 
 @onready var barrel: Node3D = get_node("../Turret/Barrel")
 @onready var power_node: Node3D = get_node("../power_node")
@@ -70,10 +81,39 @@ func _physics_process(_delta: float) -> void:
 		# this existed.
 		if settings.power_consumption > 0.0 and power_node.current_power < settings.power_consumption:
 			return
+		# Same idea for ammo - _ammo_remaining is the server's count, pushed
+		# via _sync_ammo, so this only avoids predicting a shot the server is
+		# certain to reject.
+		if settings.projectile_count_capacity != 0 and _ammo_remaining[current_weapon_index] < settings.projectile_count:
+			return
 		# Client-side rate limiting only, for feel - keeps us from spamming
 		# RPCs the server would reject anyway. Not trusted for correctness.
 		_client_next_fire_time = now + settings.cool_down
-		request_fire.rpc_id(1, current_weapon_index)
+		_shot_seq += 1
+		var muzzle := _muzzle_transform(settings)
+		# Client-side prediction: the shot leaves OUR barrel right now, from
+		# where we actually see it, instead of a round trip later from where
+		# the server thought we were. The host skips this - its own shots are
+		# already the real, server-side ones with zero latency.
+		if not multiplayer.is_server():
+			var match_node = get_tree().get_first_node_in_group("match")
+			if match_node:
+				match_node.predict_shot(_shot_seq, settings.resource_path, team, muzzle)
+		# Recoil belongs to whoever simulates this craft - that's us. The
+		# server used to apply it to its own copy, which for any client-owned
+		# craft is just a follower of the owner's transform, so client recoil
+		# silently never happened.
+		if settings.projectile_recoil > 0 and get_parent() is RigidBody3D:
+			get_parent().apply_central_impulse(muzzle.basis.z.normalized() * settings.projectile_recoil)
+		request_fire.rpc_id(1, current_weapon_index, _shot_seq, muzzle)
+
+
+func _muzzle_transform(settings: WeaponSettings) -> Transform3D:
+	var muzzle := barrel.global_transform
+	muzzle.basis = muzzle.basis.orthonormalized()
+	var forward := -muzzle.basis.z
+	muzzle.origin += forward * settings.launch_offset
+	return muzzle
 
 
 # Client-feel only, same caveat as _client_next_fire_time itself: this is
@@ -126,16 +166,29 @@ func switch_weapon() -> void:
 
 
 @rpc("any_peer", "call_local", "reliable")
-func request_fire(weapon_index: int) -> void:
+func request_fire(weapon_index: int, shot_seq: int, client_muzzle: Transform3D) -> void:
 	if not multiplayer.is_server():
 		return
-	if weapon_index < 0 or weapon_index >= weapon_settings.size():
+	# any_peer, so without this any client could fire ANY craft's weapon by
+	# calling this on someone else's weapon_node. Only the craft's owner may.
+	var sender := multiplayer.get_remote_sender_id()
+	if sender != get_multiplayer_authority():
 		return
+	if not _try_fire(weapon_index, shot_seq, client_muzzle, sender):
+		# Tell the shooter to take back the shot it already predicted.
+		if sender != 1:
+			_fire_rejected.rpc_id(sender, shot_seq)
+
+
+# Server-only. Returns false if the shot is rejected for any reason.
+func _try_fire(weapon_index: int, shot_seq: int, client_muzzle: Transform3D, sender: int) -> bool:
+	if weapon_index < 0 or weapon_index >= weapon_settings.size():
+		return false
 	var settings := weapon_settings[weapon_index]
 	if settings == null or settings.projectile_prefab == null:
-		return
+		return false
 	# The spawner still needs a plain res:// string, not the Resource itself -
-	# see match.gd::_spawn_projectile for why (replication can't safely decode
+	# see match.gd::_create_volley for why (replication can't safely decode
 	# arbitrary Objects, so every peer loads its own copy from disk by path).
 	# resource_path is populated automatically for any .tres dragged into the
 	# weapon_settings slot below, so this is just reading it back off, not
@@ -143,16 +196,20 @@ func request_fire(weapon_index: int) -> void:
 	var path := settings.resource_path
 	if path.is_empty():
 		push_warning("weapon_node: weapon_settings[%d] has no resource_path (not a saved .tres?)" % weapon_index)
-		return
-	var now = Time.get_ticks_msec() / 1000.0
+		return false
+	# Small tolerance: the client's own clock gates its cooldown, and the
+	# requests arrive with network jitter, so a shot sent exactly on time can
+	# land a few ms "early" here. Without slack that rejects a perfectly
+	# legitimate shot the client already predicted and shows flying.
+	var now = Time.get_ticks_msec() / 1000.0 + 0.05
 	var next_allowed = _server_next_fire_time.get(weapon_index, 0.0)
 	if now < next_allowed:
-		return
+		return false
 	# Checked (and spent) before the cooldown is committed below, so a shot
 	# rejected for insufficient power doesn't also cost you the cooldown - as
 	# far as the weapon's concerned, nothing happened.
 	if settings.power_consumption > 0.0 and not power_node.try_spend(settings.power_consumption):
-		return
+		return false
 	# Physical weapons (missiles, shells) spend ammo instead of power -
 	# capacity 0 means unlimited, same convention as the old game. This has to
 	# be its own Array rather than decrementing settings.projectile_count_actual
@@ -164,69 +221,47 @@ func request_fire(weapon_index: int) -> void:
 	if settings.projectile_count_capacity != 0:
 		var ammo_left: int = _ammo_remaining[weapon_index]
 		if ammo_left < settings.projectile_count:
-			return
+			return false
 		# Reassigns the whole array rather than mutating this element in
 		# place - see _ammo_remaining's own comment for why.
 		var updated: Array = _ammo_remaining.duplicate()
 		updated[weapon_index] = ammo_left - settings.projectile_count
 		_ammo_remaining = updated
 		_sync_ammo.rpc_id(get_multiplayer_authority(), _ammo_remaining)
-	_server_next_fire_time[weapon_index] = now + settings.cool_down
+	_server_next_fire_time[weapon_index] = now - 0.05 + settings.cool_down
 	var match_node = get_tree().get_first_node_in_group("match")
-	if match_node and match_node.has_method("spawn_projectile"):
-		var muzzle := barrel.global_transform
-		var forward = -muzzle.basis.z.normalized()
-		muzzle.origin += forward * settings.launch_offset
-		_fire_volley(match_node, path, muzzle, settings)
-		# Once per fire request, not once per projectile - _fire_volley
-		# spawns a separate collision_handler instance per shot in the
-		# count, so playing this from there (or from each projectile's own
-		# _ready()) would stack N overlapping copies of the same sound for
-		# one press on a multi-shot weapon.
-		_play_launch_sound.rpc(weapon_index, muzzle.origin)
-		if settings.projectile_recoil > 0 and get_parent() is RigidBody3D:
-			get_parent().apply_central_impulse(-forward * settings.projectile_recoil)
+	if match_node == null or not match_node.has_method("spawn_projectile"):
+		return false
+	var server_muzzle := _muzzle_transform(settings)
+	# Fire from where the shooter actually saw their barrel (that's what they
+	# aimed with, and what their predicted shot is already flying from) - as
+	# long as it's plausibly where the craft is.
+	var muzzle := server_muzzle
+	if client_muzzle.origin.distance_to(server_muzzle.origin) <= MUZZLE_TOLERANCE:
+		muzzle = Transform3D(client_muzzle.basis.orthonormalized(), client_muzzle.origin)
+	# The shot really left the shooter's barrel half an RTT ago - advance the
+	# server's copy to match (capped, so a terrible connection can't turn
+	# this into teleporting shots). 0 for the host's own shots.
+	var fast_forward := 0.0
+	if sender != 1:
+		fast_forward = minf(match_node.peer_one_way_latency(sender), match_node.PROJECTILE_MAX_FAST_FORWARD)
+	match_node.spawn_projectile(path, team, muzzle, false, sender, shot_seq, fast_forward)
+	return true
 
 
-# Ported from the predecessor project's shoot.gd::fire_weapon. That version
-# looped over settings.projectile_count, fanning shots around a small ring
-# (settings.projectile_spacing) rather than diverging their angle - so a
-# multi-shot weapon fires dead straight, just from several separated points -
-# with a per-count start_angle so each count's pattern sits symmetrically
-# instead of always starting from the same spot. That loop just never made it
-# into request_fire when this got ported to multiplayer, so every weapon
-# quietly fired only its first projectile regardless of projectile_count.
-#
-# Each shot below is still its own separate spawn_projectile() call, i.e. its
-# own MultiplayerSpawner.spawn() - so a volley of 4 is 4 fully independent
-# collision_handler instances, not one entity moving 4 meshes. That's what
-# guided weapons need: guided_target in collision_handler.gd is per-instance
-# state, so each missile in a volley can lock onto its own separate target.
-const _VOLLEY_START_ANGLES := [0, 0, -30, 45, 18, 0]
-
-func _fire_volley(match_node: Node, weapon_settings_path: String, muzzle: Transform3D, settings: WeaponSettings) -> void:
-	var count = max(settings.projectile_count, 1)
-	var right = muzzle.basis.x.normalized()
-	var up = muzzle.basis.y.normalized()
-	var angle_step = 360.0 / count
-	var start_angle = _VOLLEY_START_ANGLES[count - 1] if count - 1 < _VOLLEY_START_ANGLES.size() else 0
-	for i in range(count):
-		var angle = deg_to_rad(start_angle + i * angle_step)
-		var offset = (right * cos(angle) + up * sin(angle)) * settings.projectile_spacing
-		var shot_transform := Transform3D(muzzle.basis, muzzle.origin + offset)
-		match_node.spawn_projectile(weapon_settings_path, team, shot_transform)
-
-
-@rpc("any_peer", "call_local", "reliable")
-func _play_launch_sound(weapon_index: int, cur_position: Vector3) -> void:
-	if weapon_index < 0 or weapon_index >= weapon_settings.size():
+@rpc("any_peer", "call_remote", "reliable")
+func _fire_rejected(shot_seq: int) -> void:
+	if multiplayer.get_remote_sender_id() != 1:
 		return
-	var settings := weapon_settings[weapon_index]
-	if settings and settings.launch_sound:
-		Utilities.play_sound(settings.launch_sound, cur_position, 0.015)
-
+	var match_node = get_tree().get_first_node_in_group("match")
+	if match_node:
+		match_node.reject_predicted_shot(shot_seq)
 
 
 @rpc("any_peer", "call_local", "reliable")
 func _sync_ammo(ammo: Array) -> void:
+	# Server -> owner only. Without this a client could rpc_id(1, ...) its own
+	# numbers straight into the server's authoritative ammo table.
+	if multiplayer.get_remote_sender_id() != 1:
+		return
 	_ammo_remaining = ammo

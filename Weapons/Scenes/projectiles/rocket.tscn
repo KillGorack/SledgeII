@@ -11,14 +11,6 @@
 [sub_resource type="SphereShape3D" id="SphereShape3D_fmkds"]
 radius = 0.05
 
-[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_2d37w"]
-properties/0/path = NodePath(".:position")
-properties/0/spawn = true
-properties/0/replication_mode = 1
-properties/1/path = NodePath(".:rotation")
-properties/1/spawn = true
-properties/1/replication_mode = 1
-
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_x6uhk"]
 transparency = 1
 blend_mode = 1
@@ -45,9 +37,6 @@ shape = SubResource("SphereShape3D_fmkds")
 
 [node name="RayCast3D" type="RayCast3D" parent="." unique_id=1822453284]
 target_position = Vector3(0, 0, -1)
-
-[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="." unique_id=465971867]
-replication_config = SubResource("SceneReplicationConfig_2d37w")
 
 [node name="OmniLight3D" type="OmniLight3D" parent="." unique_id=1739243305]
 script = ExtResource("4_clight")

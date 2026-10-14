@@ -11,7 +11,7 @@ func _ready() -> void:
 
 # Answers the same duck-typed apply_projectile_color() call collision_handler.gd
 # already sends to the projectile itself (see colorable_mesh.gd/colorable_light.gd/
-# Trail3D.gd) - _play_hit_effect() walks the whole explosion instance looking
+# Trail3D.gd) - match.gd::_play_impact_fx() walks the whole explosion instance looking
 # for anything that knows how to color itself, so this is the only wiring this
 # scene needs to pick up weapon_settings.projectile_color.
 func apply_projectile_color(color: Color) -> void:

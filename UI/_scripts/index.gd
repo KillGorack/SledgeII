@@ -66,6 +66,9 @@ var api_params = []
 
 var selected_map_title: String = ""
 var selected_map_file_id: int = -1
+# static so it outlives this scene - index.tscn is rebuilt from scratch every
+# time a match exits back here, and populate_levels_tree reselects it.
+static var _last_selected_map_file_id: int = -1
 var selected_game_row = null
 
 
@@ -164,6 +167,7 @@ func _on_level_selected():
 	if selected:
 		selected_map_title = selected.get_text(0)
 		selected_map_file_id = int(selected.get_meta("fil_id", -1))
+		_last_selected_map_file_id = selected_map_file_id
 
 
 func _on_game_selected():
@@ -252,7 +256,7 @@ func _on_join_pressed():
 	var port = int(selected_game_row.get_meta("hst_port", 0))
 	var map_file_id = int(selected_game_row.get_meta("hst_map_file_id", 0))
 	set_ui_feedback("Connecting...", "INFO")
-	NetworkManager.join_game(address, port, map_file_id)
+	NetworkManager.join_game(address, port, map_file_id, selected_game_row.get_text(0))
 
 
 func _on_joined_match():
@@ -460,6 +464,11 @@ func populate_levels_tree(response_data):
 			row.set_meta("fil_id", map_item.file_id)
 			row.set_meta("tan_id", map_item.tan_id)
 			row.set_meta("thm_id", map_item.thm_id)
+			if int(map_item.file_id) == _last_selected_map_file_id:
+				row.select(0)
+				# Deferred - the Tree hasn't laid out its new rows yet this frame.
+				world_list.scroll_to_item.call_deferred(row, true)
+				_on_level_selected()
 
 
 

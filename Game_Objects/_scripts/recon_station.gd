@@ -85,8 +85,11 @@ func _on_body_exited(body: Node3D) -> void:
 
 
 
-@rpc("any_peer", "call_local", "reliable")
+# Cosmetic - unreliable, own channel (see weapon_node.gd::_play_launch_sound).
+@rpc("any_peer", "call_local", "unreliable", 1)
 func _play_resupply_sound() -> void:
+	if multiplayer.get_remote_sender_id() != 1:
+		return
 	if resupply_sound:
 		Utilities.play_sound(resupply_sound, global_position)
 

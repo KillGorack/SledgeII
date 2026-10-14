@@ -6,6 +6,7 @@
 [ext_resource type="Material" uid="uid://bvk3h5cf6p6nq" path="res://Materials/PBR/digi_cammo.tres" id="1_nv2sd"]
 [ext_resource type="Material" uid="uid://dl6geb5lgd7j1" path="res://Materials/PBR/Gun_Metal.tres" id="3_gfhax"]
 [ext_resource type="Resource" uid="uid://csey8qhg0e4rt" path="res://Crafts/Settings/lightning_stats.tres" id="4_stats"]
+[ext_resource type="AudioStream" uid="uid://cjmg1eqi1eacq" path="res://Crafts/Sounds/vehicle.mp3" id="4_tqpc5"]
 [ext_resource type="PhysicsMaterial" path="res://Physics/physics_craft.tres" id="5_physmat"]
 [ext_resource type="Script" uid="uid://cs0sh685407yx" path="res://Crafts/_scripts/health_node.gd" id="6_health"]
 [ext_resource type="Script" uid="uid://dfcysnykxpal7" path="res://Weapons/_scripts/weapon_node.gd" id="7_weapon"]
@@ -42,16 +43,16 @@ points = PackedVector3Array(0.359591, 0.08753002, 0.36253202, -0.359594, 0.08753
 size = Vector3(0.7373047, 0.35, 1.6203003)
 
 [sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_lightning"]
-properties/0/path = NodePath(".:position")
+properties/0/path = NodePath("movement_node:net_position")
 properties/0/spawn = true
 properties/0/replication_mode = 1
-properties/1/path = NodePath(".:rotation")
+properties/1/path = NodePath("movement_node:net_rotation")
 properties/1/spawn = true
 properties/1/replication_mode = 1
-properties/2/path = NodePath("Turret:rotation_degrees")
+properties/2/path = NodePath("movement_node:yaw")
 properties/2/spawn = true
 properties/2/replication_mode = 1
-properties/3/path = NodePath("Turret/Barrel:rotation_degrees")
+properties/3/path = NodePath("movement_node:pitch")
 properties/3/spawn = true
 properties/3/replication_mode = 1
 
@@ -379,18 +380,18 @@ shadow_mesh = SubResource("ArrayMesh_lvbs3")
 [sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_health"]
 properties/0/path = NodePath(".:shields")
 properties/0/spawn = true
-properties/0/replication_mode = 1
+properties/0/replication_mode = 2
 properties/1/path = NodePath(".:armor")
 properties/1/spawn = true
-properties/1/replication_mode = 1
+properties/1/replication_mode = 2
 properties/2/path = NodePath(".:life")
 properties/2/spawn = true
-properties/2/replication_mode = 1
+properties/2/replication_mode = 2
 
 [sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_power"]
 properties/0/path = NodePath(".:current_power")
 properties/0/spawn = true
-properties/0/replication_mode = 1
+properties/0/replication_mode = 2
 
 [node name="Lightning" type="RigidBody3D" unique_id=223635602]
 mass = 5.0
@@ -441,8 +442,12 @@ target_position = Vector3(0, -0.2, 0)
 collision_mask = 2
 
 [node name="Engine Sound" type="AudioStreamPlayer3D" parent="." unique_id=208324712]
+stream = ExtResource("4_tqpc5")
+volume_db = -80.0
+max_db = -24.0
 
 [node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="." unique_id=899119704]
+replication_interval = 0.0333
 replication_config = SubResource("SceneReplicationConfig_lightning")
 public_visibility = false
 
@@ -503,6 +508,7 @@ script = ExtResource("6_health")
 stats = ExtResource("4_stats")
 
 [node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="health_node" unique_id=1586067962]
+delta_interval = 0.1
 replication_config = SubResource("SceneReplicationConfig_health")
 public_visibility = false
 
@@ -511,6 +517,7 @@ script = ExtResource("22_power")
 stats = ExtResource("4_stats")
 
 [node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="power_node" unique_id=1782664373]
+delta_interval = 0.1
 replication_config = SubResource("SceneReplicationConfig_power")
 public_visibility = false
 
@@ -640,6 +647,19 @@ offset_left = 5.0
 offset_right = 102.0
 offset_bottom = 23.0
 text = "116 FPS"
+
+[node name="Arena" type="Label" parent="Hud_InGame" unique_id=1491971939]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -200.0
+offset_top = 47.0
+offset_right = 200.0
+offset_bottom = 70.0
+grow_horizontal = 2
+text = "Arena"
+horizontal_alignment = 1
 
 [node name="Weapon" type="Label" parent="Hud_InGame" unique_id=1301515584]
 layout_mode = 1

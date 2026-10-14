@@ -82,11 +82,10 @@ func _process(delta: float) -> void:
 	# teleported back up until respawn_at() actually fires - so this would
 	# otherwise re-fire every tick for the whole 4 seconds.
 	#
-	# Routed through apply_damage.rpc(), not a direct destroy_self() call -
-	# this whole block only ever runs on the server (see the guard above),
-	# and destroy_self() is a plain function specifically because every
-	# other caller (apply_damage() itself) already broadcasts before
-	# reaching it. Calling it directly here skipped that broadcast entirely:
+	# Routed through apply_damage(), not a direct destroy_self() call -
+	# destroy_self() is a plain local function, and apply_damage() is what
+	# broadcasts the death (_broadcast_destroyed) to every peer. Calling
+	# destroy_self() directly here skipped that broadcast entirely:
 	# the host (the server, in any host-and-play session) would correctly
 	# see itself explode, but no other peer was ever told, leaving that
 	# craft alive and healthy on every other screen forever - stuck, since
@@ -94,16 +93,20 @@ func _process(delta: float) -> void:
 	# shields + armor + life guarantees lethality through all three layers
 	# regardless of current HP, same as a real overkill hit would.
 	if not _is_destroyed and body.global_position.y < FALL_DEATH_Y:
-		apply_damage.rpc(shields + armor + life)
+		apply_damage(shields + armor + life)
 
 
-# Only the server should ever decide damage - the collision handler that
-# calls this only runs its hit-resolution logic on the server (see
-# Weapons/collision_handler.gd), and this RPC shape ("authority", call_local)
-# means only the server is allowed to invoke it, while the resulting HP
-# values still get pushed out and applied identically on every client.
-@rpc("authority", "call_local", "reliable")
+# Server-only, plain function - not an RPC. HP lives on the server alone and
+# reaches the owning client's HUD through health_node/MultiplayerSynchronizer
+# (on-change, rate-limited - see match.gd::_grant_visibility for why it's
+# still visible to everyone); nobody else ever reads another craft's HP. Every peer used to re-run this same
+# math on its own copy and decide the death locally, which only stayed in
+# step because HP was streamed to everyone every frame - the death is now an
+# explicit broadcast (_broadcast_destroyed) instead, so no peer can ever
+# disagree with the server about whether a craft died.
 func apply_damage(damage: float) -> void:
+	if not multiplayer.is_server() or _is_destroyed:
+		return
 	_regeneration_timer.start()
 	_is_regenerating = false
 	if shields > 0:
@@ -123,7 +126,12 @@ func apply_damage(damage: float) -> void:
 	if damage > 0:
 		life -= damage
 	if life <= 0:
-		destroy_self()
+		_broadcast_destroyed.rpc()
+
+
+@rpc("authority", "call_local", "reliable")
+func _broadcast_destroyed() -> void:
+	destroy_self()
 
 
 # Client-requested, same shape as weapon_node.gd's request_fire(): movement.gd
@@ -143,10 +151,15 @@ func apply_damage(damage: float) -> void:
 func request_fall_damage(impact_speed: float) -> void:
 	if not multiplayer.is_server():
 		return
+	# any_peer, so anyone could otherwise call this on ANY craft with any
+	# impact_speed - only the peer actually simulating this craft may report
+	# its own landings.
+	if multiplayer.get_remote_sender_id() != body.get_multiplayer_authority():
+		return
 	if stats == null or impact_speed <= stats.fall_damage_safe_speed:
 		return
 	var excess = impact_speed - stats.fall_damage_safe_speed
-	apply_damage.rpc(stats.fall_damage_coefficient * excess * excess)
+	apply_damage(stats.fall_damage_coefficient * excess * excess)
 
 
 # Armor-then-life heal while parked inside a recon station captured by this
@@ -184,9 +197,8 @@ func _at_own_captured_station() -> bool:
 	return false
 
 
-# apply_damage() above is already broadcast to every peer (rpc + call_local),
-# so this runs identically everywhere without needing its own separate RPC -
-# that's what makes it actually visible to everyone, not just the host.
+# Runs on every peer via _broadcast_destroyed above - that's what makes it
+# visible to everyone, not just the host.
 func destroy_self() -> void:
 	# Two projectiles landing in the same frame both push life below zero and
 	# both arrive here. Without this guard that is two explosions and, worse,
@@ -243,7 +255,12 @@ func respawn_at(spawn_position: Vector3, spawn_basis: Basis) -> void:
 		# body was still frozen moved the simulation but left the NODE's own
 		# transform parked at the death position until a physics tick after the
 		# unfreeze.
-		body.freeze = false
+		# Only the owner's copy is ever a live dynamic body - every other peer
+		# keeps it frozen kinematic and just follows the replicated transform
+		# (see movement.gd::_ready), so unfreezing it there would hand a
+		# remote craft back to local gravity/collisions.
+		if body.is_multiplayer_authority():
+			body.freeze = false
 		# That stale node transform is what everything else actually reads: the
 		# collision shapes hang off it, the MultiplayerSynchronizer replicates
 		# .:position and .:rotation (both node properties, so remote peers were
@@ -263,6 +280,12 @@ func respawn_at(spawn_position: Vector3, spawn_basis: Basis) -> void:
 	# smoothly blend the render from the old to the new position instead of
 	# snapping - this explicitly tells it a teleport happened.
 	body.reset_physics_interpolation()
+	# Remote copies smooth toward the last replicated transform - point that
+	# at the spawn too, or they'd glide back toward the death spot until the
+	# owner's first post-respawn update arrives.
+	var movement_node = body.get_node_or_null("movement_node")
+	if movement_node and movement_node.has_method("snap_net_target"):
+		movement_node.snap_net_target(new_transform)
 	body.visible = true
 	# Collision only comes back now, once the body is already standing at the
 	# spawn point, so it is never solid at the old location.
