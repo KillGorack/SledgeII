@@ -11,9 +11,16 @@ const FALL_DAMAGE_RAY_LENGTH := 5.0
 @export var SUSPENSION_DAMPING := 100.0
 const LATERAL_GRIP_STRENGTH := 10.0
 const LONGITUDINAL_GRIP_STRENGTH := 2.0
+# Remote-copy smoothing (see _follow_net_target). The root synchronizer only
+# sends ~30 times a second now instead of every rendered frame, so remote
+# craft ease toward the latest update rather than snapping to it. Rate is
+# 1/time-constant: 18 -> ~55ms to close most of the gap. Anything further
+# off than NET_SNAP_DISTANCE is a teleport (respawn, big desync) - jump.
+const NET_SMOOTHING_RATE := 18.0
+const NET_SNAP_DISTANCE := 8.0
 
-var engine_audio: AudioStreamPlayer
-var target_pitch = 2.0
+var engine_audio: AudioStreamPlayer3D
+var target_pitch = 3.0
 var target_volume = -30.0
 var ui_pitch: float = 1
 var pitch_transition_speed = 5.0
@@ -31,8 +38,16 @@ var _airborne_velocity: Vector3 = Vector3.ZERO
 @onready var suspension_rays: Array[RayCast3D] = []
 @onready var ground_check_area = $"../FloorDetection"
 
-var yaw = 0.0
-var pitch = 0.0
+# yaw/pitch double as the replicated turret/barrel aim - the root
+# MultiplayerSynchronizer sends these two floats instead of two full
+# rotation_degrees Vector3s, and remote copies apply them in _follow_net_target.
+var yaw: float = 0.0
+var pitch: float = 0.0
+# The owner's craft transform as last replicated (written by the owner every
+# physics tick, read by every other peer) - see _follow_net_target. Global
+# space; the Crafts container sits at the origin on every peer.
+var net_position: Vector3 = Vector3.ZERO
+var net_rotation: Quaternion = Quaternion.IDENTITY
 var recentering = false
 @onready var barrel = $"../Turret/Barrel"
 @onready var turret = $"../Turret"
@@ -48,15 +63,37 @@ func _ready() -> void:
 		return
 	Utilities.set_allegiance(body, team)
 	body.angular_damp = 0.0
-	engine_audio = engine_audio_path as AudioStreamPlayer
+	engine_audio = engine_audio_path as AudioStreamPlayer3D
+	if engine_audio and is_multiplayer_authority():
+		engine_audio.pitch_scale = target_pitch
+		engine_audio.volume_db = target_volume
+		engine_audio.play()
 	if has_node("../Suspension"):
 		for ray in get_node("../Suspension").get_children():
 			if ray is RayCast3D:
 				suspension_rays.append(ray)
 	yaw = get_node("../Turret").rotation_degrees.y if has_node("../Turret") else 0.0
 	pitch = barrel.rotation_degrees.x if barrel else 0.0
+	snap_net_target(body.global_transform)
 	if is_multiplayer_authority():
 		_hide_own_body()
+	else:
+		# Only the owner simulates this craft. Every other copy used to stay a
+		# live dynamic body - falling under gravity between updates (nothing
+		# but the owner runs suspension) and then being teleported back by the
+		# next packet, which both jittered and, when it teleported into
+		# another craft, resolved the overlap as a huge collision impulse.
+		# Kinematic: still solid, still pushes the local player like a moving
+		# platform would, but only ever moves where it's told.
+		body.freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
+		body.freeze = true
+
+
+# Hard-sets the remote smoothing target (no easing) - initial spawn, and
+# health_node.gd::respawn_at so a respawn doesn't glide back from the death spot.
+func snap_net_target(target: Transform3D) -> void:
+	net_position = target.origin
+	net_rotation = target.basis.get_rotation_quaternion()
 
 
 
@@ -144,7 +181,10 @@ func _find_mesh_instances(node: Node) -> Array:
 
 func _physics_process(delta: float) -> void:
 	if not is_multiplayer_authority():
+		_follow_net_target(delta)
 		return
+	net_position = body.global_position
+	net_rotation = body.global_basis.get_rotation_quaternion()
 	var health_node = body.get_node_or_null("health_node")
 	if health_node and health_node.has_method("_is_destroyed"):
 		if health_node._is_destroyed:
@@ -190,6 +230,29 @@ func _physics_process(delta: float) -> void:
 
 
 
+
+
+# Remote copies only. Runs in _physics_process on purpose: transforms set
+# here are what physics interpolation blends between, so the render stays
+# smooth at any frame rate even though updates only arrive ~30x a second.
+# Stopgap until proper timestamped snapshot interpolation (networking Phase 2).
+func _follow_net_target(delta: float) -> void:
+	if body == null:
+		return
+	var t := 1.0 - exp(-NET_SMOOTHING_RATE * delta)
+	if body.global_position.distance_to(net_position) > NET_SNAP_DISTANCE:
+		body.global_transform = Transform3D(Basis(net_rotation), net_position)
+		body.reset_physics_interpolation()
+	else:
+		var current_rotation := body.global_basis.get_rotation_quaternion()
+		body.global_transform = Transform3D(
+			Basis(current_rotation.slerp(net_rotation, t)),
+			body.global_position.lerp(net_position, t)
+		)
+	if turret:
+		turret.rotation_degrees.y = lerpf(turret.rotation_degrees.y, yaw, t)
+	if barrel:
+		barrel.rotation_degrees.x = lerpf(barrel.rotation_degrees.x, pitch, t)
 
 
 func handle_turret_barrel_look():

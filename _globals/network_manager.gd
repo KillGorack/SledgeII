@@ -47,6 +47,9 @@ var is_host: bool = false
 var peer_teams: Dictionary = {}
 var team_juice: Dictionary = {}
 var current_map_file_id: int = -1
+# Display name only (the HUD's arena label) - the lobby lists a hosted game
+# under its map's title, so both host and joiner already have it in hand.
+var current_map_title: String = ""
 # Every map .pck exports under the same virtual path (res://secret_level.tscn),
 # so "does that path already resolve" can't tell two different maps apart -
 # this is the actual bookkeeping for which map_file_id is currently mounted.
@@ -75,9 +78,11 @@ func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] 
 	if err != OK:
 		host_failed.emit("Could not open port %d (%s)" % [port, error_string(err)])
 		return err
+	_enable_compression()
 	multiplayer.multiplayer_peer = peer
 	is_host = true
 	current_map_file_id = map_file_id
+	current_map_title = game_name
 	peer_teams = {1: host_team}
 	allowed_weapon_paths = weapon_paths
 	day_night_enabled = day_night
@@ -103,16 +108,26 @@ func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] 
 	return OK
 
 
-func join_game(address: String, port: int, map_file_id: int) -> Error:
+func join_game(address: String, port: int, map_file_id: int, map_title: String = "") -> Error:
 	peer = ENetMultiplayerPeer.new()
 	var err = peer.create_client(address, port)
 	if err != OK:
 		join_failed.emit("Could not connect to %s:%d (%s)" % [address, port, error_string(err)])
 		return err
+	_enable_compression()
 	multiplayer.multiplayer_peer = peer
 	is_host = false
 	current_map_file_id = map_file_id
+	current_map_title = map_title
 	return OK
+
+
+# Range-coder compression on every ENet packet - cheap CPU-wise and a
+# meaningful cut for this game's traffic (lots of small, similar float
+# payloads). Has to match on both ends: a build without this can't talk to a
+# build with it, so host and joiners need to be on the same version.
+func _enable_compression() -> void:
+	peer.host.compress(ENetConnection.COMPRESS_RANGE_CODER)
 
 
 func stop_hosting() -> void:
@@ -144,6 +159,7 @@ func leave_game() -> void:
 		multiplayer.multiplayer_peer = null
 	peer_teams.clear()
 	current_map_file_id = -1
+	current_map_title = ""
 
 
 func list_open_games() -> void:
@@ -236,10 +252,14 @@ func _assign_team(peer_id: int, team: String) -> void:
 	player_registered.emit(peer_id, team)
 
 
+# All four teams in one message, values in TEAM_NAMES order - see
+# match.gd::_broadcast_juice. A packed float array rather than a Dictionary
+# keeps the four team-name strings off the wire entirely.
 @rpc("authority", "call_local", "reliable")
-func _update_team_juice(team: String, amount: float) -> void:
-	team_juice[team] = amount
-	team_juice_changed.emit(team, amount)
+func _update_all_team_juice(values: PackedFloat32Array) -> void:
+	for i in mini(values.size(), TEAM_NAMES.size()):
+		team_juice[TEAM_NAMES[i]] = values[i]
+		team_juice_changed.emit(TEAM_NAMES[i], values[i])
 
 
 func _start_heartbeat() -> void:

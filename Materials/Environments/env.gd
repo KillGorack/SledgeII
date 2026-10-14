@@ -63,7 +63,14 @@ func _process(delta: float) -> void:
 		_sync_elapsed += delta
 		if _sync_elapsed >= SYNC_INTERVAL:
 			_sync_elapsed = 0.0
-			sync_time_to.rpc(time_of_day)
+			# Only peers whose match scene actually exists - a peer still on
+			# the team-select screen has no Match/Env to receive this, and
+			# a plain broadcast just spammed "Node not found" there.
+			var match_node = get_tree().get_first_node_in_group("match")
+			if match_node:
+				for peer_id in match_node._ready_peers:
+					if peer_id != 1:
+						sync_time_to.rpc_id(peer_id, time_of_day)
 
 
 # Broadcast (server) or targeted at one newly-ready peer (see

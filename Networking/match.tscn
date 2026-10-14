@@ -1,27 +1,24 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://x1ecqih5bjox"]
 
-[ext_resource type="Script" path="res://Networking/match.gd" id="1_match"]
+[ext_resource type="Script" uid="uid://dnlg68g6rpriu" path="res://Networking/match.gd" id="1_match"]
 
-[node name="Match" type="Node3D"]
+[node name="Match" type="Node3D" unique_id=1416258273]
 script = ExtResource("1_match")
 
-[node name="LocalCamera" type="Camera3D" parent="."]
+[node name="LocalCamera" type="Camera3D" parent="." unique_id=2074948942]
 
-[node name="BaseGuns" type="Node3D" parent="."]
+[node name="BaseGuns" type="Node3D" parent="." unique_id=548045783]
 
-[node name="Crafts" type="Node3D" parent="."]
+[node name="Crafts" type="Node3D" parent="." unique_id=5201692]
 
-[node name="CraftSpawner" type="MultiplayerSpawner" parent="."]
+[node name="CraftSpawner" type="MultiplayerSpawner" parent="." unique_id=1745533260]
 spawn_path = NodePath("../Crafts")
 
-[node name="Projectiles" type="Node3D" parent="."]
+[node name="Projectiles" type="Node3D" parent="." unique_id=542561772]
 
-[node name="ProjectileSpawner" type="MultiplayerSpawner" parent="."]
-spawn_path = NodePath("../Projectiles")
+[node name="LoadingScreen" type="CanvasLayer" parent="." unique_id=2057782834]
 
-[node name="LoadingScreen" type="CanvasLayer" parent="."]
-
-[node name="Background" type="ColorRect" parent="LoadingScreen"]
+[node name="Background" type="ColorRect" parent="LoadingScreen" unique_id=1825474287]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -29,7 +26,7 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.05, 0.05, 0.07, 1)
 
-[node name="Label" type="Label" parent="LoadingScreen"]
+[node name="Label" type="Label" parent="LoadingScreen" unique_id=781242802]
 anchors_preset = 8
 anchor_left = 0.5
 anchor_top = 0.5

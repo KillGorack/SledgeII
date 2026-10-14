@@ -41,7 +41,7 @@ const SELF_RENDER_LAYER := 20
 
 @onready var craft_container: Node3D = $Crafts
 @onready var spawner: MultiplayerSpawner = $CraftSpawner
-@onready var projectile_spawner: MultiplayerSpawner = $ProjectileSpawner
+@onready var projectiles_container: Node3D = $Projectiles
 @onready var loading_screen: CanvasLayer = $LoadingScreen
 # The one Camera3D that exists for this client, for the whole match. It is
 # never created/destroyed alongside a craft - only ever reparented onto
@@ -74,10 +74,11 @@ const BASE_PAD_GROUPS := {
 	"team_blue": "base_pad_blue",
 	"team_gray": "base_pad_gray",
 }
-# Base pads are small (~7x7) - a candidate spawn point within this distance
-# of an existing craft is "occupied" for picking purposes; see
-# _pick_spawn_transform.
-const SPAWN_CLEAR_RADIUS := 4.0
+# Keep spawned craft centers at least this far from each pad edge. The
+# resulting grid gives a 7x7 pad nine separated spawn spots.
+const SPAWN_SLOT_EDGE_MARGIN := 1.0
+const SPAWN_SLOT_SPACING := 2.25
+const DEFAULT_BASE_PAD_SIZE := Vector2(7.0, 7.0)
 # The craft's own origin sits at the turret's center, not its bottom - Y
 # range on its main collider (Crafts/Scenes/lightning.tscn) runs -0.29 to
 # +0.08, and FloorDetection's own collider bottoms out around -0.30, so
@@ -127,6 +128,9 @@ const JUICE_SYNC_INTERVAL := 0.5
 
 var _team_juice: Dictionary = {}
 var _juice_sync_elapsed := 0.0
+# Last juice values actually broadcast, in TEAM_NAMES order - lets the
+# periodic sync skip sending when nothing moved (see _broadcast_juice).
+var _last_sent_juice := PackedFloat32Array()
 
 var _spawn_points_by_team: Dictionary = {}
 var _fallback_spawn_points: Array = []
@@ -154,11 +158,11 @@ func _ready() -> void:
 	local_camera.current = true
 	local_camera.cull_mask = ((1 << 20) - 1) & ~(1 << (SELF_RENDER_LAYER - 1))
 	spawner.spawn_function = _spawn_craft
-	projectile_spawner.spawn_function = _spawn_projectile
 	await _load_map()
 	_map_ready = true
 	for craft in _pending_unfreeze:
-		if is_instance_valid(craft):
+		# Remote copies stay frozen kinematic for good - see movement.gd::_ready.
+		if is_instance_valid(craft) and craft.is_multiplayer_authority():
 			craft.freeze = false
 	_pending_unfreeze.clear()
 	NetworkManager.player_registered.connect(_on_player_registered)
@@ -182,7 +186,7 @@ func _ready() -> void:
 	if multiplayer.is_server():
 		for team in NetworkManager.TEAM_NAMES:
 			_team_juice[team] = JUICE_CAPACITY
-			NetworkManager._update_team_juice.rpc(team, JUICE_CAPACITY)
+		_broadcast_juice(true)
 
 
 func _process(delta: float) -> void:
@@ -193,8 +197,26 @@ func _process(delta: float) -> void:
 	_juice_sync_elapsed += delta
 	if _juice_sync_elapsed >= JUICE_SYNC_INTERVAL:
 		_juice_sync_elapsed = 0.0
-		for team in _team_juice:
-			NetworkManager._update_team_juice.rpc(team, _team_juice[team])
+		_broadcast_juice()
+
+
+# One packed message for all four teams (instead of one RPC per team), and
+# only when a value actually changed - juice sits at capacity for long
+# stretches, and this used to resend all four reliably every half second
+# regardless. force skips the change check (match start, a capture spend).
+func _broadcast_juice(force: bool = false) -> void:
+	var values := _juice_values()
+	if not force and values == _last_sent_juice:
+		return
+	_last_sent_juice = values
+	NetworkManager._update_all_team_juice.rpc(values)
+
+
+func _juice_values() -> PackedFloat32Array:
+	var values := PackedFloat32Array()
+	for team in NetworkManager.TEAM_NAMES:
+		values.append(_team_juice.get(team, 0.0))
+	return values
 
 
 # Additive per-recon, per team - "the more cons you have the more juice you
@@ -515,6 +537,9 @@ func _notify_ready() -> void:
 			_grant_visibility(craft, requester_id)
 	if is_instance_valid(_env):
 		_env.sync_time_to.rpc_id(requester_id, _env.time_of_day)
+	# Juice is only broadcast on change now (see _broadcast_juice), so a late
+	# joiner could otherwise sit on an empty bar until the next capture.
+	NetworkManager._update_all_team_juice.rpc_id(requester_id, _juice_values())
 	# Catch up on every recon someone else already captured before this peer
 	# connected - see _sync_recon_capture. Fixed map-authored stations are
 	# skipped: recon.changeable is false for those, and they already came out
@@ -542,11 +567,21 @@ func _notify_ready() -> void:
 # is exactly why health/power synced but position never did. That one has to
 # be granted by the owning peer itself instead (see _grant_own_craft_visibility).
 func _grant_visibility(craft: Node, viewer_peer_id: int) -> void:
-	for sync_path in ["health_node/MultiplayerSynchronizer", "power_node/MultiplayerSynchronizer"]:
-		var sync = craft.get_node_or_null(sync_path)
-		if sync:
-			sync.set_visibility_for(viewer_peer_id, true)
 	var owner_peer_id: int = craft.get_multiplayer_authority()
+	# HP has to stay visible to EVERY peer, even though only the owner's HUD
+	# reads it: Godot only delivers RPCs on a node to peers its synchronizer
+	# is visible to, and health_node carries the death/respawn/knockback RPCs
+	# - owner-only visibility silently swallowed other tanks' explosions and
+	# respawns. It's on-change and rate-limited (lightning.tscn), so this is
+	# cheap. power_node has no RPCs and only the owner reads it (HUD, local
+	# fire prediction), so that one stays owner-only.
+	var health_sync = craft.get_node_or_null("health_node/MultiplayerSynchronizer")
+	if health_sync:
+		health_sync.set_visibility_for(viewer_peer_id, true)
+	if viewer_peer_id == owner_peer_id:
+		var power_sync = craft.get_node_or_null("power_node/MultiplayerSynchronizer")
+		if power_sync:
+			power_sync.set_visibility_for(viewer_peer_id, true)
 	if owner_peer_id == multiplayer.get_unique_id():
 		# The owning peer IS the server (this is the host's own craft) - no
 		# RPC round trip needed, just do it directly.
@@ -589,28 +624,59 @@ func _on_player_unregistered(peer_id: int) -> void:
 		craft.queue_free()
 
 
-# Prefers whichever of this team's own base pad markers currently has the
-# most room around it, so spawning/respawning doesn't drop a player on top
-# of a teammate already there (pads are small, ~7x7) - only falls back to
-# the roomiest-available pick (letting spawns overlap) if every pad on the
-# team is currently crowded, since spawning imperfectly still beats not
-# spawning at all.
+# Spreads craft across the available space on this team's pads, choosing the
+# spawn spot whose nearest craft is farthest away. Legacy PlayerSpawn points
+# remain single-position candidates.
 func _pick_spawn_transform(team: String) -> Transform3D:
 	var candidates: Array = _spawn_points_by_team.get(team, [])
+	var is_base_pad := not candidates.is_empty()
 	if candidates.is_empty():
 		candidates = _fallback_spawn_points
 	if candidates.is_empty():
 		return Transform3D.IDENTITY
-	var roomiest = candidates[0]
-	var roomiest_distance := -1.0
+	var spawn_transforms: Array[Transform3D] = []
 	for candidate in candidates:
-		var distance := _distance_to_nearest_craft(candidate.global_position)
-		if distance >= SPAWN_CLEAR_RADIUS:
-			return _lift_spawn_transform(candidate.global_transform)
+		if is_base_pad:
+			spawn_transforms.append_array(_spawn_transforms_for_pad(candidate))
+		else:
+			spawn_transforms.append(_lift_spawn_transform(candidate.global_transform))
+	var roomiest := spawn_transforms[0]
+	var roomiest_distance := -1.0
+	for spawn_transform in spawn_transforms:
+		var distance := _distance_to_nearest_craft(spawn_transform.origin)
 		if distance > roomiest_distance:
-			roomiest = candidate
+			roomiest = spawn_transform
 			roomiest_distance = distance
-	return _lift_spawn_transform(roomiest.global_transform)
+	return roomiest
+
+
+func _spawn_transforms_for_pad(pad: Node3D) -> Array[Transform3D]:
+	var pad_size := DEFAULT_BASE_PAD_SIZE
+	var local_center := Vector3.ZERO
+	if pad is MeshInstance3D and pad.mesh:
+		var bounds: AABB = pad.mesh.get_aabb()
+		if bounds.size.x > 0.0 and bounds.size.z > 0.0:
+			pad_size = Vector2(bounds.size.x, bounds.size.z)
+			local_center = Vector3(bounds.get_center().x, 0.0, bounds.get_center().z)
+
+	var x_offsets := _spawn_axis_offsets(pad_size.x)
+	var z_offsets := _spawn_axis_offsets(pad_size.y)
+	var pad_basis := pad.global_basis.orthonormalized()
+	var spawn_transforms: Array[Transform3D] = []
+	for x_offset in x_offsets:
+		for z_offset in z_offsets:
+			var local_position := local_center + Vector3(x_offset, 0.0, z_offset)
+			var pad_position := pad.global_transform * local_position
+			spawn_transforms.append(_lift_spawn_transform(Transform3D(pad_basis, pad_position)))
+	return spawn_transforms
+
+
+func _spawn_axis_offsets(axis_size: float) -> Array[float]:
+	var available_extent := maxf(0.0, axis_size * 0.5 - SPAWN_SLOT_EDGE_MARGIN)
+	if available_extent == 0.0:
+		return [0.0]
+	var offset := minf(SPAWN_SLOT_SPACING, available_extent)
+	return [-offset, 0.0, offset]
 
 
 func _lift_spawn_transform(spawn_transform: Transform3D) -> Transform3D:
@@ -713,7 +779,7 @@ func _start_capture_request(requester_id: int, recon_path: NodePath) -> void:
 	# capture is somehow interrupted later, same "spend on attempt, not on
 	# success" rule power/ammo already follow.
 	_team_juice[team] -= JUICE_CAPTURE_COST
-	NetworkManager._update_team_juice.rpc(team, _team_juice[team])
+	_broadcast_juice(true)
 	_capturing_recons[recon] = true
 	_run_capture.rpc(get_path_to(gun), recon_path, team)
 
@@ -762,49 +828,238 @@ func _sync_recon_capture(recon_path: NodePath, team: String) -> void:
 		recon.capture(team)
 
 
-func spawn_projectile(weapon_settings_path: String, team: String, muzzle_transform: Transform3D, use_team_color: bool = false) -> void:
-	projectile_spawner.spawn({
-		"weapon_settings_path": weapon_settings_path,
-		"team": team,
-		"position": muzzle_transform.origin,
-		"basis": muzzle_transform.basis,
-		"use_team_color": use_team_color,
-	})
+# --- Projectiles -----------------------------------------------------------
+# No projectile is ever streamed per frame (they used to each carry a
+# MultiplayerSynchronizer sending position+rotation every rendered frame to
+# every peer - by far the biggest bandwidth cost in the game). Instead:
+#   spawn  - one reliable event per volley; every peer creates its own copy
+#            and flies it locally (collision_handler.gd::_cosmetic_step).
+#   correct- only for what clients can't predict: guided course (unreliable
+#            stream) and ricochets/pierces/bounces (reliable, one-off).
+#   end    - one reliable event; explosion/bullet hole ride _play_impact_fx.
+# The server's own copy stays the only one that resolves hits.
+#
+# Latency compensation: the server advances its copy by the shooter's
+# one-way latency (the shot left their barrel that long ago), and every
+# other peer by that plus its own one-way latency. The shooter themselves
+# never waits at all - see predict_shot.
+const PROJECTILE_MAX_FAST_FORWARD := 0.15
+const _VOLLEY_START_ANGLES := [0, 0, -30, 45, 18, 0]
+
+# Server-only id counter. Every peer's copy of one projectile shares its id.
+var _next_projectile_id := 1
+# net_id -> projectile, on every peer.
+var _projectiles: Dictionary = {}
+# Shooter-only: shot_seq -> Array of locally predicted projectiles, waiting
+# for the server to confirm (adopt) or reject them.
+var _predicted_shots: Dictionary = {}
 
 
-func _spawn_projectile(data: Dictionary) -> Node:
-	# weapon_settings_path is a string, not the Resource itself - Godot's RPC/
-	# spawn replication doesn't safely support arbitrary Object decoding by
-	# default. Every peer has the same .tres file locally, so each side just
-	# loads it independently instead of sending the Resource over the wire.
-	var settings: WeaponSettings = load(data["weapon_settings_path"])
-	if data.get("use_team_color", false):
+# Server-only. shooter_peer 0 = not a player (base guns), which also means
+# no launch sound (same as before - only crafts ever played one).
+func spawn_projectile(weapon_settings_path: String, team: String, muzzle_transform: Transform3D, use_team_color: bool = false, shooter_peer: int = 0, shot_seq: int = -1, fast_forward: float = 0.0) -> void:
+	if not multiplayer.is_server():
+		return
+	var settings: WeaponSettings = load(weapon_settings_path)
+	if settings == null or settings.projectile_prefab == null:
+		return
+	var first_id := _next_projectile_id
+	_next_projectile_id += maxi(settings.projectile_count, 1)
+	_create_volley(first_id, weapon_settings_path, team, muzzle_transform, use_team_color, fast_forward, shooter_peer != 0)
+	var team_index := NetworkManager.TEAM_NAMES.find(team)
+	# Only to peers whose match scene actually exists - see _ready_peers.
+	for peer_id in _ready_peers:
+		if peer_id != 1:
+			_spawn_projectile_event.rpc_id(peer_id, first_id, weapon_settings_path, team_index, muzzle_transform, use_team_color, fast_forward, shooter_peer, shot_seq)
+
+
+@rpc("authority", "call_remote", "reliable", 2)
+func _spawn_projectile_event(first_id: int, weapon_settings_path: String, team_index: int, muzzle_transform: Transform3D, use_team_color: bool, fast_forward: float, shooter_peer: int, shot_seq: int) -> void:
+	if shooter_peer == multiplayer.get_unique_id() and _predicted_shots.has(shot_seq):
+		# Our own shot - already flying since the moment we fired. Adopt the
+		# server's ids instead of spawning a duplicate.
+		var predicted: Array = _predicted_shots[shot_seq]
+		_predicted_shots.erase(shot_seq)
+		for i in predicted.size():
+			if is_instance_valid(predicted[i]):
+				predicted[i].net_id = first_id + i
+				_projectiles[first_id + i] = predicted[i]
+		return
+	var team: String = NetworkManager.TEAM_NAMES[team_index] if team_index >= 0 and team_index < NetworkManager.TEAM_NAMES.size() else ""
+	_create_volley(first_id, weapon_settings_path, team, muzzle_transform, use_team_color, fast_forward + _one_way_latency(), shooter_peer != 0)
+
+
+# Shooter-only (never the host - its shots are the real ones already). Spawns
+# the volley locally the instant the trigger is pulled; the server's spawn
+# event later adopts it (see _spawn_projectile_event) or reject_predicted_shot
+# removes it.
+func predict_shot(shot_seq: int, weapon_settings_path: String, team: String, muzzle_transform: Transform3D) -> void:
+	_predicted_shots[shot_seq] = _create_volley(-1, weapon_settings_path, team, muzzle_transform, false, 0.0, true)
+
+
+func reject_predicted_shot(shot_seq: int) -> void:
+	for projectile in _predicted_shots.get(shot_seq, []):
+		if is_instance_valid(projectile):
+			projectile.queue_free()
+	_predicted_shots.erase(shot_seq)
+
+
+# Server-only, from collision_handler.gd::destroy_self.
+func notify_projectile_ended(net_id: int) -> void:
+	_projectiles.erase(net_id)
+	for peer_id in _ready_peers:
+		if peer_id != 1:
+			_end_projectile_event.rpc_id(peer_id, net_id)
+
+
+@rpc("authority", "call_remote", "reliable", 2)
+func _end_projectile_event(net_id: int) -> void:
+	var projectile = _projectiles.get(net_id)
+	_projectiles.erase(net_id)
+	if is_instance_valid(projectile):
+		projectile.end_cosmetic()
+
+
+# Server-only, from collision_handler.gd::_send_correction.
+func send_projectile_correction(net_id: int, server_transform: Transform3D, velocity: Vector3, snap: bool) -> void:
+	for peer_id in _ready_peers:
+		if peer_id == 1:
+			continue
+		if snap:
+			_correct_projectile_reliable.rpc_id(peer_id, net_id, server_transform, velocity)
+		else:
+			_correct_projectile.rpc_id(peer_id, net_id, server_transform, velocity)
+
+
+# Periodic guided-missile stream - a lost one is superseded 50ms later, so
+# unreliable (and on its own channel, so it never queues behind anything).
+@rpc("authority", "call_remote", "unreliable_ordered", 3)
+func _correct_projectile(net_id: int, server_transform: Transform3D, velocity: Vector3) -> void:
+	_apply_projectile_correction(net_id, server_transform, velocity, false)
+
+
+# One-off course changes (ricochet etc.) - same channel as spawn/end so it
+# can never arrive before the spawn it refers to.
+@rpc("authority", "call_remote", "reliable", 2)
+func _correct_projectile_reliable(net_id: int, server_transform: Transform3D, velocity: Vector3) -> void:
+	_apply_projectile_correction(net_id, server_transform, velocity, true)
+
+
+func _apply_projectile_correction(net_id: int, server_transform: Transform3D, velocity: Vector3, snap: bool) -> void:
+	var projectile = _projectiles.get(net_id)
+	if is_instance_valid(projectile):
+		projectile.apply_correction(server_transform, velocity, _one_way_latency(), snap)
+
+
+# Half the ENet-measured round trip to the server, capped. 0 on the server.
+func _one_way_latency() -> float:
+	if multiplayer.is_server():
+		return 0.0
+	return minf(peer_one_way_latency(1), PROJECTILE_MAX_FAST_FORWARD)
+
+
+# Half the ENet-measured round trip to peer_id (as seen from this machine).
+func peer_one_way_latency(peer_id: int) -> float:
+	var enet := multiplayer.multiplayer_peer as ENetMultiplayerPeer
+	if enet == null:
+		return 0.0
+	var packet_peer := enet.get_peer(peer_id)
+	if packet_peer == null:
+		return 0.0
+	return packet_peer.get_statistic(ENetPacketPeer.PEER_ROUND_TRIP_TIME) / 2000.0
+
+
+# Builds one volley locally - identical on every peer, which is what lets
+# a single spawn event stand in for every projectile in it. net ids are
+# first_id, first_id+1, ... (first_id -1 = predicted, ids assigned later).
+func _create_volley(first_id: int, weapon_settings_path: String, team: String, muzzle_transform: Transform3D, use_team_color: bool, fast_forward: float, play_launch_sound: bool) -> Array:
+	# weapon_settings_path is a string, not the Resource itself - every peer
+	# has the same .tres locally, so each side just loads it by path.
+	var settings: WeaponSettings = load(weapon_settings_path)
+	if settings == null or settings.projectile_prefab == null:
+		return []
+	if use_team_color:
 		# load() caches and shares this exact Resource across every shot of
-		# this weapon by every peer and every player, so mutating
-		# projectile_color directly on it would repaint every other shot
-		# using the same .tres, including a player firing this same weapon
-		# right after. Duplicating first scopes the change to just this
-		# shot. Shallow is enough - projectile_color is the only field this
-		# ever changes, and it's a plain Color; explosion_prefab and
-		# projectile_prefab are meant to keep pointing at the same shared
-		# PackedScene either way (nothing here mutates those, and each shot
-		# already gets its own instantiate() from them regardless).
-		#
-		# Doing this here, before weapon_settings is ever handed to the
-		# projectile, means every consumer that reads
-		# weapon_settings.projectile_color for the rest of this shot's
-		# life - collision_handler.gd's own _ready() tint AND the separate
-		# spark tint in _play_hit_effect(), spawned much later on impact -
-		# picks up the team color automatically, with no per-consumer flag
-		# to keep in sync by hand (a base_gun-fired shot previously missed
-		# the spark tint this way).
+		# this weapon by every player, so mutating projectile_color directly
+		# would repaint every other shot using the same .tres. Duplicating
+		# scopes it to just this volley - and since it happens before the
+		# projectile ever sees weapon_settings, everything that reads
+		# projectile_color for this shot's life (projectile tint, impact
+		# sparks) picks up the team color automatically.
 		settings = settings.duplicate()
-		settings.projectile_color = ReconStation.render_color_for_team(data["team"])
-	var projectile := settings.projectile_prefab.instantiate()
-	projectile.weapon_settings = settings
-	projectile.team = data["team"]
-	projectile.transform = Transform3D(data["basis"], data["position"])
-	return projectile
+		settings.projectile_color = ReconStation.render_color_for_team(team)
+	var created: Array = []
+	var transforms := _volley_transforms(settings, muzzle_transform)
+	for i in transforms.size():
+		var projectile := settings.projectile_prefab.instantiate()
+		projectile.weapon_settings = settings
+		projectile.weapon_settings_path = weapon_settings_path
+		projectile.team = team
+		projectile.transform = transforms[i]
+		if first_id >= 0:
+			projectile.net_id = first_id + i
+			_projectiles[first_id + i] = projectile
+		projectiles_container.add_child(projectile)
+		projectile.fast_forward(fast_forward)
+		created.append(projectile)
+	if play_launch_sound and settings.launch_sound:
+		Utilities.play_sound(settings.launch_sound, muzzle_transform.origin + Vector3.UP * 2.0, 0.1)
+	return created
+
+
+# Ported from the predecessor's shoot.gd::fire_weapon: a multi-shot weapon
+# fires dead straight from several points on a small ring
+# (projectile_spacing) rather than diverging, with a per-count start angle so
+# each pattern sits symmetrically. Each shot is its own collision_handler
+# instance, so each guided missile in a volley locks its own target.
+func _volley_transforms(settings: WeaponSettings, muzzle: Transform3D) -> Array[Transform3D]:
+	var count := maxi(settings.projectile_count, 1)
+	var right := muzzle.basis.x.normalized()
+	var up := muzzle.basis.y.normalized()
+	var angle_step := 360.0 / count
+	var start_angle: float = _VOLLEY_START_ANGLES[count - 1] if count - 1 < _VOLLEY_START_ANGLES.size() else 0
+	var transforms: Array[Transform3D] = []
+	for i in range(count):
+		var angle := deg_to_rad(start_angle + i * angle_step)
+		var offset := (right * cos(angle) + up * sin(angle)) * settings.projectile_spacing
+		transforms.append(Transform3D(muzzle.basis, muzzle.origin + offset))
+	return transforms
+
+
+# Cosmetic only - explosion + bullet hole for one projectile impact, sent by
+# collision_handler.gd::set_hit_scene on the server. Unreliable on its own
+# channel: a dropped packet just means one missing spark, and it can never
+# hold up gameplay-critical reliable traffic (spawns, damage, chat) queued
+# behind it. Lives here on the persistent match node, not the projectile, so
+# it still plays if the projectile's despawn wins the race to this peer.
+@rpc("authority", "call_local", "unreliable", 1)
+func _play_impact_fx(settings_path: String, color: Color, impact_transform: Transform3D, show_hit: bool, show_hole: bool, hole_point: Vector3, hole_normal: Vector3) -> void:
+	if settings_path.is_empty():
+		return
+	var settings: WeaponSettings = load(settings_path)
+	if settings == null:
+		return
+	if show_hit:
+		if settings.hit_sound:
+			Utilities.play_sound(settings.hit_sound, impact_transform.origin, 0.1)
+		if settings.explosion_prefab:
+			var explosion_instance := settings.explosion_prefab.instantiate()
+			add_child(explosion_instance)
+			explosion_instance.transform = impact_transform
+			Utilities.apply_projectile_color_recursive(explosion_instance, color)
+	if show_hole and settings.bullet_hole_prefab:
+		var bullet_hole_instance := settings.bullet_hole_prefab.instantiate()
+		add_child(bullet_hole_instance)
+		var offset_position := hole_point + hole_normal * 0.01
+		bullet_hole_instance.global_transform.origin = offset_position
+		if not hole_normal.is_zero_approx():
+			var normal := hole_normal.normalized()
+			var up_vector := Vector3.UP
+			if normal.dot(up_vector) > 0.999:
+				up_vector = Vector3.RIGHT
+			up_vector = up_vector.rotated(normal, randf() * TAU)
+			if not up_vector.cross(normal).is_zero_approx():
+				bullet_hole_instance.look_at_from_position(offset_position, offset_position + normal, up_vector)
 
 
 # Called exactly once, the first time YOUR craft spawns. It never needs to
@@ -858,7 +1113,7 @@ func _spawn_craft(data: Dictionary) -> Node:
 	craft.set_multiplayer_authority(data["peer_id"])
 	# set_multiplayer_authority() above is recursive by default, so it just
 	# silently reassigned health_node's authority to the owning client too.
-	# health_node's apply_damage/respawn_at RPCs are deliberately
+	# health_node's _broadcast_destroyed/respawn_at RPCs are deliberately
 	# @rpc("authority", ...) so ONLY the server can ever push HP or a
 	# respawn transform (see the comments on those functions) - but Godot's
 	# "authority" RPC mode is enforced against the target node's OWN
@@ -871,6 +1126,13 @@ func _spawn_craft(data: Dictionary) -> Node:
 	# exactly where it died instead of at the spawn point. Re-pin it to the
 	# server explicitly so those RPCs actually replicate.
 	craft.get_node("health_node").set_multiplayer_authority(1)
+	# Godot refuses to send an RPC on a synchronizer-tracked node to a peer
+	# that synchronizer isn't visible to - and that check runs on the SENDING
+	# peer, against its own local copy. health_node's request_fall_damage is
+	# client -> server, so every peer's copy has to count the server as a
+	# viewer, or the call never leaves the client ("Attempt to call an RPC to
+	# a peer that cannot see this node") - client fall damage never worked.
+	craft.get_node("health_node/MultiplayerSynchronizer").set_visibility_for(1, true)
 	# power_node needs the same fix, for the same reason: request_fire() below
 	# has to trust its power total enough to gate whether a shot is even allowed
 	# to fire, so the server has to be the one computing/holding it, not the
