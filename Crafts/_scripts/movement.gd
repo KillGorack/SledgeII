@@ -11,13 +11,17 @@ const FALL_DAMAGE_RAY_LENGTH := 5.0
 @export var SUSPENSION_DAMPING := 100.0
 const LATERAL_GRIP_STRENGTH := 10.0
 const LONGITUDINAL_GRIP_STRENGTH := 2.0
-# Remote-copy smoothing (see _follow_net_target). The root synchronizer only
-# sends ~30 times a second now instead of every rendered frame, so remote
-# craft ease toward the latest update rather than snapping to it. Rate is
-# 1/time-constant: 18 -> ~55ms to close most of the gap. Anything further
-# off than NET_SNAP_DISTANCE is a teleport (respawn, big desync) - jump.
-const NET_SMOOTHING_RATE := 18.0
+# Remote-copy snapshot interpolation (see _interpolate_remote). Remote craft
+# are drawn INTERP_DELAY in the past, blending between the two real
+# snapshots around that moment - ~3 snapshots deep at the root
+# synchronizer's 30Hz, enough to ride out a late or lost packet without
+# stalling. If the buffer runs dry anyway, extrapolate along the last known
+# velocity for up to MAX_EXTRAPOLATION, then hold. Two snapshots further
+# apart than NET_SNAP_DISTANCE are a teleport (respawn) - jump, never glide.
+const INTERP_DELAY := 0.1
+const MAX_EXTRAPOLATION := 0.25
 const NET_SNAP_DISTANCE := 8.0
+const SNAPSHOT_BUFFER_MAX := 32
 
 var engine_audio: AudioStreamPlayer3D
 var target_pitch = 3.0
@@ -38,16 +42,22 @@ var _airborne_velocity: Vector3 = Vector3.ZERO
 @onready var suspension_rays: Array[RayCast3D] = []
 @onready var ground_check_area = $"../FloorDetection"
 
-# yaw/pitch double as the replicated turret/barrel aim - the root
-# MultiplayerSynchronizer sends these two floats instead of two full
-# rotation_degrees Vector3s, and remote copies apply them in _follow_net_target.
 var yaw: float = 0.0
 var pitch: float = 0.0
-# The owner's craft transform as last replicated (written by the owner every
-# physics tick, read by every other peer) - see _follow_net_target. Global
-# space; the Crafts container sits at the origin on every peer.
-var net_position: Vector3 = Vector3.ZERO
-var net_rotation: Quaternion = Quaternion.IDENTITY
+# The owner's craft state, packed into one replicated property (written by
+# the owner every physics tick, sent ~30x/s by the root
+# MultiplayerSynchronizer): [pos.xyz, rot quat.xyzw, velocity.xyz, yaw, pitch]
+# in global space (the Crafts container sits at the origin on every peer).
+# net_time is when it was sampled, on the shared server clock
+# (NetworkManager.server_time) - kept as its own full-precision float,
+# since float32 would lose milliseconds an hour into a match.
+var net_state := PackedFloat32Array()
+var net_time: float = 0.0
+# Remote copies only: received snapshots, oldest first.
+var _snapshots: Array[Dictionary] = []
+# Remote copies only: last hard reset (spawn/respawn) - see _on_net_snapshot.
+var _snap_time: float = -INF
+var _snap_position := Vector3.ZERO
 var recentering = false
 @onready var barrel = $"../Turret/Barrel"
 @onready var turret = $"../Turret"
@@ -87,13 +97,63 @@ func _ready() -> void:
 		# platform would, but only ever moves where it's told.
 		body.freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
 		body.freeze = true
+		var root_sync := body.get_node_or_null("MultiplayerSynchronizer") as MultiplayerSynchronizer
+		if root_sync:
+			root_sync.synchronized.connect(_on_net_snapshot)
 
 
-# Hard-sets the remote smoothing target (no easing) - initial spawn, and
-# health_node.gd::respawn_at so a respawn doesn't glide back from the death spot.
+# Hard reset of the remote snapshot buffer - initial spawn, and
+# health_node.gd::respawn_at so a respawn never glides from the death spot.
 func snap_net_target(target: Transform3D) -> void:
-	net_position = target.origin
-	net_rotation = target.basis.get_rotation_quaternion()
+	_snap_time = NetworkManager.server_time()
+	_snap_position = target.origin
+	_snapshots.clear()
+	# Back-dated so the owner's first real snapshots - sampled slightly
+	# earlier than this moment, by their travel time - still sort after it
+	# instead of being dropped as stale. Same position as those, so nothing
+	# glides across the gap.
+	_snapshots.append({
+		"t": _snap_time - 1.0,
+		"pos": target.origin,
+		"rot": target.basis.get_rotation_quaternion(),
+		"vel": Vector3.ZERO,
+		"yaw": yaw,
+		"pitch": pitch,
+	})
+
+
+# Owner only, every physics tick.
+func _write_net_state() -> void:
+	var p := body.global_position
+	var q := body.global_basis.get_rotation_quaternion()
+	var v := body.linear_velocity
+	net_state = PackedFloat32Array([p.x, p.y, p.z, q.x, q.y, q.z, q.w, v.x, v.y, v.z, yaw, pitch])
+	net_time = NetworkManager.server_time()
+
+
+# Remote copies only - the root synchronizer just applied a fresh
+# net_state/net_time from the owner.
+func _on_net_snapshot() -> void:
+	if net_state.size() < 12:
+		return
+	var snapshot := {
+		"t": net_time,
+		"pos": Vector3(net_state[0], net_state[1], net_state[2]),
+		"rot": Quaternion(net_state[3], net_state[4], net_state[5], net_state[6]).normalized(),
+		"vel": Vector3(net_state[7], net_state[8], net_state[9]),
+		"yaw": net_state[10],
+		"pitch": net_state[11],
+	}
+	# Duplicates and reordered stragglers - unreliable sync can do both.
+	if not _snapshots.is_empty() and snapshot.t <= _snapshots.back().t:
+		return
+	# A pre-respawn snapshot still in flight when the respawn landed - it
+	# would yank the craft back to where it died.
+	if snapshot.t < _snap_time and snapshot.pos.distance_to(_snap_position) > NET_SNAP_DISTANCE:
+		return
+	_snapshots.append(snapshot)
+	if _snapshots.size() > SNAPSHOT_BUFFER_MAX:
+		_snapshots.pop_front()
 
 
 
@@ -181,10 +241,9 @@ func _find_mesh_instances(node: Node) -> Array:
 
 func _physics_process(delta: float) -> void:
 	if not is_multiplayer_authority():
-		_follow_net_target(delta)
+		_interpolate_remote()
 		return
-	net_position = body.global_position
-	net_rotation = body.global_basis.get_rotation_quaternion()
+	_write_net_state()
 	var health_node = body.get_node_or_null("health_node")
 	if health_node and health_node.has_method("_is_destroyed"):
 		if health_node._is_destroyed:
@@ -234,25 +293,52 @@ func _physics_process(delta: float) -> void:
 
 # Remote copies only. Runs in _physics_process on purpose: transforms set
 # here are what physics interpolation blends between, so the render stays
-# smooth at any frame rate even though updates only arrive ~30x a second.
-# Stopgap until proper timestamped snapshot interpolation (networking Phase 2).
-func _follow_net_target(delta: float) -> void:
-	if body == null:
+# smooth at any frame rate even though snapshots only arrive ~30x a second.
+func _interpolate_remote() -> void:
+	if body == null or _snapshots.is_empty() or not NetworkManager.is_clock_synced():
 		return
-	var t := 1.0 - exp(-NET_SMOOTHING_RATE * delta)
-	if body.global_position.distance_to(net_position) > NET_SNAP_DISTANCE:
-		body.global_transform = Transform3D(Basis(net_rotation), net_position)
+	var render_time := NetworkManager.server_time() - INTERP_DELAY
+	# Keep exactly one snapshot at or before render_time as the "from" side.
+	while _snapshots.size() >= 2 and _snapshots[1].t <= render_time:
+		_snapshots.pop_front()
+	var from: Dictionary = _snapshots[0]
+	var pos: Vector3 = from.pos
+	var rot: Quaternion = from.rot
+	var aim_yaw: float = from.yaw
+	var aim_pitch: float = from.pitch
+	if _snapshots.size() >= 2 and render_time > from.t:
+		var to: Dictionary = _snapshots[1]
+		var span: float = to.t - from.t
+		if span > 0.0 and from.pos.distance_to(to.pos) <= NET_SNAP_DISTANCE:
+			var f := clampf((render_time - from.t) / span, 0.0, 1.0)
+			pos = _hermite(from.pos, from.vel, to.pos, to.vel, f, span)
+			rot = from.rot.slerp(to.rot, f)
+			aim_yaw = lerpf(from.yaw, to.yaw, f)
+			aim_pitch = lerpf(from.pitch, to.pitch, f)
+	elif render_time > from.t:
+		# Buffer ran dry - a late/lost packet. Coast on the last velocity
+		# briefly rather than freezing, then hold.
+		pos = from.pos + from.vel * minf(render_time - from.t, MAX_EXTRAPOLATION)
+	var teleported := body.global_position.distance_to(pos) > NET_SNAP_DISTANCE
+	body.global_transform = Transform3D(Basis(rot), pos)
+	if teleported:
 		body.reset_physics_interpolation()
-	else:
-		var current_rotation := body.global_basis.get_rotation_quaternion()
-		body.global_transform = Transform3D(
-			Basis(current_rotation.slerp(net_rotation, t)),
-			body.global_position.lerp(net_position, t)
-		)
 	if turret:
-		turret.rotation_degrees.y = lerpf(turret.rotation_degrees.y, yaw, t)
+		turret.rotation_degrees.y = aim_yaw
 	if barrel:
-		barrel.rotation_degrees.x = lerpf(barrel.rotation_degrees.x, pitch, t)
+		barrel.rotation_degrees.x = aim_pitch
+
+
+# Cubic Hermite between two snapshots, using each one's velocity as its
+# tangent - follows the actual curve of a turning/accelerating craft instead
+# of cutting straight corners between samples the way a plain lerp would.
+func _hermite(p0: Vector3, v0: Vector3, p1: Vector3, v1: Vector3, f: float, span: float) -> Vector3:
+	var f2 := f * f
+	var f3 := f2 * f
+	return (2.0 * f3 - 3.0 * f2 + 1.0) * p0 \
+		+ (f3 - 2.0 * f2 + f) * span * v0 \
+		+ (-2.0 * f3 + 3.0 * f2) * p1 \
+		+ (f3 - f2) * span * v1
 
 
 func handle_turret_barrel_look():

@@ -647,6 +647,7 @@ func _pick_spawn_transform(team: String) -> Transform3D:
 		if distance > roomiest_distance:
 			roomiest = spawn_transform
 			roomiest_distance = distance
+	_recent_spawns.append([roomiest.origin, Time.get_ticks_msec()])
 	return roomiest
 
 
@@ -684,11 +685,25 @@ func _lift_spawn_transform(spawn_transform: Transform3D) -> Transform3D:
 	return spawn_transform
 
 
+# Spots handed out in the last SPAWN_RESERVE_MSEC count as occupied too. A
+# dead craft still sits at its death position until respawn_at() moves it,
+# so two players respawning in the same instant both used to see the same
+# "empty" slot and land inside each other - and since every peer only ever
+# sees other craft as immovable kinematic bodies, the overlap launches the
+# simulated one out hard enough to kill it again.
+const SPAWN_RESERVE_MSEC := 3000
+var _recent_spawns: Array = [] # [position, ticks_msec]
+
+
 func _distance_to_nearest_craft(spawn_position: Vector3) -> float:
 	var nearest := INF
 	for craft in craft_container.get_children():
 		if craft is Node3D:
 			nearest = min(nearest, spawn_position.distance_to(craft.global_position))
+	var now := Time.get_ticks_msec()
+	_recent_spawns = _recent_spawns.filter(func(entry): return now - entry[1] < SPAWN_RESERVE_MSEC)
+	for entry in _recent_spawns:
+		nearest = min(nearest, spawn_position.distance_to(entry[0]))
 	return nearest
 
 

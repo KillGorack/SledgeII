@@ -66,10 +66,111 @@ var day_night_enabled: bool = true
 
 var _heartbeat_timer: Timer
 
+# --- Shared match clock -----------------------------------------------------
+# Every peer needs to agree on "what time is it on the server" so remote craft
+# can be drawn from timestamped snapshots (movement.gd's interpolation buffer)
+# instead of from whenever packets happen to arrive. Clients ping the server
+# once a second (unreliable, own channel - a retransmitted reliable ping would
+# report a bogus RTT) and keep the offset from the fastest recent round trip:
+# the lowest-RTT sample is the one least distorted by queueing delay. The
+# server's own clock IS the reference (offset 0).
+const CLOCK_PING_INTERVAL := 1.0
+const CLOCK_SAMPLE_WINDOW := 10
+# Small corrections are only ever nudged this much per sample, so ordinary
+# jitter can't make server_time() (and with it every remote craft) visibly
+# jump. Big ones - a clearly better (faster) sample, or an error past
+# CLOCK_SNAP_THRESHOLD - are applied at once: the very first samples are
+# often taken while this peer is stalled loading the map, which makes their
+# replies look a full load-time late and the estimate off by a second or
+# more, far too much to slew out of 2ms at a time.
+const CLOCK_MAX_SLEW := 0.002
+const CLOCK_SNAP_THRESHOLD := 0.05
+var _clock_offset: float = 0.0
+# RTT of the sample _clock_offset currently comes from.
+var _clock_offset_rtt: float = INF
+var _clock_synced: bool = false
+var _clock_samples: Array = [] # [rtt, offset] pairs, newest last
+var _clock_ping_elapsed: float = 0.0
+var round_trip_time: float = 0.0
+
 
 func _ready() -> void:
 	multiplayer.peer_connected.connect(_on_peer_connected)
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
+	multiplayer.connected_to_server.connect(_reset_clock)
+	multiplayer.server_disconnected.connect(_reset_clock)
+
+
+func _process(delta: float) -> void:
+	if not multiplayer.has_multiplayer_peer() or multiplayer.is_server():
+		return
+	if multiplayer.multiplayer_peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
+		return
+	_clock_ping_elapsed += delta
+	# Ping faster until the first estimate exists, so a fresh joiner is synced
+	# well before their map finishes loading.
+	var interval := CLOCK_PING_INTERVAL if _clock_synced else 0.1
+	if _clock_ping_elapsed >= interval:
+		_clock_ping_elapsed = 0.0
+		_clock_ping.rpc_id(1, _local_time())
+
+
+func _local_time() -> float:
+	return Time.get_ticks_usec() / 1000000.0
+
+
+# This peer's best estimate of the server's clock, in seconds. Exact on the
+# server itself.
+func server_time() -> float:
+	return _local_time() + _clock_offset
+
+
+func is_clock_synced() -> bool:
+	return _clock_synced or (multiplayer.has_multiplayer_peer() and multiplayer.is_server())
+
+
+func _reset_clock() -> void:
+	_clock_offset = 0.0
+	_clock_offset_rtt = INF
+	_clock_synced = false
+	_clock_samples.clear()
+	_clock_ping_elapsed = 0.0
+	round_trip_time = 0.0
+
+
+@rpc("any_peer", "call_remote", "unreliable", 4)
+func _clock_ping(client_time: float) -> void:
+	if not multiplayer.is_server():
+		return
+	_clock_pong.rpc_id(multiplayer.get_remote_sender_id(), client_time, _local_time())
+
+
+@rpc("authority", "call_remote", "unreliable", 4)
+func _clock_pong(client_time: float, server_clock: float) -> void:
+	var now := _local_time()
+	var rtt := now - client_time
+	if rtt < 0.0:
+		return
+	# The server read its clock roughly half a round trip ago.
+	var offset := server_clock + rtt * 0.5 - now
+	_clock_samples.append([rtt, offset])
+	if _clock_samples.size() > CLOCK_SAMPLE_WINDOW:
+		_clock_samples.pop_front()
+	var best: Array = _clock_samples[0]
+	for sample in _clock_samples:
+		if sample[0] < best[0]:
+			best = sample
+	round_trip_time = best[0]
+	var error: float = best[1] - _clock_offset
+	if not _clock_synced or best[0] < _clock_offset_rtt * 0.8 or absf(error) > CLOCK_SNAP_THRESHOLD:
+		_clock_offset = best[1]
+		_clock_offset_rtt = best[0]
+	else:
+		_clock_offset += clampf(error, -CLOCK_MAX_SLEW, CLOCK_MAX_SLEW)
+		_clock_offset_rtt = best[0]
+	# A handful of samples first, so the very first estimate isn't one
+	# unlucky slow packet.
+	_clock_synced = _clock_samples.size() >= 3
 
 
 func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] = [], day_night: bool = true, host_address_override: String = "", host_team: String = "team_red", port: int = DEFAULT_PORT, max_players: int = 20, public_game: bool = false) -> Error:
