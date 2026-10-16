@@ -2,6 +2,8 @@ extends Node
 
 signal player_registered(peer_id: int, team: String)
 signal player_unregistered(peer_id: int)
+# peer_names changed - see match.gd::_sync_roster.
+signal roster_changed
 signal host_started(address: String)
 signal host_failed(reason: String)
 # Hosting itself still succeeds when this fires - port_forwarding just
@@ -45,6 +47,11 @@ var _upnp: UPNP
 var _upnp_port: int = -1
 var is_host: bool = false
 var peer_teams: Dictionary = {}
+# peer_id -> username for everyone in the match, pushed by the server
+# (match.gd::_sync_roster). Read by the F4 player list.
+var peer_names: Dictionary = {}
+# peer_id -> [takedowns, wrecks], same source as peer_names.
+var peer_scores: Dictionary = {}
 var team_juice: Dictionary = {}
 var current_map_file_id: int = -1
 # Display name only (the HUD's arena label) - the lobby lists a hosted game
@@ -101,10 +108,24 @@ func _ready() -> void:
 	multiplayer.server_disconnected.connect(_reset_clock)
 
 
+# True only while this peer is hosting a live match. multiplayer.is_server()
+# errors on every call ("The multiplayer instance isn't currently active") when
+# a peer object exists but isn't connected - mid-connect, or a client still
+# sitting in the match after the host left - so the status check goes first.
+func is_live_server() -> bool:
+	if not multiplayer.has_multiplayer_peer():
+		return false
+	if multiplayer.multiplayer_peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
+		return false
+	return multiplayer.is_server()
+
+
 func _process(delta: float) -> void:
-	if not multiplayer.has_multiplayer_peer() or multiplayer.is_server():
+	if not multiplayer.has_multiplayer_peer():
 		return
 	if multiplayer.multiplayer_peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
+		return
+	if multiplayer.is_server():
 		return
 	_clock_ping_elapsed += delta
 	# Ping faster until the first estimate exists, so a fresh joiner is synced
@@ -126,7 +147,7 @@ func server_time() -> float:
 
 
 func is_clock_synced() -> bool:
-	return _clock_synced or (multiplayer.has_multiplayer_peer() and multiplayer.is_server())
+	return _clock_synced or is_live_server()
 
 
 func _reset_clock() -> void:
@@ -247,6 +268,8 @@ func stop_hosting() -> void:
 	multiplayer.multiplayer_peer = null
 	is_host = false
 	peer_teams.clear()
+	peer_names.clear()
+	peer_scores.clear()
 
 
 # Covers both sides of leaving a match: unhosts (unregisters from the lobby,
@@ -259,6 +282,8 @@ func leave_game() -> void:
 		multiplayer.multiplayer_peer.close()
 		multiplayer.multiplayer_peer = null
 	peer_teams.clear()
+	peer_names.clear()
+	peer_scores.clear()
 	current_map_file_id = -1
 	current_map_title = ""
 

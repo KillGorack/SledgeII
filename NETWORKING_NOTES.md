@@ -120,12 +120,22 @@ Next is a two-PC playtest of Phase 2 with real ping. Nothing else should be buil
 - [ ] Recon pads capture and heal for client tanks (remote tanks are now kinematic in Jolt)
 - [ ] Client fall damage works and the amount feels right
 
+**Chat join/leave (2026-10-15, uncommitted):** `_notify_ready(username)` → `_peer_names` → `_announce` → `_broadcast_chat_message` ("X: has entered the arena." / "X: has left the arena.").
+
+**F4 player list (2026-10-15, uncommitted):** `Crafts/_scripts/player_list.gd`, added to the owner's HUD by `hud_controller.gd`. The server pushes `_peer_names` to loaded peers via `match.gd::_sync_roster` on every join/leave → `NetworkManager.peer_names` + `roster_changed`. The `player_list` action (F4) is registered in code if the Input Map doesn't have it.
+
+**Takedowns / wrecks (2026-10-15, uncommitted):** projectiles carry `shooter_peer`. `health_node.note_attacker` records the last attacker on damage (`apply_damage(damage, attacker)`) and on knockback (`apply_hit_force`, so the Repulsor counts). A death within `TAKEDOWN_CREDIT_MSEC` (5 s) credits them. `match._record_defeat` keeps `_peer_scores` (`[takedowns, wrecks]`, no credit for teammates) and ships them with `_sync_roster`; the F4 list shows them. Seen in a test: teleporting a client tank 80 m straight down dragged the host's parked tank through the floor on the host. Remote copies are kinematic and swept through it. Real falls are gradual, so this is probably harmless, but it's the same family as "bumping remote tanks" on the playtest checklist.
+
 **Known gaps, in suggested order**
 
-1. Rewind lag compensation: the server checks hits against remote tanks drawn 100 ms in the past. Only if hits on moving tanks feel late.
-2. The freeze effect (`collision_handler.freeze_target`) only affects the host's tank. Route it to the owner, the way `health_node.apply_impulse` does.
-3. Crit and ricochet sounds only play on the host.
+1. Rewind lag compensation: the server checks hits against remote tanks drawn 100 ms in the past. **On hold (user, 2026-10-15)**; revisit only if hits on moving tanks feel late.
+2. ~~Freeze only affected the host's tank.~~ Fixed 2026-10-15: `collision_handler._send_freeze` → `health_node.apply_weapon_freeze` RPC; the owner runs the timer, overlapping freezes extend and never shorten, duration 0 unfreezes. No weapon sets `freeze_timer`/`unfreeze` yet. Uncommitted.
+3. ~~Crit and ricochet sounds only played on the host.~~ Fixed 2026-10-15: crits set `_crit_pending`, which rides `_play_impact_fx` as `show_crit`. Ricochet already reached clients through the impact fx `hit_sound`; the extra `play_hit_sound()` only doubled it on the host and is gone. No weapon sets `crit_sound` yet. Uncommitted.
 4. Server-side movement sanity check: reject tank movement faster than `max_speed` plus a margin, allowing for knockback and respawns.
-5. Tank spawn messages can reach peers still on the team-select screen. Projectiles already gate on `_ready_peers`.
+5. ~~Tank spawns reached peers before their match loaded.~~ Fixed 2026-10-15, uncommitted. Two bugs, both reproduced with host + 4 clients joining 1 s apart:
+   - **Spawns:** Godot skips synchronizers the server isn't authority of when deciding spawn visibility, so client-owned crafts spawned on every connected peer at once. If one landed before `Match/CraftSpawner` existed, that peer's path cache broke and it never saw a tank (before: 4 of 4 clients saw 0 tanks). Fix: `_spawn_craft` adds a server-owned, property-less `SpawnGate` synchronizer, granted in `_grant_visibility`.
+   - **Movement:** `_grant_own_craft_visibility` was sent to an owner still loading and was dropped, so nobody saw that tank move (before: the host saw 0 of 4 client tanks move). Fix: only sent to ready owners; `_notify_ready` grants the newcomer's craft to everyone already there.
+   - After: every peer sees every tank, all moving; no spawner or "Match not found" errors.
+   - Join/leave chat lines go only to `_ready_peers` (`_announce`).
 6. Maps with a single `PlayerSpawn` point stack tanks that respawn together. Could offset when the spot is occupied.
 7. Optional: put the headless harness in the repo (for example `tests/net_test`), if the user wants it there.

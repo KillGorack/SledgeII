@@ -1,5 +1,7 @@
 extends Control
 
+const PLAYER_LIST := preload("res://Crafts/_scripts/player_list.gd")
+
 # Sibling nodes on the same craft, not children of this HUD.
 @onready var health_node: Node3D = get_node("../health_node")
 @onready var weapon_node: Node3D = get_node("../weapon_node")
@@ -41,6 +43,7 @@ func _ready() -> void:
 		return
 	_match_node = get_tree().get_first_node_in_group("match")
 	arena_label.text = NetworkManager.current_map_title
+	add_child(PLAYER_LIST.new())
 	NetworkManager.team_juice_changed.connect(_on_team_juice_changed)
 	_update_team_juice_bar()
 

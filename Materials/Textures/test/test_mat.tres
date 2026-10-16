@@ -1,0 +1,26 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://c7lk6wx3nwr83"]
+
+[ext_resource type="Texture2D" uid="uid://ih8w6esa3ux4" path="res://Materials/Textures/test/Untitled.png" id="1_y04uu"]
+[ext_resource type="Texture2D" uid="uid://c1ttygsyh7e27" path="res://Materials/Textures/test/emmit.png" id="2_fjgm2"]
+[ext_resource type="Texture2D" uid="uid://bf55xpv2nk6ie" path="res://Materials/Textures/test/height.png" id="3_pdnws"]
+[ext_resource type="Texture2D" uid="uid://cgf5fpcltvy0u" path="res://Materials/Textures/test/_Metallic.png" id="4_ghrcj"]
+[ext_resource type="Texture2D" uid="uid://bu3ab5kihha8q" path="res://Materials/Textures/test/goat_normal.png" id="5_j73un"]
+[ext_resource type="Texture2D" uid="uid://belgebc4deyh3" path="res://Materials/Textures/test/_Smoothness.png" id="6_2e3tx"]
+
+[resource]
+cull_mode = 2
+albedo_texture = ExtResource("1_y04uu")
+metallic = 1.0
+metallic_texture = ExtResource("4_ghrcj")
+roughness = 0.73
+roughness_texture = ExtResource("6_2e3tx")
+emission_enabled = true
+emission_energy_multiplier = 16.0
+emission_texture = ExtResource("2_fjgm2")
+normal_enabled = true
+normal_scale = 0.3
+normal_texture = ExtResource("5_j73un")
+heightmap_enabled = true
+heightmap_scale = 1.0
+heightmap_texture = ExtResource("3_pdnws")
+uv1_scale = Vector3(15, 15, 15)

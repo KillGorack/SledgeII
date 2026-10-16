@@ -1,6 +1,11 @@
 extends Node3D
 
-signal craft_defeated(peer_id: int)
+# attacker_id is the player credited with the takedown, 0 if nobody.
+signal craft_defeated(peer_id: int, attacker_id: int)
+
+# A hit or shove this recent still gets the credit for a death that follows -
+# knocked off the map, or finished by fall damage.
+const TAKEDOWN_CREDIT_MSEC := 5000
 
 const VEHICLE_EXPLOSION := preload("res://Weapons/Scenes/explosions/explosion_main.tscn")
 const VEHICLE_EXPLOSION_SCALE := 3.0
@@ -20,6 +25,12 @@ var _life_max: float
 
 var _regeneration_timer: Timer
 var _is_regenerating: bool = false
+# Weapon freeze (freeze_timer / unfreeze weapons). Runs on the craft's owner -
+# see apply_weapon_freeze below.
+var _weapon_freeze_timer: Timer
+# Server-only. Who last hit or shoved this craft, and when - see note_attacker.
+var _last_attacker: int = 0
+var _last_attacker_msec: int = 0
 
 # Death-window bookkeeping. A destroyed craft keeps its node alive (see
 # destroy_self below), so its collider has to be explicitly taken out of the
@@ -55,12 +66,15 @@ func _ready() -> void:
 	_regeneration_timer.timeout.connect(_on_regeneration_timeout)
 	add_child(_regeneration_timer)
 
+	_weapon_freeze_timer = Timer.new()
+	_weapon_freeze_timer.one_shot = true
+	_weapon_freeze_timer.timeout.connect(_on_weapon_freeze_timeout)
+	add_child(_weapon_freeze_timer)
+
 
 func _process(delta: float) -> void:
-	# has_multiplayer_peer() first - see power_node.gd's _process() for why
-	# (is_server() alone spams "Condition is_active() is true" errors every
-	# frame while this peer's connection isn't fully up yet).
-	if not multiplayer.has_multiplayer_peer() or not multiplayer.is_server():
+	# See NetworkManager.is_live_server() for why not plain is_server().
+	if not NetworkManager.is_live_server():
 		return
 	# apply_damage()/respawn_at() below broadcast shields/armor/life correctly
 	# on their own (RPCs, so every peer computes the same result whenever a
@@ -104,9 +118,10 @@ func _process(delta: float) -> void:
 # step because HP was streamed to everyone every frame - the death is now an
 # explicit broadcast (_broadcast_destroyed) instead, so no peer can ever
 # disagree with the server about whether a craft died.
-func apply_damage(damage: float) -> void:
+func apply_damage(damage: float, attacker_id: int = 0) -> void:
 	if not multiplayer.is_server() or _is_destroyed:
 		return
+	note_attacker(attacker_id)
 	_regeneration_timer.start()
 	_is_regenerating = false
 	if shields > 0:
@@ -127,6 +142,20 @@ func apply_damage(damage: float) -> void:
 		life -= damage
 	if life <= 0:
 		_broadcast_destroyed.rpc()
+
+
+# Server-only. 0 (base guns, falls) and the craft's own owner never count.
+func note_attacker(attacker_id: int) -> void:
+	if attacker_id == 0 or attacker_id == body.get_multiplayer_authority():
+		return
+	_last_attacker = attacker_id
+	_last_attacker_msec = Time.get_ticks_msec()
+
+
+func _credited_attacker() -> int:
+	if _last_attacker != 0 and Time.get_ticks_msec() - _last_attacker_msec <= TAKEDOWN_CREDIT_MSEC:
+		return _last_attacker
+	return 0
 
 
 @rpc("authority", "call_local", "reliable")
@@ -233,7 +262,8 @@ func destroy_self() -> void:
 	# or the first tick after the respawn teleport immediately fights it.
 	_set_movement_frozen(true)
 	if multiplayer.is_server():
-		craft_defeated.emit(body.get_multiplayer_authority())
+		craft_defeated.emit(body.get_multiplayer_authority(), _credited_attacker())
+		_last_attacker = 0
 
 
 # Called by match.gd once per respawn. Broadcast (not server-only) so every
@@ -324,6 +354,31 @@ func apply_impulse(impulse: Vector3) -> void:
 	# off briefly so the knockback actually plays out.
 	if movement_node and movement_node.has_method("apply_knockback_grace"):
 		movement_node.apply_knockback_grace()
+
+
+# Weapon freeze, routed to the owner for the same reason as apply_impulse:
+# setFreezeState only stops the movement_node that actually simulates the
+# craft, and on the server that is only ever the host's own tank. duration > 0
+# freezes (extending, never shortening, a freeze already running); 0 unfreezes.
+# The timer lives here on the owner too, so overlapping freezes can't have an
+# earlier one's timeout thaw a later one early.
+@rpc("authority", "call_local", "reliable")
+func apply_weapon_freeze(duration: float) -> void:
+	if _is_destroyed or _weapon_freeze_timer == null or not body.is_multiplayer_authority():
+		return
+	if duration <= 0.0:
+		_weapon_freeze_timer.stop()
+		_set_movement_frozen(false)
+		return
+	if _weapon_freeze_timer.is_stopped() or _weapon_freeze_timer.time_left < duration:
+		_weapon_freeze_timer.start(duration)
+	_set_movement_frozen(true)
+
+
+func _on_weapon_freeze_timeout() -> void:
+	# A craft that died mid-freeze stays parked until respawn_at thaws it.
+	if not _is_destroyed:
+		_set_movement_frozen(false)
 
 
 func _set_collision_enabled(enabled: bool) -> void:
