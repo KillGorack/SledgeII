@@ -34,6 +34,7 @@ var current_direction: Vector3
 var ricochet_count: int = 0
 var bullet_hole_one_off: bool = false
 var hit_scene_one_off: bool = false
+var _crit_pending: bool = false
 var collided_layer: int = -1
 var ignored_objects: Array = []
 var guided_target: Node = null
@@ -50,6 +51,9 @@ var _ballistic_launched: bool = false
 # match.gd's _projectiles registry. -1 until assigned (a shooter's own
 # predicted shot gets its id when the server confirms it).
 var net_id: int = -1
+# Peer that fired this, 0 for base guns. Server-side, credits takedowns - see
+# health_node.gd::note_attacker.
+var shooter_peer: int = 0
 const GUIDED_CORRECTION_INTERVAL := 0.05
 const CORRECTION_SNAP_DISTANCE := 5.0
 const CORRECTION_BLEND_RATE := 15.0
@@ -443,32 +447,24 @@ func unfreeze_targets(body_result) -> void:
 		for item in body_result:
 			var body = item.collider
 			if body and is_instance_valid(body) and body != self:
-				_set_freeze_on(body, false)
+				_send_freeze(body, 0.0)
 
 
 func freeze_target() -> void:
 	if collided_object:
-		_set_freeze_on(collided_object, true)
-		var target_movement = collided_object.get_node_or_null("movement_node")
-		if target_movement:
-			var timer = Timer.new()
-			timer.wait_time = weapon_settings.freeze_timer
-			timer.one_shot = true
-			target_movement.add_child(timer)
-			timer.timeout.connect(_set_freeze_on.bind(collided_object, false))
-			timer.start()
+		_send_freeze(collided_object, weapon_settings.freeze_timer)
 
 
-# The predecessor calls collided_object.call("setFreezeState", ...) directly,
-# assuming the hit body itself has that method. Here setFreezeState lives on
-# the craft's movement_node (a child), not the RigidBody3D root, so this
-# looks it up explicitly rather than assuming the root has the method.
-func _set_freeze_on(body: Object, frozen: bool) -> void:
+# Routed through the target's health_node, same as apply_hit_force: this runs
+# on the server, which only simulates the host's own tank, so freezing its
+# local movement_node did nothing to anyone else. The owner runs the timer -
+# see health_node.gd::apply_weapon_freeze. duration 0 unfreezes.
+func _send_freeze(body: Object, duration: float) -> void:
 	if not is_instance_valid(body):
 		return
-	var target_movement = body.get_node_or_null("movement_node")
-	if target_movement and target_movement.has_method("setFreezeState"):
-		target_movement.setFreezeState(frozen)
+	var health_node = body.get_node_or_null("health_node")
+	if health_node and health_node.has_method("apply_weapon_freeze"):
+		health_node.apply_weapon_freeze.rpc(duration)
 
 
 func apply_direct_damage(damage: float, target: Object = null) -> void:
@@ -514,7 +510,7 @@ func _apply_damage_to(body: Object, damage: float) -> void:
 		return
 	var health_node = body.get_node_or_null("health_node")
 	if health_node and health_node.has_method("apply_damage"):
-		health_node.apply_damage(damage)
+		health_node.apply_damage(damage, shooter_peer)
 
 
 # Routed through the target's health_node instead of being applied straight
@@ -529,6 +525,8 @@ func apply_hit_force(force: float, target: Object = null, direction: Vector3 = V
 	var impulse: Vector3 = force * force_direction
 	var health_node = force_target.get_node_or_null("health_node")
 	if health_node and health_node.has_method("apply_impulse"):
+		# A shove that knocks someone off the map earns the takedown too.
+		health_node.note_attacker(shooter_peer)
 		health_node.apply_impulse.rpc(impulse)
 	else:
 		# Plain world physics props have no networked owner to hand this to.
@@ -549,7 +547,9 @@ func apply_explosive_forces(body_result) -> void:
 func handle_ricochet() -> bool:
 	ricochet_count += 1
 	if ricochet_count <= weapon_settings.projectile_ricochet_count:
-		play_hit_sound()
+		# No sound here: handle_collision's set_hit_scene() right after this
+		# plays hit_sound on every peer. Playing it here too only doubled it on
+		# the host.
 		var reflect_direction = current_direction.bounce(collision_normal).normalized()
 		current_direction = reflect_direction
 		linear_velocity = reflect_direction * weapon_settings.projectile_speed
@@ -611,14 +611,11 @@ func _reset_one_offs() -> void:
 	aoe_damage_one_off = false
 
 
-func play_hit_sound() -> void:
-	if weapon_settings.hit_sound:
-		Utilities.play_sound(weapon_settings.hit_sound, global_transform.origin, 0.1)
-
-
+# Crits are rolled on the server only, so the sound can't just play here -
+# that was host-only. Flag it instead; set_hit_scene() sends it out with the
+# impact effects to every peer.
 func play_crit_sound() -> void:
-	if weapon_settings.crit_sound:
-		Utilities.play_sound(weapon_settings.crit_sound, global_transform.origin, 10.0)
+	_crit_pending = true
 
 
 func handle_guided(delta: float) -> void:
@@ -650,10 +647,12 @@ func guide_to_target(delta: float) -> void:
 func set_hit_scene(include_bullet_hole: bool = false) -> void:
 	var show_hit := not hit_scene_one_off
 	var show_hole := include_bullet_hole and not bullet_hole_one_off and collided_layer == 2 # world
+	var show_crit := _crit_pending
+	_crit_pending = false
 	hit_scene_one_off = true
 	if include_bullet_hole:
 		bullet_hole_one_off = true
-	if not show_hit and not show_hole:
+	if not show_hit and not show_hole and not show_crit:
 		return
 	var match_node = get_tree().get_first_node_in_group("match")
 	if match_node == null:
@@ -665,7 +664,8 @@ func set_hit_scene(include_bullet_hole: bool = false) -> void:
 		show_hit,
 		show_hole,
 		collision_point,
-		collision_normal
+		collision_normal,
+		show_crit
 	)
 
 

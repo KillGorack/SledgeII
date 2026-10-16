@@ -59,7 +59,7 @@ func _process(delta: float) -> void:
 	if NetworkManager.day_night_enabled:
 		time_of_day = fmod(time_of_day + delta / day_length_seconds, 1.0)
 	_update_sun()
-	if multiplayer.is_server():
+	if NetworkManager.is_live_server():
 		_sync_elapsed += delta
 		if _sync_elapsed >= SYNC_INTERVAL:
 			_sync_elapsed = 0.0

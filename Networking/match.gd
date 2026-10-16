@@ -51,6 +51,14 @@ const SELF_RENDER_LAYER := 20
 @onready var local_camera: Camera3D = $LocalCamera
 
 var _spawned_peers: Dictionary = {}
+# Server-only: peer_id -> username, for the join/leave lines in chat. Filled
+# from _notify_ready, so it only holds peers who actually made it into the
+# match - someone who drops on the team-select screen never gets a "left".
+var _peer_names: Dictionary = {}
+# Server-only: peer_id -> [takedowns, wrecks]. Sent with the names in
+# _sync_roster. Cleared when a player leaves.
+var _peer_scores: Dictionary = {}
+const MAX_NAME_LENGTH := 24
 # Server-only: which peers have confirmed THEIR OWN match.tscn actually
 # exists yet (see _notify_ready below) - used purely to decide who to grant
 # visibility to and when. Every craft's synchronizers default to
@@ -176,8 +184,10 @@ func _ready() -> void:
 	# The host doesn't need the round trip; it already knows its own state.
 	if multiplayer.is_server():
 		_ready_peers[1] = true
+		_peer_names[1] = _clean_name(UserData.username, 1)
+		_push_roster()
 	else:
-		_notify_ready.rpc_id(1)
+		_notify_ready.rpc_id(1, UserData.username)
 	# Backfill: peers may already be registered (e.g. the host itself) by the
 	# time this scene loads, since NetworkManager persists across the scene
 	# change and its signal can fire before match.tscn finishes loading.
@@ -190,8 +200,8 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	# has_multiplayer_peer() first - see power_node.gd's _process() for why.
-	if not multiplayer.has_multiplayer_peer() or not multiplayer.is_server():
+	# See NetworkManager.is_live_server() for why not plain is_server().
+	if not NetworkManager.is_live_server():
 		return
 	_generate_juice(delta)
 	_juice_sync_elapsed += delta
@@ -270,6 +280,37 @@ func _broadcast_chat_message(sender: String, text: String) -> void:
 	var chat := my_craft.get_node_or_null("Hud_InGame/Chat")
 	if chat:
 		chat.receive_message(sender, text)
+
+
+# Client-supplied, so keep it to one short line.
+func _clean_name(username: String, peer_id: int) -> String:
+	var display_name := username.replace("\n", " ").replace("\r", " ").strip_edges().left(MAX_NAME_LENGTH)
+	if display_name.is_empty():
+		display_name = "Player %d" % peer_id
+	return display_name
+
+
+# Server-only. The whole name list to every loaded peer, on every join/leave -
+# a handful of short strings, so not worth sending diffs.
+func _push_roster() -> void:
+	for peer_id in _ready_peers.keys():
+		_sync_roster.rpc_id(peer_id, _peer_names, _peer_scores)
+
+
+@rpc("authority", "call_local", "reliable")
+func _sync_roster(names: Dictionary, scores: Dictionary) -> void:
+	NetworkManager.peer_names = names
+	NetworkManager.peer_scores = scores
+	NetworkManager.roster_changed.emit()
+
+
+# Server-only. Join/leave lines, shown as an ordinary chat line from that
+# player ("Name: has entered the arena."). Only to peers whose match has
+# loaded - a broadcast would also hit peers still loading, which have no Match
+# node to receive it on.
+func _announce(sender: String, text: String) -> void:
+	for peer_id in _ready_peers.keys():
+		_broadcast_chat_message.rpc_id(peer_id, sender, text)
 
 
 func _exit_to_main_menu() -> void:
@@ -524,17 +565,29 @@ func _on_player_registered(peer_id: int, team: String) -> void:
 # ever attempting to replicate anything toward a peer before their own scene
 # can receive it - see _ready_peers' comment for the bug that caused.
 @rpc("any_peer", "reliable")
-func _notify_ready() -> void:
+func _notify_ready(username: String = "") -> void:
 	if not multiplayer.is_server():
 		return
 	var requester_id := multiplayer.get_remote_sender_id()
 	if requester_id == 0:
 		return
 	_ready_peers[requester_id] = true
+	var display_name := _clean_name(username, requester_id)
+	_peer_names[requester_id] = display_name
+	_announce(display_name, "has entered the arena.")
+	_push_roster()
 	for other_peer_id in _spawned_peers.keys():
 		var craft = craft_container.get_node_or_null("Craft_%d" % other_peer_id)
 		if is_instance_valid(craft):
 			_grant_visibility(craft, requester_id)
+	# The other direction: everyone already here seeing THIS peer's craft.
+	# _on_player_registered already tried, but only this peer can open its own
+	# root synchronizer, and it was still loading then - see _grant_visibility.
+	var own_craft = craft_container.get_node_or_null("Craft_%d" % requester_id)
+	if is_instance_valid(own_craft):
+		for viewer_peer_id in _ready_peers.keys():
+			if viewer_peer_id != requester_id:
+				_grant_visibility(own_craft, viewer_peer_id)
 	if is_instance_valid(_env):
 		_env.sync_time_to.rpc_id(requester_id, _env.time_of_day)
 	# Juice is only broadcast on change now (see _broadcast_juice), so a late
@@ -568,6 +621,10 @@ func _notify_ready() -> void:
 # be granted by the owning peer itself instead (see _grant_own_craft_visibility).
 func _grant_visibility(craft: Node, viewer_peer_id: int) -> void:
 	var owner_peer_id: int = craft.get_multiplayer_authority()
+	# Lets the spawn itself reach viewer_peer_id - see SpawnGate in _spawn_craft.
+	var spawn_gate = craft.get_node_or_null("SpawnGate")
+	if spawn_gate:
+		spawn_gate.set_visibility_for(viewer_peer_id, true)
 	# HP has to stay visible to EVERY peer, even though only the owner's HUD
 	# reads it: Godot only delivers RPCs on a node to peers its synchronizer
 	# is visible to, and health_node carries the death/respawn/knockback RPCs
@@ -588,7 +645,10 @@ func _grant_visibility(craft: Node, viewer_peer_id: int) -> void:
 		var root_sync = craft.get_node_or_null("MultiplayerSynchronizer")
 		if root_sync:
 			root_sync.set_visibility_for(viewer_peer_id, true)
-	else:
+	elif _ready_peers.has(owner_peer_id):
+		# An owner still loading has no Match node to receive this on, so it
+		# was silently dropped and nobody ever saw that tank move. _notify_ready
+		# repeats the grant once the owner is loaded.
 		_grant_own_craft_visibility.rpc_id(owner_peer_id, viewer_peer_id)
 
 
@@ -615,6 +675,11 @@ func _on_player_unregistered(peer_id: int) -> void:
 	_ready_peers.erase(peer_id)
 	if not multiplayer.is_server():
 		return
+	if _peer_names.has(peer_id):
+		_announce(_peer_names[peer_id], "has left the arena.")
+		_peer_names.erase(peer_id)
+		_peer_scores.erase(peer_id)
+		_push_roster()
 	# Only the server frees it. Every craft now always goes through the real
 	# spawner (see _on_player_registered/_notify_ready) - MultiplayerSpawner
 	# replicates this despawn out, by itself, to every peer who currently has
@@ -880,7 +945,7 @@ func spawn_projectile(weapon_settings_path: String, team: String, muzzle_transfo
 		return
 	var first_id := _next_projectile_id
 	_next_projectile_id += maxi(settings.projectile_count, 1)
-	_create_volley(first_id, weapon_settings_path, team, muzzle_transform, use_team_color, fast_forward, shooter_peer != 0)
+	_create_volley(first_id, weapon_settings_path, team, muzzle_transform, use_team_color, fast_forward, shooter_peer != 0, shooter_peer)
 	var team_index := NetworkManager.TEAM_NAMES.find(team)
 	# Only to peers whose match scene actually exists - see _ready_peers.
 	for peer_id in _ready_peers:
@@ -901,7 +966,7 @@ func _spawn_projectile_event(first_id: int, weapon_settings_path: String, team_i
 				_projectiles[first_id + i] = predicted[i]
 		return
 	var team: String = NetworkManager.TEAM_NAMES[team_index] if team_index >= 0 and team_index < NetworkManager.TEAM_NAMES.size() else ""
-	_create_volley(first_id, weapon_settings_path, team, muzzle_transform, use_team_color, fast_forward + _one_way_latency(), shooter_peer != 0)
+	_create_volley(first_id, weapon_settings_path, team, muzzle_transform, use_team_color, fast_forward + _one_way_latency(), shooter_peer != 0, shooter_peer)
 
 
 # Shooter-only (never the host - its shots are the real ones already). Spawns
@@ -987,7 +1052,7 @@ func peer_one_way_latency(peer_id: int) -> float:
 # Builds one volley locally - identical on every peer, which is what lets
 # a single spawn event stand in for every projectile in it. net ids are
 # first_id, first_id+1, ... (first_id -1 = predicted, ids assigned later).
-func _create_volley(first_id: int, weapon_settings_path: String, team: String, muzzle_transform: Transform3D, use_team_color: bool, fast_forward: float, play_launch_sound: bool) -> Array:
+func _create_volley(first_id: int, weapon_settings_path: String, team: String, muzzle_transform: Transform3D, use_team_color: bool, fast_forward: float, play_launch_sound: bool, shooter_peer: int = 0) -> Array:
 	# weapon_settings_path is a string, not the Resource itself - every peer
 	# has the same .tres locally, so each side just loads it by path.
 	var settings: WeaponSettings = load(weapon_settings_path)
@@ -1010,6 +1075,7 @@ func _create_volley(first_id: int, weapon_settings_path: String, team: String, m
 		projectile.weapon_settings = settings
 		projectile.weapon_settings_path = weapon_settings_path
 		projectile.team = team
+		projectile.shooter_peer = shooter_peer
 		projectile.transform = transforms[i]
 		if first_id >= 0:
 			projectile.net_id = first_id + i
@@ -1048,7 +1114,7 @@ func _volley_transforms(settings: WeaponSettings, muzzle: Transform3D) -> Array[
 # behind it. Lives here on the persistent match node, not the projectile, so
 # it still plays if the projectile's despawn wins the race to this peer.
 @rpc("authority", "call_local", "unreliable", 1)
-func _play_impact_fx(settings_path: String, color: Color, impact_transform: Transform3D, show_hit: bool, show_hole: bool, hole_point: Vector3, hole_normal: Vector3) -> void:
+func _play_impact_fx(settings_path: String, color: Color, impact_transform: Transform3D, show_hit: bool, show_hole: bool, hole_point: Vector3, hole_normal: Vector3, show_crit: bool = false) -> void:
 	if settings_path.is_empty():
 		return
 	var settings: WeaponSettings = load(settings_path)
@@ -1062,6 +1128,8 @@ func _play_impact_fx(settings_path: String, color: Color, impact_transform: Tran
 			add_child(explosion_instance)
 			explosion_instance.transform = impact_transform
 			Utilities.apply_projectile_color_recursive(explosion_instance, color)
+	if show_crit and settings.crit_sound:
+		Utilities.play_sound(settings.crit_sound, impact_transform.origin, 10.0)
 	if show_hole and settings.bullet_hole_prefab:
 		var bullet_hole_instance := settings.bullet_hole_prefab.instantiate()
 		add_child(bullet_hole_instance)
@@ -1153,6 +1221,23 @@ func _spawn_craft(data: Dictionary) -> Node:
 	# to fire, so the server has to be the one computing/holding it, not the
 	# owning client - see power_node.gd's own _process gating.
 	craft.get_node("power_node").set_multiplayer_authority(1)
+	# Spawn gate. Godot decides who receives a spawn from the synchronizers
+	# rooted at the spawned node, but on the server it skips any it isn't the
+	# authority of - and the root synchronizer belongs to the owning client.
+	# With nothing left to check, every client-owned craft counted as visible
+	# to every connected peer and was spawned on them the moment its owner
+	# picked a team, even on a peer still on team select or loading the map.
+	# If that landed before Match/CraftSpawner existed there, the path cache
+	# failed ("ID 2 not found in cache of peer 1") and that peer never saw a
+	# tank again. This server-owned, property-less synchronizer is only made
+	# visible in _grant_visibility, so spawns now wait for _notify_ready.
+	# Added after set_multiplayer_authority above, which is recursive.
+	var spawn_gate := MultiplayerSynchronizer.new()
+	spawn_gate.name = "SpawnGate"
+	spawn_gate.public_visibility = false
+	spawn_gate.replication_config = SceneReplicationConfig.new()
+	spawn_gate.set_multiplayer_authority(1)
+	craft.add_child(spawn_gate)
 	craft.transform = Transform3D(data["basis"], data["position"])
 	# A craft's spawn instruction travels over the fast game connection and
 	# can arrive (and materialize this node) before this peer's own slow
@@ -1179,6 +1264,20 @@ func _spawn_craft(data: Dictionary) -> Node:
 	return craft
 
 
+# Server-only. Every defeat is a wreck for the victim; a takedown goes to the
+# credited attacker if they're still here and on another team.
+func _record_defeat(peer_id: int, attacker_id: int) -> void:
+	var victim_score: Array = _peer_scores.get(peer_id, [0, 0])
+	victim_score[1] += 1
+	_peer_scores[peer_id] = victim_score
+	var teams := NetworkManager.peer_teams
+	if attacker_id != 0 and teams.has(attacker_id) and teams.get(attacker_id) != teams.get(peer_id):
+		var attacker_score: Array = _peer_scores.get(attacker_id, [0, 0])
+		attacker_score[0] += 1
+		_peer_scores[attacker_id] = attacker_score
+	_push_roster()
+
+
 func _tint_emissive(mesh_instance: MeshInstance3D, color: Color) -> void:
 	var mat := mesh_instance.material_override
 	if not (mat is StandardMaterial3D):
@@ -1189,9 +1288,10 @@ func _tint_emissive(mesh_instance: MeshInstance3D, color: Color) -> void:
 	mesh_instance.material_override = mat
 
 
-func _on_craft_defeated(peer_id: int) -> void:
+func _on_craft_defeated(peer_id: int, attacker_id: int) -> void:
 	if not multiplayer.is_server():
 		return
+	_record_defeat(peer_id, attacker_id)
 	await get_tree().create_timer(RESPAWN_DELAY).timeout
 	if not NetworkManager.peer_teams.has(peer_id):
 		return # player left during the respawn delay
