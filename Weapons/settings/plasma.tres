@@ -7,6 +7,7 @@
 [resource]
 script = ExtResource("1_hmjdw")
 weapon_name = "Plasma"
+reload_on = 1
 hit_points = 5.0
 cool_down = 0.1
 projectile_prefab = ExtResource("2_vb3si")

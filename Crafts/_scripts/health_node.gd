@@ -1,7 +1,11 @@
+class_name HealthNode
 extends Node3D
 
-# attacker_id is the player credited with the takedown, 0 if nobody.
-signal craft_defeated(peer_id: int, attacker_id: int)
+# attacker_id is the player credited with the takedown, 0 if nobody. cause is
+# a DeathCause - what dealt the final blow, for the chat announcement.
+signal craft_defeated(peer_id: int, attacker_id: int, cause: int)
+
+enum DeathCause { WEAPON, BASE_GUN, FALL, VOID, MINE }
 
 # A hit or shove this recent still gets the credit for a death that follows -
 # knocked off the map, or finished by fall damage.
@@ -31,6 +35,8 @@ var _weapon_freeze_timer: Timer
 # Server-only. Who last hit or shoved this craft, and when - see note_attacker.
 var _last_attacker: int = 0
 var _last_attacker_msec: int = 0
+# Server-only. What dealt the blow that destroyed this craft.
+var _death_cause: int = DeathCause.WEAPON
 
 # Death-window bookkeeping. A destroyed craft keeps its node alive (see
 # destroy_self below), so its collider has to be explicitly taken out of the
@@ -107,7 +113,7 @@ func _process(delta: float) -> void:
 	# shields + armor + life guarantees lethality through all three layers
 	# regardless of current HP, same as a real overkill hit would.
 	if not _is_destroyed and body.global_position.y < FALL_DEATH_Y:
-		apply_damage(shields + armor + life)
+		apply_damage(shields + armor + life, 0, DeathCause.VOID)
 
 
 # Server-only, plain function - not an RPC. HP lives on the server alone and
@@ -118,7 +124,7 @@ func _process(delta: float) -> void:
 # step because HP was streamed to everyone every frame - the death is now an
 # explicit broadcast (_broadcast_destroyed) instead, so no peer can ever
 # disagree with the server about whether a craft died.
-func apply_damage(damage: float, attacker_id: int = 0) -> void:
+func apply_damage(damage: float, attacker_id: int = 0, cause: int = DeathCause.WEAPON) -> void:
 	if not multiplayer.is_server() or _is_destroyed:
 		return
 	note_attacker(attacker_id)
@@ -141,6 +147,7 @@ func apply_damage(damage: float, attacker_id: int = 0) -> void:
 	if damage > 0:
 		life -= damage
 	if life <= 0:
+		_death_cause = cause
 		_broadcast_destroyed.rpc()
 
 
@@ -188,7 +195,7 @@ func request_fall_damage(impact_speed: float) -> void:
 	if stats == null or impact_speed <= stats.fall_damage_safe_speed:
 		return
 	var excess = impact_speed - stats.fall_damage_safe_speed
-	apply_damage(stats.fall_damage_coefficient * excess * excess)
+	apply_damage(stats.fall_damage_coefficient * excess * excess, 0, DeathCause.FALL)
 
 
 # Armor-then-life heal while parked inside a recon station captured by this
@@ -262,7 +269,7 @@ func destroy_self() -> void:
 	# or the first tick after the respawn teleport immediately fights it.
 	_set_movement_frozen(true)
 	if multiplayer.is_server():
-		craft_defeated.emit(body.get_multiplayer_authority(), _credited_attacker())
+		craft_defeated.emit(body.get_multiplayer_authority(), _credited_attacker(), _death_cause)
 		_last_attacker = 0
 
 

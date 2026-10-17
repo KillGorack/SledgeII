@@ -4,6 +4,7 @@
 [ext_resource type="PackedScene" uid="uid://c8wgfwmq20j15" path="res://Weapons/Scenes/hitmarks/scorch.tscn" id="1_fltvq"]
 [ext_resource type="Script" uid="uid://defwrtblkx02f" path="res://Weapons/_scripts/weapon_settings.gd" id="1_l7uby"]
 [ext_resource type="PackedScene" uid="uid://b2vljciuo54jp" path="res://Weapons/Scenes/projectiles/laser.tscn" id="2_fltvq"]
+[ext_resource type="PackedScene" uid="uid://cbbcjhhhvec5c" path="res://Weapons/Scenes/projectiles/trail_ribbon.tscn" id="2_jcek8"]
 [ext_resource type="AudioStream" uid="uid://d4kvrtidstm8e" path="res://Weapons/Sounds/laser5.mp3" id="3_gd237"]
 
 [resource]
@@ -15,6 +16,7 @@ projectile_prefab = ExtResource("2_fltvq")
 projectile_color = Color(1, 0, 0, 1)
 explosion_prefab = ExtResource("1_dseh2")
 bullet_hole_prefab = ExtResource("1_fltvq")
+exhaust_prefab = ExtResource("2_jcek8")
 launch_sound = ExtResource("3_gd237")
 projectile_count = 4
 projectile_spacing = 0.125

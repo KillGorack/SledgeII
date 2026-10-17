@@ -2,15 +2,16 @@
 
 [ext_resource type="PackedScene" uid="uid://b3f44mlsxoif8" path="res://Weapons/Scenes/hitmarks/crater.tscn" id="1_y8gcj"]
 [ext_resource type="PackedScene" uid="uid://c5y6qmv3cggb6" path="res://Weapons/Scenes/explosions/shockwave.tscn" id="2_i4pwi"]
+[ext_resource type="PackedScene" uid="uid://ccxhqgq7uepr2" path="res://Weapons/Scenes/projectiles/trail_smoke.tscn" id="2_vcfcg"]
 [ext_resource type="PackedScene" uid="uid://b4qwbkxy8u1u6" path="res://Weapons/Scenes/projectiles/shell.tscn" id="2_y8gcj"]
 [ext_resource type="AudioStream" uid="uid://bfpc6t43o35qy" path="res://Weapons/Sounds/HitHard.wav" id="3_djqd1"]
 [ext_resource type="Script" uid="uid://defwrtblkx02f" path="res://Weapons/_scripts/weapon_settings.gd" id="3_y8gcj"]
 [ext_resource type="AudioStream" uid="uid://dy0ecskx3n1b" path="res://Weapons/Sounds/Mortar2.wav" id="4_djqd1"]
-[ext_resource type="PackedScene" uid="uid://ccxhqgq7uepr2" path="res://Weapons/Scenes/projectiles/smoke_trail.tscn" id="5_smoke"]
 
 [resource]
 script = ExtResource("3_y8gcj")
 weapon_name = "AP Shell"
+reload_on = 1
 hit_points = 10.0
 crit_chance = 0.05
 crit_multiplier = 2.0
@@ -18,7 +19,7 @@ cool_down = 2.0
 projectile_prefab = ExtResource("2_y8gcj")
 explosion_prefab = ExtResource("2_i4pwi")
 bullet_hole_prefab = ExtResource("1_y8gcj")
-smoke_trail_prefab = ExtResource("5_smoke")
+exhaust_prefab = ExtResource("2_vcfcg")
 launch_sound = ExtResource("4_djqd1")
 hit_sound = ExtResource("3_djqd1")
 projectile_count_capacity = 15
