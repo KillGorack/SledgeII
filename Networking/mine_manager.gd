@@ -170,6 +170,11 @@ func remove_player_mines(peer_id: int) -> void:
 	_last_lay_msec.erase(peer_id)
 
 
+# Any peer: every peer holds the full mine set, so the HUD can count its own.
+func mines_left(peer_id: int) -> int:
+	return maxi(0, MAX_MINES_PER_PLAYER - _mines_of(peer_id).size())
+
+
 func _mines_of(peer_id: int) -> Array:
 	var result: Array = []
 	for mine in _mines.values():
