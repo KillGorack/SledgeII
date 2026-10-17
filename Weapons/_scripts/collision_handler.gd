@@ -54,6 +54,9 @@ var net_id: int = -1
 # Peer that fired this, 0 for base guns. Server-side, credits takedowns - see
 # health_node.gd::note_attacker.
 var shooter_peer: int = 0
+# The shooter held "reverso" when firing: projectile_force pulls instead of
+# pushes. Only the server's copy resolves hits, so only it needs this.
+var reverse_force: bool = false
 const GUIDED_CORRECTION_INTERVAL := 0.05
 const CORRECTION_SNAP_DISTANCE := 5.0
 const CORRECTION_BLEND_RATE := 15.0
@@ -432,7 +435,7 @@ func handle_collision() -> void:
 			apply_direct_damage(weapon_settings.hit_points)
 
 		if weapon_settings.projectile_force > 0:
-			apply_hit_force(weapon_settings.projectile_force)
+			apply_hit_force(-weapon_settings.projectile_force if reverse_force else weapon_settings.projectile_force)
 
 		if weapon_settings.projectile_pierce_count > 0:
 			destroy = handle_pierce()

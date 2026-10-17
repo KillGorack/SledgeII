@@ -1,0 +1,59 @@
+[gd_scene format=3]
+
+[ext_resource type="Texture2D" path="res://Materials/Textures/Particles/T_smoke_flipbook.png" id="1_g3jc6"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gckcn"]
+transparency = 1
+vertex_color_use_as_albedo = true
+vertex_color_is_srgb = true
+albedo_texture = ExtResource("1_g3jc6")
+billboard_mode = 3
+particles_anim_h_frames = 8
+particles_anim_v_frames = 8
+particles_anim_loop = false
+
+[sub_resource type="Gradient" id="Gradient_fqp22"]
+colors = PackedColorArray(1, 1, 1, 1, 0, 0, 0, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_g3jc6"]
+gradient = SubResource("Gradient_fqp22")
+
+[sub_resource type="Curve" id="Curve_gckcn"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(0.178478, 0), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_sbpgx"]
+curve = SubResource("Curve_gckcn")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_fqp22"]
+particle_flag_rotate_y = true
+emission_shape = 1
+emission_sphere_radius = 0.05
+angle_min = -180.0
+angle_max = 180.0
+direction = Vector3(0, 1, 0)
+spread = 0.0
+initial_velocity_min = 0.8
+initial_velocity_max = 1.2
+angular_velocity_min = -50.0
+angular_velocity_max = 50.0
+gravity = Vector3(0, 0, 0)
+scale_min = 0.3
+scale_max = 0.7
+color_ramp = SubResource("GradientTexture1D_g3jc6")
+emission_curve = SubResource("CurveTexture_sbpgx")
+anim_speed_min = 1.0
+anim_speed_max = 1.0
+
+[sub_resource type="QuadMesh" id="QuadMesh_gwyq5"]
+
+[node name="DamageSmoke" type="Node3D"]
+
+[node name="GPUParticles3D" type="GPUParticles3D" parent="."]
+material_override = SubResource("StandardMaterial3D_gckcn")
+emitting = false
+amount = 40
+lifetime = 2.0
+fixed_fps = 60
+process_material = SubResource("ParticleProcessMaterial_fqp22")
+draw_pass_1 = SubResource("QuadMesh_gwyq5")

@@ -11,6 +11,9 @@ enum DeathCause { WEAPON, BASE_GUN, FALL, VOID, MINE }
 # knocked off the map, or finished by fall damage.
 const TAKEDOWN_CREDIT_MSEC := 5000
 
+# The craft smokes while its hull (life) is below this fraction of its maximum.
+const SMOKE_LIFE_RATIO := 0.2
+
 const VEHICLE_EXPLOSION := preload("res://Weapons/Scenes/explosions/explosion_main.tscn")
 const VEHICLE_EXPLOSION_SCALE := 3.0
 # Falling off the map counts as a kill, same explosion/respawn path as dying
@@ -49,6 +52,9 @@ var _stored_collision_layer: int = 0
 var _stored_collision_mask: int = 0
 
 @onready var body: Node3D = get_parent()
+# Lives on the craft (lightning.tscn). life reaches every peer through the
+# synchronizer, so each one drives its own copy - no RPC needed.
+@onready var _smoke: GPUParticles3D = get_parent().get_node_or_null("DamageSmoke/GPUParticles3D")
 
 
 
@@ -79,6 +85,7 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	_update_smoke()
 	# See NetworkManager.is_live_server() for why not plain is_server().
 	if not NetworkManager.is_live_server():
 		return
@@ -114,6 +121,12 @@ func _process(delta: float) -> void:
 	# regardless of current HP, same as a real overkill hit would.
 	if not _is_destroyed and body.global_position.y < FALL_DEATH_Y:
 		apply_damage(shields + armor + life, 0, DeathCause.VOID)
+
+
+func _update_smoke() -> void:
+	if _smoke == null or _life_max <= 0.0:
+		return
+	_smoke.emitting = not _is_destroyed and life < _life_max * SMOKE_LIFE_RATIO
 
 
 # Server-only, plain function - not an RPC. HP lives on the server alone and

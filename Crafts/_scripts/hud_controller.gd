@@ -59,7 +59,11 @@ func _process(_delta: float) -> void:
 	# The needle this whole lighting/light-count pass is trying to move -
 	# Engine.get_frames_per_second() is the engine's own already-computed
 	# rolling average, not something worth recomputing by hand here.
-	fps_label.text = "%d FPS" % Engine.get_frames_per_second()
+	# Second line: takedowns/wrecks and bounty. The bounty is read live (see
+	# match.gd::get_my_bounty), the F4 list only refreshes it on events.
+	var score: Array = NetworkManager.peer_scores.get(multiplayer.get_unique_id(), [0, 0, 0]) if NetworkManager.is_online() else [0, 0, 0]
+	var bounty := int(_match_node.get_my_bounty()) if _match_node else 0
+	fps_label.text = "FPS: %d\n%d/%d %d" % [Engine.get_frames_per_second(), score[0], score[1], bounty]
 func _on_team_juice_changed(team: String, _amount: float) -> void:
 	if team == weapon_node.team:
 		_update_team_juice_bar()

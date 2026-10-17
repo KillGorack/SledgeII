@@ -12,6 +12,10 @@ var feedback_base_x: float
 @onready var btn_register: TextureButton = $"Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect/MarginContainer/TextureRect/MarginContainer/MarginContainer/VBoxContainer/HBoxContainer/btn_register"
 @onready var ui_feedback: Label = $Screen_layout/VBoxContainer/StatusBar/ui_feedback_node/lbl_ui_feedback
 @onready var btn_play: TextureButton = $Screen_layout/Buttons_Section/Menu/VBox/btn_play
+@onready var btn_settings: TextureButton = $Screen_layout/Buttons_Section/Menu/VBox/btn_settings
+@onready var btn_credits: TextureButton = $Screen_layout/Buttons_Section/Menu/VBox/btn_credits
+@onready var settings_group: Control = %Settings
+@onready var credits_group: Control = %Credits
 @onready var http_request = $HTTPRequest
 @onready var login_timer = Timer.new()
 @onready var load_group: Control = $"Screen_layout/VBoxContainer/MarginContainer/Load Game"
@@ -22,14 +26,16 @@ var feedback_base_x: float
 @onready var world_list: Tree = %WorldList
 @onready var map_thumbnail: TextureRect = %MapThumbnail
 @onready var map_description: RichTextLabel = %MapDescription
-@onready var btn_host: Button = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/btn_host"
+@onready var map_title: Label = %MapTitle
+@onready var map_byline: Label = %MapByline
+@onready var btn_host: Button = %btn_host
 @onready var game_list: Tree = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Join Game/MarginContainer/VBoxContainer/GameList"
 @onready var btn_refresh: Button = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Join Game/MarginContainer/VBoxContainer/btn_refresh"
 @onready var btn_join: Button = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Join Game/MarginContainer/VBoxContainer/btn_join"
 @onready var load_game_tabs: TabContainer = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer"
 @onready var game_list_poll_timer := Timer.new()
-@onready var base_gun_respawn_spin: SpinBox = %BaseGunRespawnSpin
-@onready var mines_check: CheckBox = %MinesCheck
+@onready var mine_checklist: VBoxContainer = %MineChecklist
+@onready var rockets_check: CheckBox = %RocketsCheck
 @onready var day_night_check: CheckBox = %DayNightCheck
 @onready var public_game_check: CheckBox = %PublicGameCheck
 
@@ -37,7 +43,6 @@ var feedback_base_x: float
 # _on_host_pressed's comment for why this can't just be a set_ui_feedback()
 # call at the point it fires.
 var _pending_port_forward_warning: String = ""
-@onready var host_address_override: LineEdit = %HostAddressOverride
 @onready var weapon_checklist: VBoxContainer = %WeaponChecklist
 @onready var host_team_picker: OptionButton = %HostTeamPicker
 @onready var team_select_group: Control = $"Screen_layout/VBoxContainer/MarginContainer/Team Select"
@@ -53,6 +58,7 @@ const JOIN_GAME_TAB_INDEX := 1
 # else equippable added later) can slot into the same checklist/ruleset by
 # adding a directory here - see the mines reference note from the design
 # discussion for why they won't live in this same folder.
+const MINE_CATALOG_DIR := "res://Weapons/settings_mines/"
 const WEAPON_CATALOG_DIRS: Array[String] = ["res://Weapons/settings/"]
 
 
@@ -88,6 +94,7 @@ func _ready() -> void:
 	game_list_poll_timer.timeout.connect(func(): NetworkManager.list_open_games())
 	load_game_tabs.tab_changed.connect(_on_load_game_tab_changed)
 	_build_weapon_checklist()
+	_build_mine_checklist()
 	for team in NetworkManager.TEAM_NAMES:
 		host_team_picker.add_item(team.trim_prefix("team_").capitalize())
 	feedback_base_x = ui_feedback.position.x + 25
@@ -97,6 +104,9 @@ func _ready() -> void:
 	game_list.connect("item_selected", Callable(self, "_on_game_selected"))
 	login_timer.one_shot = true
 	btn_quit.pressed.connect(func(): _on_quit())
+	btn_play.pressed.connect(_on_play_pressed)
+	btn_settings.pressed.connect(func(): _show_info_panel(settings_group))
+	btn_credits.pressed.connect(func(): _show_info_panel(credits_group))
 	btn_register.pressed.connect(func(): _on_register())
 	btn_login.pressed.connect(func(): _on_login())
 	btn_host.pressed.connect(func(): _on_host_pressed())
@@ -132,13 +142,44 @@ func _ready() -> void:
 		login_group.visible = true
 		load_group.visible = false
 		set_ui_feedback("Please login to continue...", "INFO")
-		btn_play.disabled = true
+
+
+# --- Menu buttons: Play / Settings / Credits --------------------------------
+# Settings and Credits take over the right-hand area; Play brings back whichever
+# of login / load game / team select was showing before.
+var _return_panel: Control = null
+
+
+func _main_panels() -> Array[Control]:
+	return [login_group, load_group, team_select_group]
+
+
+func _show_info_panel(panel: Control) -> void:
+	for main in _main_panels():
+		if main.visible:
+			_return_panel = main
+			main.visible = false
+	settings_group.visible = panel == settings_group
+	credits_group.visible = panel == credits_group
+
+
+func _hide_info_panels() -> void:
+	settings_group.visible = false
+	credits_group.visible = false
+
+
+func _on_play_pressed() -> void:
+	if not (settings_group.visible or credits_group.visible):
+		return
+	_hide_info_panels()
+	var back: Control = _return_panel if _return_panel else (load_group if UserData.user_id > 0 else login_group)
+	back.visible = true
 
 
 func _enter_load_screen(feedback_message: String) -> void:
 	login_group.visible = false
 	load_group.visible = true
-	btn_play.disabled = false
+	_hide_info_panels()
 	load_game_tabs.current_tab = 0
 	set_ui_feedback(feedback_message, "OK")
 	getLevels()
@@ -187,6 +228,8 @@ var _thumb_cache: Dictionary = {}
 func _show_map_details(row: TreeItem) -> void:
 	var description := str(row.get_meta("description", ""))
 	map_description.text = description if description != "" else "No description available."
+	map_title.text = row.get_text(0)
+	map_byline.text = "by %s   -   %s" % [row.get_text(1), row.get_text(2)]
 	var tan_id := int(row.get_meta("tan_id", -1))
 	if _thumb_cache.has(tan_id):
 		map_thumbnail.texture = _thumb_cache[tan_id]
@@ -251,6 +294,33 @@ func _build_weapon_checklist() -> void:
 				weapon_checklist.add_child(check)
 
 
+# Same idea as the weapon list, for the specials (mines). There is no master switch:
+# mines exist in a match exactly when at least one of them is ticked.
+func _build_mine_checklist() -> void:
+	for child in mine_checklist.get_children():
+		child.queue_free()
+	for file_name in ResourceLoader.list_directory(MINE_CATALOG_DIR):
+		if file_name.ends_with("/") or not file_name.ends_with(".tres"):
+			continue
+		var mine_path := MINE_CATALOG_DIR.path_join(file_name)
+		var settings: MineSettings = load(mine_path)
+		if settings:
+			var check := CheckBox.new()
+			check.text = settings.mine_name
+			check.tooltip_text = settings.mine_lore
+			check.button_pressed = settings.default_available
+			check.set_meta("mine_path", mine_path)
+			mine_checklist.add_child(check)
+
+
+func _get_checked_mine_paths() -> Array[String]:
+	var paths: Array[String] = []
+	for child in mine_checklist.get_children():
+		if child is CheckBox and child.button_pressed:
+			paths.append(child.get_meta("mine_path"))
+	return paths
+
+
 func _get_checked_weapon_paths() -> Array[String]:
 	var paths: Array[String] = []
 	for child in weapon_checklist.get_children():
@@ -274,13 +344,15 @@ func _on_host_pressed():
 		selected_map_file_id,
 		_get_checked_weapon_paths(),
 		day_night_check.button_pressed,
-		host_address_override.text,
+		"",
 		NetworkManager.TEAM_NAMES[host_team_picker.selected],
 		NetworkManager.DEFAULT_PORT,
 		20,
 		public_game_check.button_pressed,
-		base_gun_respawn_spin.value,
-		mines_check.button_pressed
+		NetworkManager.BASE_GUN_RESPAWN_SECONDS,
+		not _get_checked_mine_paths().is_empty(),
+		_get_checked_mine_paths(),
+		rockets_check.button_pressed
 	)
 
 
@@ -316,6 +388,7 @@ func _on_joined_match():
 	# which is what does the real transition once that happens.
 	login_group.visible = false
 	load_group.visible = false
+	_hide_info_panels()
 	team_select_group.visible = true
 	_build_team_roster()
 

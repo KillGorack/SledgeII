@@ -1,6 +1,10 @@
 [gd_scene format=4 uid="uid://wo657mkxalrd"]
 
-[ext_resource type="Script" path="res://Crafts/_scripts/mine_counter.gd" id="mine_counter_script"]
+[ext_resource type="PackedScene" path="res://Game_Objects/damage_smoke.tscn" id="damage_smoke_scene"]
+[ext_resource type="Script" uid="uid://dmp6mofyfrsod" path="res://Crafts/_scripts/mine_counter.gd" id="mine_counter_script"]
+[ext_resource type="Resource" path="res://Weapons/settings_mines/mine_detno.tres" id="mine_settings_res"]
+[ext_resource type="Resource" path="res://Weapons/settings_mines/mine_force.tres" id="mine_force_res"]
+[ext_resource type="Script" path="res://Weapons/_scripts/mine_settings.gd" id="mine_settings_script"]
 [ext_resource type="Material" uid="uid://bgh0ehawiffev" path="res://Materials/PBR/emitting_stuff.tres" id="1_75qxs"]
 [ext_resource type="Material" uid="uid://cu6i37pttdjcl" path="res://Materials/PBR/Red_Metal.tres" id="1_gfhax"]
 [ext_resource type="Script" uid="uid://b32whv15op7uy" path="res://Crafts/_scripts/movement.gd" id="1_nm6mo"]
@@ -414,6 +418,9 @@ collision_mask = 2
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0014648438, -0.35, -0.43850708)
 shape = SubResource("BoxShape3D_r1wdx")
 
+[node name="DamageSmoke" parent="." instance=ExtResource("damage_smoke_scene")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0.3)
+
 [node name="Suspension" type="Node3D" parent="." unique_id=885553309]
 
 [node name="FrontLeft" type="RayCast3D" parent="Suspension" unique_id=1867380839]
@@ -518,6 +525,7 @@ public_visibility = false
 
 [node name="weapon_node" type="Node3D" parent="." unique_id=1782664371]
 script = ExtResource("7_weapon")
+mine_settings = Array[ExtResource("mine_settings_script")]([ExtResource("mine_settings_res"), ExtResource("mine_force_res")])
 weapon_settings = Array[ExtResource("10_4qjx5")]([ExtResource("12_cannon"), ExtResource("14_detno"), ExtResource("15_mkiv"), ExtResource("13_repulsor"), ExtResource("16_8hncv")])
 
 [node name="Hud_InGame" type="Control" parent="." unique_id=1814334772]
@@ -639,9 +647,10 @@ script = ExtResource("23_juice")
 [node name="FPS" type="Label" parent="Hud_InGame" unique_id=457254272]
 layout_mode = 1
 offset_left = 5.0
-offset_right = 102.0
-offset_bottom = 23.0
-text = "116 FPS"
+offset_right = 130.0
+offset_bottom = 46.0
+theme_override_colors/font_color = Color(1, 1, 0, 1)
+text = "FPS: 116"
 
 [node name="Arena" type="Label" parent="Hud_InGame" unique_id=1491971939]
 layout_mode = 1

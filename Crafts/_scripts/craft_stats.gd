@@ -28,11 +28,10 @@ class_name CraftStats
 # shields already regen on their own via regeneration_rate above, so this
 # never touches shields.
 @export var station_heal_rate: float = 10.0
-# Fall damage (see movement.gd::_handle_landing and
-# health_node.gd::request_fall_damage) - impact speed is the component of
-# landing velocity straight into whatever surface you hit (world-space
-# ground normal, not the craft's own orientation), so a hard flat slam
-# damages a lot more than skimming the same speed along a ramp. Below
+# Fall damage (see movement.gd::_detect_impact and
+# health_node.gd::request_fall_damage) - impact speed is how much speed the
+# craft lost over a few physics ticks while touching the world, whichever way
+# up it is and whatever it hit (ground, ramp, wall). Below
 # fall_damage_safe_speed nothing happens at all, same as any normal landing;
 # above it, damage scales with the SQUARE of the excess speed (kinetic
 # energy, not linear) so a landing twice as hard hurts four times as much.

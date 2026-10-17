@@ -227,13 +227,20 @@ func _refresh_state() -> void:
 # Server-only (collision_handler.gd only resolves hits there, via
 # base_gun_health.gd). HP is server state; everyone else just hears about the
 # destruction and the return.
-func take_damage(damage: float) -> void:
+func take_damage(damage: float, attacker_id: int = 0) -> void:
 	if not multiplayer.is_server() or is_dead or team == "":
+		return
+	# Nobody on this gun's team is here to be hurt by it going down - shots
+	# still land on it (so they are absorbed), they just do nothing.
+	if not NetworkManager.peer_teams.values().has(team):
 		return
 	_hp -= damage
 	if _hp > 0.0:
 		return
 	_destroyed.rpc()
+	var match_node := get_tree().get_first_node_in_group("match")
+	if match_node:
+		match_node.on_gun_destroyed(attacker_id)
 	var delay := NetworkManager.base_gun_respawn_seconds
 	await get_tree().create_timer(delay).timeout
 	if is_instance_valid(self) and is_dead:

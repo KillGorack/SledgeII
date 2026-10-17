@@ -10,8 +10,8 @@ const DeathCause := HealthNode.DeathCause
 @onready var _gun: BaseGun = get_parent().get_parent()
 
 
-func apply_damage(damage: float, _attacker_id: int = 0, _cause: int = DeathCause.WEAPON) -> void:
-	_gun.take_damage(damage)
+func apply_damage(damage: float, attacker_id: int = 0, _cause: int = DeathCause.WEAPON) -> void:
+	_gun.take_damage(damage, attacker_id)
 
 
 func note_attacker(_attacker_id: int) -> void:
