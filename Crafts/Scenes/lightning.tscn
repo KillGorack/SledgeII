@@ -1,5 +1,6 @@
 [gd_scene format=4 uid="uid://wo657mkxalrd"]
 
+[ext_resource type="Script" path="res://Crafts/_scripts/mine_counter.gd" id="mine_counter_script"]
 [ext_resource type="Material" uid="uid://bgh0ehawiffev" path="res://Materials/PBR/emitting_stuff.tres" id="1_75qxs"]
 [ext_resource type="Material" uid="uid://cu6i37pttdjcl" path="res://Materials/PBR/Red_Metal.tres" id="1_gfhax"]
 [ext_resource type="Script" uid="uid://b32whv15op7uy" path="res://Crafts/_scripts/movement.gd" id="1_nm6mo"]
@@ -685,6 +686,21 @@ grow_horizontal = 2
 grow_vertical = 0
 text = "0 / 4"
 horizontal_alignment = 2
+
+[node name="MineCounter" type="Control" parent="Hud_InGame"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -226.5
+offset_top = -85.0
+offset_right = -106.5
+offset_bottom = -51.0
+grow_horizontal = 2
+grow_vertical = 0
+script = ExtResource("mine_counter_script")
 
 [node name="Radar_Bezel" type="TextureRect" parent="Hud_InGame" unique_id=640715911]
 layout_mode = 1

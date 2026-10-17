@@ -72,7 +72,7 @@ var allowed_weapon_paths: Array[String] = []
 var day_night_enabled: bool = true
 # Server-only: seconds a shot-down base gun stays gone. Set by the host UI.
 var base_gun_respawn_seconds: float = 30.0
-# Server-only: host rule, whether mines can be laid at all.
+# Host rule, whether mines can be laid at all (clients get it via _assign_ruleset).
 var mines_enabled: bool = true
 
 
@@ -305,7 +305,7 @@ func _on_peer_connected(peer_id: int) -> void:
 	# One match-wide ruleset, not per-peer, so this is a single targeted send
 	# rather than the backfill loop below - there's nothing to backfill, the
 	# host is the only one who ever sets it.
-	_assign_ruleset.rpc_id(peer_id, allowed_weapon_paths, day_night_enabled)
+	_assign_ruleset.rpc_id(peer_id, allowed_weapon_paths, day_night_enabled, mines_enabled)
 	# Backfill the roster so the newly joined peer sees everyone already
 	# assigned before picking their own - no auto-assignment anymore, the new
 	# peer isn't in peer_teams at all until request_team() below succeeds, so
@@ -347,9 +347,10 @@ func _reject_team_request(reason: String) -> void:
 
 
 @rpc("authority", "call_local", "reliable")
-func _assign_ruleset(weapon_paths: Array, day_night: bool) -> void:
+func _assign_ruleset(weapon_paths: Array, day_night: bool, mines: bool) -> void:
 	allowed_weapon_paths.assign(weapon_paths)
 	day_night_enabled = day_night
+	mines_enabled = mines
 
 
 func _team_count(team: String) -> int:
