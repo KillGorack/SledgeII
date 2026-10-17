@@ -5,7 +5,30 @@ extends Node3D
 @export var team: String = "team_red"
 
 const SELF_RENDER_LAYER := 20
-const FALL_DAMAGE_RAY_LENGTH := 5.0
+# Fall damage is worked out from how far the craft FELL, not from collision
+# forces (which jitter): from the highest point reached since it last had
+# contact with the world, to where it touches down. That distance becomes the
+# speed an object dropped from that height would hit at (v = sqrt(2*g*d)),
+# which feeds the existing fall_damage_* stats. Same result whichever way up
+# the craft lands, and the same fall always costs the same.
+# Airborne spells shorter than this are bumps over lips and ripples, not falls.
+const FALL_MIN_AIR_MSEC := 120
+# Rockets (R) lift the craft. They don't work when it is mostly upside down: 1 = upright,
+# 0 = on its side, -1 = upside down.
+const ROCKET_MIN_UP_DOT := -0.3
+# Unturtling (left / right): an overturned craft that is on the ground and nearly stopped rolls
+# toward the key pressed, and after a while rights itself so it is never stuck for good.
+const UNTURTLE_SETTLED_SPEED := 1.0
+const UNTURTLE_AUTO_MSEC := 4000
+const UNTURTLE_TORQUE_MULT := 2.0
+const UNTURTLE_LIFT_RATIO := 0.5 # of thruster_force: just enough to take weight off while it rolls
+const THRUST_LOCK_MAX_MSEC := 4000
+# A shove that never lifts the craft off the ground frees the thrusters again after this long.
+const THRUST_LOCK_GROUNDED_MSEC := 500
+# After being shoved (Repulsor and friends - see apply_knockback_grace) a
+# landing this soon does no fall damage, so a craft thrown at a ramp keeps
+# flying instead of being killed by the impact speed. Tune freely.
+const KNOCKBACK_FALL_IMMUNITY := 0.5
 @export var SUSPENSION_RAY_LENGTH := 0.04
 @export var SUSPENSION_SPRING_STRENGTH := 7000.0
 @export var SUSPENSION_DAMPING := 100.0
@@ -36,7 +59,20 @@ var current_turn_speed = 0.0
 var body: RigidBody3D
 var stop_forces = false
 var _knockback_until_msec: int = 0
-var _airborne_velocity: Vector3 = Vector3.ZERO
+var _fall_immune_until_msec: int = 0
+var _airborne: bool = false
+# Downward speed in the last airborne tick - what the craft actually hit the ground at.
+var _last_air_down_speed: float = 0.0
+# Thrusters are locked from a shove until the craft next touches down (or this runs out), so a
+# Repulsor launch can't simply be rocketed out of. See _rockets_allowed.
+var _thrust_locked: bool = false
+var _stuck_since_msec: int = 0
+var _thrust_lock_msec: int = 0
+# Set while dead: the first touchdown after a respawn is just settling onto
+# the pad, never a fall.
+var _ignore_next_landing: bool = false
+var _fall_peak_y: float = 0.0
+var _air_start_msec: int = 0
 
 @onready var engine_audio_path = $"../Engine Sound"
 @onready var suspension_rays: Array[RayCast3D] = []
@@ -73,6 +109,10 @@ func _ready() -> void:
 		return
 	Utilities.set_allegiance(body, team)
 	body.angular_damp = 0.0
+	if is_multiplayer_authority():
+		# get_colliding_bodies() (impact detection) only works with this on.
+		body.contact_monitor = true
+		body.max_contacts_reported = 8
 	engine_audio = engine_audio_path as AudioStreamPlayer3D
 	if engine_audio and is_multiplayer_authority():
 		engine_audio.pitch_scale = target_pitch
@@ -175,35 +215,72 @@ func get_speed_ratio() -> float:
 
 
 
-func _handle_landing() -> void:
+func _track_fall() -> void:
+	var now := Time.get_ticks_msec()
+	var y := body.global_position.y
+	if _has_world_contact():
+		if _airborne:
+			_airborne = false
+			_thrust_locked = false
+			_on_landed(_fall_peak_y - y, now - _air_start_msec)
+		elif _thrust_locked and now - _thrust_lock_msec > THRUST_LOCK_GROUNDED_MSEC:
+			_thrust_locked = false
+	elif not _airborne:
+		_airborne = true
+		_fall_peak_y = y
+		_air_start_msec = now
+		_last_air_down_speed = maxf(0.0, -body.linear_velocity.y)
+	else:
+		_fall_peak_y = maxf(_fall_peak_y, y)
+		_last_air_down_speed = maxf(0.0, -body.linear_velocity.y)
+
+
+func _on_landed(fall_distance: float, air_msec: int) -> void:
+	if _ignore_next_landing:
+		_ignore_next_landing = false
+		return
+	if fall_distance <= 0.0 or air_msec < FALL_MIN_AIR_MSEC:
+		return
+	if Time.get_ticks_msec() < _fall_immune_until_msec:
+		return
 	var health_node = get_node_or_null("../health_node")
 	if health_node == null or not health_node.has_method("request_fall_damage"):
 		return
-	var space_state := body.get_world_3d().direct_space_state
-	var origin := body.global_position
-	var query := PhysicsRayQueryParameters3D.create(origin, origin + Vector3.DOWN * FALL_DAMAGE_RAY_LENGTH)
-	query.collision_mask = 1 << (Utilities.GROUP_LAYER_SCOPE["world"]["layer"] - 1)
-	var result := space_state.intersect_ray(query)
-	if result.is_empty():
-		return
-	var impact_speed = max(0.0, -_airborne_velocity.dot(result.normal))
+	var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
+	# The speed a drop from that height would reach - but never more than the speed the craft was actually
+	# doing when it touched down, so a rocket-assisted or otherwise gentle landing from a great height is not
+	# punished as if it were a free fall.
+	var impact_speed := minf(sqrt(2.0 * gravity * fall_distance), _last_air_down_speed)
 	if impact_speed <= 0.0:
 		return
-	# One path, not two - this used to branch (direct local call if already
-	# the server, rpc_id() otherwise), almost certainly because rpc_id(1,...)
-	# used to be a no-op when the caller's own peer id is 1 (i.e. whenever
-	# the HOST owns the landing craft) without call_local on
-	# request_fall_damage's own @rpc annotation. Now that it has call_local,
-	# a single rpc_id() call is correct either way - no reason for two
-	# different code paths to stay in sync for what's supposed to be one
-	# event.
+	# One path for host and clients: request_fall_damage is call_local, so
+	# rpc_id(1, ...) also works when this peer IS the server.
 	health_node.request_fall_damage.rpc_id(1, impact_speed)
 
 
+# Any contact with the world counts - wheels, floor sensor, or a roof/side
+# when upside down or tumbling.
+func _has_world_contact() -> bool:
+	if isGrounded or _touching_world():
+		return true
+	for ray in suspension_rays:
+		if ray.is_colliding():
+			return true
+	return false
 
+
+func _touching_world() -> bool:
+	var world_bit: int = 1 << (Utilities.GROUP_LAYER_SCOPE["world"]["layer"] - 1)
+	for other in body.get_colliding_bodies():
+		if other.collision_layer & world_bit:
+			return true
+	return false
 
 
 func apply_knockback_grace(duration: float = 1.5) -> void:
+	_thrust_locked = true
+	_thrust_lock_msec = Time.get_ticks_msec()
+	_fall_immune_until_msec = max(_fall_immune_until_msec, Time.get_ticks_msec() + int(KNOCKBACK_FALL_IMMUNITY * 1000.0))
 	_knockback_until_msec = max(_knockback_until_msec, Time.get_ticks_msec() + int(duration * 1000.0))
 
 
@@ -247,6 +324,10 @@ func _physics_process(delta: float) -> void:
 	var health_node = body.get_node_or_null("health_node")
 	if health_node and health_node.has_method("_is_destroyed"):
 		if health_node._is_destroyed:
+			# Whatever the corpse does (or the respawn teleport that follows)
+			# must never count as a fall.
+			_airborne = false
+			_ignore_next_landing = true
 			return
 	if stop_forces or stats == null:
 		return
@@ -263,12 +344,8 @@ func _physics_process(delta: float) -> void:
 	if not chatting:
 		forward_input = Input.get_action_strength("ui_down") - Input.get_action_strength("ui_up")
 		turn_input = Input.get_action_strength("ui_left") - Input.get_action_strength("ui_right")
-	var was_grounded := isGrounded
 	isGrounded = ground_check_area.get_overlapping_bodies().size() > 0
-	if isGrounded and not was_grounded:
-		_handle_landing()
-	elif not isGrounded:
-		_airborne_velocity = body.linear_velocity
+	_track_fall()
 	_apply_suspension_forces(forward_input)
 	if not chatting:
 		handle_turret_barrel_look()
@@ -276,9 +353,9 @@ func _physics_process(delta: float) -> void:
 			recentering = true
 	if recentering:
 		recenter_turret_barrel()
-	if not chatting and Input.is_action_pressed("unturtle"):
+	if not chatting and Input.is_action_pressed("rockets") and _rockets_allowed():
 		activate_thrusters(delta)
-	else:
+	elif not _unturtle(turn_input, delta):
 		if is_right_side_up() and isGrounded:
 			rotational_velocity_set_to_zero = false
 			adjust_rotation(turn_input, delta)
@@ -458,6 +535,39 @@ func _apply_suspension_forces(forward_input: float) -> void:
 
 
 
+
+
+# Rockets are allowed when the host has them on, the craft isn't locked out after a shove, and it
+# isn't mostly upside down.
+func _rockets_allowed() -> bool:
+	if not NetworkManager.rockets_enabled:
+		return false
+	if _thrust_locked and Time.get_ticks_msec() - _thrust_lock_msec < THRUST_LOCK_MAX_MSEC:
+		return false
+	return body.global_basis.y.dot(Vector3.UP) > ROCKET_MIN_UP_DOT
+
+
+# Rolls an overturned craft back over. Returns true when the craft is in that state (so normal
+# driving, which needs an upright craft, is skipped). Separate from the rockets on purpose: needs
+# no rocket, no host rule, and isn't blocked by the post-shove lock.
+func _unturtle(turn_input: float, delta: float) -> bool:
+	if is_right_side_up() or not _has_world_contact():
+		_stuck_since_msec = 0
+		return false
+	if body.linear_velocity.length() > UNTURTLE_SETTLED_SPEED:
+		_stuck_since_msec = 0
+		return true
+	var now := Time.get_ticks_msec()
+	if _stuck_since_msec == 0:
+		_stuck_since_msec = now
+	var direction := signf(turn_input)
+	if direction == 0.0 and now - _stuck_since_msec > UNTURTLE_AUTO_MSEC:
+		direction = 1.0
+	if direction != 0.0:
+		var roll_axis := -body.global_basis.z
+		body.apply_torque_impulse(roll_axis * direction * stats.rotation_speed * UNTURTLE_TORQUE_MULT * delta)
+		body.apply_central_force(Vector3.UP * stats.thruster_force * UNTURTLE_LIFT_RATIO)
+	return true
 
 
 func activate_thrusters(delta):

@@ -2,7 +2,9 @@ extends Node
 
 signal player_registered(peer_id: int, team: String)
 signal player_unregistered(peer_id: int)
-# peer_names changed - see match.gd::_sync_roster.
+# peer_names changed - see match.gd::_sync_roster. Emitted from match.gd, not in this class, hence the
+# annotation: Godot only looks for emits in the file that declares a signal.
+@warning_ignore("unused_signal")
 signal roster_changed
 signal host_started(address: String)
 signal host_failed(reason: String)
@@ -71,9 +73,15 @@ var mounted_map_file_id: int = -1
 var allowed_weapon_paths: Array[String] = []
 var day_night_enabled: bool = true
 # Server-only: seconds a shot-down base gun stays gone. Set by the host UI.
-var base_gun_respawn_seconds: float = 30.0
+# How long a shot-down base gun stays gone. A game rule, not a per-match setting.
+const BASE_GUN_RESPAWN_SECONDS := 30.0
+var base_gun_respawn_seconds: float = BASE_GUN_RESPAWN_SECONDS
 # Host rule, whether mines can be laid at all (clients get it via _assign_ruleset).
 var mines_enabled: bool = true
+# Host rule: rockets (the R key, movement.gd). Off = no rocket lift for anyone; flipping a craft over is separate and always works.
+var rockets_enabled: bool = true
+# MineSettings paths the host allows (see allowed_weapon_paths); empty = all.
+var allowed_mine_paths: Array[String] = []
 
 
 var _heartbeat_timer: Timer
@@ -117,6 +125,12 @@ func _ready() -> void:
 # errors on every call ("The multiplayer instance isn't currently active") when
 # a peer object exists but isn't connected - mid-connect, or a client still
 # sitting in the match after the host left - so the status check goes first.
+# True while there is a connected multiplayer peer at all (server or client). multiplayer.get_unique_id()
+# errors every call when a peer object exists but isn't connected, so per-frame code asks this first.
+func is_online() -> bool:
+	return multiplayer.has_multiplayer_peer() and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED
+
+
 func is_live_server() -> bool:
 	if not multiplayer.has_multiplayer_peer():
 		return false
@@ -199,7 +213,7 @@ func _clock_pong(client_time: float, server_clock: float) -> void:
 	_clock_synced = _clock_samples.size() >= 3
 
 
-func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] = [], day_night: bool = true, host_address_override: String = "", host_team: String = "team_red", port: int = DEFAULT_PORT, max_players: int = 20, public_game: bool = false, base_gun_respawn: float = 30.0, mines: bool = true) -> Error:
+func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] = [], day_night: bool = true, host_address_override: String = "", host_team: String = "team_red", port: int = DEFAULT_PORT, max_players: int = 20, public_game: bool = false, base_gun_respawn: float = BASE_GUN_RESPAWN_SECONDS, mines: bool = true, mine_paths: Array[String] = [], rockets: bool = true) -> Error:
 	peer = ENetMultiplayerPeer.new()
 	var err = peer.create_server(port, max_players)
 	if err != OK:
@@ -215,6 +229,8 @@ func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] 
 	day_night_enabled = day_night
 	base_gun_respawn_seconds = base_gun_respawn
 	mines_enabled = mines
+	allowed_mine_paths = mine_paths
+	rockets_enabled = rockets
 	# _get_local_ip() just takes whatever address the OS happens to list
 	# first, which isn't stable if there's more than one active adapter (a
 	# VPN, a virtual bridge, Wi-Fi and Ethernet both up) - that's picked a
@@ -305,7 +321,7 @@ func _on_peer_connected(peer_id: int) -> void:
 	# One match-wide ruleset, not per-peer, so this is a single targeted send
 	# rather than the backfill loop below - there's nothing to backfill, the
 	# host is the only one who ever sets it.
-	_assign_ruleset.rpc_id(peer_id, allowed_weapon_paths, day_night_enabled, mines_enabled)
+	_assign_ruleset.rpc_id(peer_id, allowed_weapon_paths, day_night_enabled, mines_enabled, allowed_mine_paths, rockets_enabled)
 	# Backfill the roster so the newly joined peer sees everyone already
 	# assigned before picking their own - no auto-assignment anymore, the new
 	# peer isn't in peer_teams at all until request_team() below succeeds, so
@@ -347,10 +363,12 @@ func _reject_team_request(reason: String) -> void:
 
 
 @rpc("authority", "call_local", "reliable")
-func _assign_ruleset(weapon_paths: Array, day_night: bool, mines: bool) -> void:
+func _assign_ruleset(weapon_paths: Array, day_night: bool, mines: bool, mine_paths: Array, rockets: bool) -> void:
 	allowed_weapon_paths.assign(weapon_paths)
 	day_night_enabled = day_night
 	mines_enabled = mines
+	allowed_mine_paths.assign(mine_paths)
+	rockets_enabled = rockets
 
 
 func _team_count(team: String) -> int:

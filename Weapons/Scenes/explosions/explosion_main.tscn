@@ -121,11 +121,9 @@ size = Vector2(0.1, 0.6)
 
 [node name="Explosion_Main" type="Node3D" unique_id=2133547461]
 script = ExtResource("4_4h2r5")
-duration = 1.0
-
-[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." unique_id=801616076]
-stream = ExtResource("9_04cjh")
-autoplay = true
+duration = 5.0
+sound = ExtResource("9_04cjh")
+one_shot_particles = true
 
 [node name="Explosion" type="GPUParticles3D" parent="." unique_id=1636963669]
 material_override = SubResource("StandardMaterial3D_yj4eb")
@@ -135,7 +133,7 @@ fixed_fps = 60
 process_material = SubResource("ParticleProcessMaterial_yj4eb")
 draw_pass_1 = SubResource("QuadMesh_rv8q1")
 script = ExtResource("4_4h2r5")
-duration = 0.75
+duration = 3.0
 
 [node name="Flash" type="OmniLight3D" parent="." unique_id=2050309136]
 light_color = Color(18.892157, 18.892157, 18.892157, 1)

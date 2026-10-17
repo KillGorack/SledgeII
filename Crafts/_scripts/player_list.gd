@@ -5,8 +5,8 @@ extends CenterContainer
 # HUD ever has one. Names come from NetworkManager.peer_names (pushed by the
 # server, see match.gd::_sync_roster), teams from NetworkManager.peer_teams.
 
-const COLUMN_WIDTH := 190.0
-# Scores are shown as "takedowns / wrecks" next to each name - unlabelled
+const COLUMN_WIDTH := 240.0
+# Scores are shown as "takedowns/wrecks bounty" next to each name - unlabelled
 # on screen until the names are settled.
 
 var _columns: Dictionary = {}
@@ -92,9 +92,12 @@ func _refresh() -> void:
 		label.clip_text = true
 		label.add_theme_color_override("font_color", color)
 		entry.add_child(label)
-		var score: Array = NetworkManager.peer_scores.get(peer_id, [0, 0])
+		var score: Array = NetworkManager.peer_scores.get(peer_id, [0, 0, 0])
 		var score_label := Label.new()
-		score_label.text = "%d / %d" % [score[0], score[1]]
+		# kills/deaths bounty, e.g. "0/7 2450"
+		score_label.text = "%d/%d %d" % [score[0], score[1], score[2] if score.size() > 2 else 0]
+		score_label.custom_minimum_size.x = 100.0
+		score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		score_label.add_theme_color_override("font_color", color)
 		entry.add_child(score_label)
 		_columns[team].add_child(entry)

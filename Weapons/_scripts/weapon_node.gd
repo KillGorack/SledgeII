@@ -45,9 +45,19 @@ var _shot_seq: int = 0
 # somewhere the craft plainly isn't.
 const MUZZLE_TOLERANCE := 4.0
 
+# The mines this craft can lay (Weapons/settings_mines/*.tres), filtered to the
+# host's choices at spawn like weapon_settings. change_specials cycles
+# current_mine_index. See Networking/mine_manager.gd.
+@export var mine_settings: Array[MineSettings] = []
+var current_mine_index: int = 0
+
 @onready var barrel: Node3D = get_node("../Turret/Barrel")
 @onready var power_node: Node3D = get_node("../power_node")
 @onready var chat: Control = get_node("../Hud_InGame/Chat")
+
+
+func current_mine() -> MineSettings:
+	return mine_settings[current_mine_index] if current_mine_index >= 0 and current_mine_index < mine_settings.size() else null
 
 
 func _ready() -> void:
@@ -68,14 +78,19 @@ func _physics_process(_delta: float) -> void:
 		return
 	# Mines are laid and blown by the server (mine_manager.gd); this is just
 	# the request.
+	if Input.is_action_just_pressed("change_specials", true) and not mine_settings.is_empty():
+		current_mine_index = (current_mine_index + 1) % mine_settings.size()
 	if Input.is_action_just_pressed("lay_mine") or Input.is_action_just_pressed("blow_mines"):
 		var match_node = get_tree().get_first_node_in_group("match")
 		if match_node and match_node.mines:
 			if Input.is_action_just_pressed("lay_mine"):
-				match_node.mines.request_lay_mine.rpc_id(1)
+				match_node.mines.request_lay_mine.rpc_id(1, current_mine_index)
 			else:
 				match_node.mines.request_blow_mines.rpc_id(1)
-	if Input.is_action_just_pressed("weapon_change"):
+	# weapon_change is Tab and change_specials is Shift+Tab. Godot ignores held
+	# modifiers by default, so Tab alone would also fire on Shift+Tab; exact_match
+	# makes each action fire only for its own exact key combination.
+	if Input.is_action_just_pressed("weapon_change", true):
 		switch_weapon()
 	var now = Time.get_ticks_msec() / 1000.0
 	if Input.is_action_pressed("fire_weapon") and now >= _client_next_fire_time:
@@ -114,7 +129,10 @@ func _physics_process(_delta: float) -> void:
 		# silently never happened.
 		if settings.projectile_recoil > 0 and get_parent() is RigidBody3D:
 			get_parent().apply_central_impulse(muzzle.basis.z.normalized() * settings.projectile_recoil)
-		request_fire.rpc_id(1, current_weapon_index, _shot_seq, muzzle)
+		# "reverso" held at the moment of firing flips this shot's hit force
+		# (push becomes pull) - the server decides what that means, see
+		# collision_handler.gd::reverse_force.
+		request_fire.rpc_id(1, current_weapon_index, _shot_seq, muzzle, Input.is_action_pressed("reverso"))
 
 
 func _muzzle_transform(settings: WeaponSettings) -> Transform3D:
@@ -178,7 +196,7 @@ func switch_weapon() -> void:
 
 
 @rpc("any_peer", "call_local", "reliable")
-func request_fire(weapon_index: int, shot_seq: int, client_muzzle: Transform3D) -> void:
+func request_fire(weapon_index: int, shot_seq: int, client_muzzle: Transform3D, reverse_force: bool = false) -> void:
 	if not multiplayer.is_server():
 		return
 	# any_peer, so without this any client could fire ANY craft's weapon by
@@ -186,14 +204,14 @@ func request_fire(weapon_index: int, shot_seq: int, client_muzzle: Transform3D) 
 	var sender := multiplayer.get_remote_sender_id()
 	if sender != get_multiplayer_authority():
 		return
-	if not _try_fire(weapon_index, shot_seq, client_muzzle, sender):
+	if not _try_fire(weapon_index, shot_seq, client_muzzle, sender, reverse_force):
 		# Tell the shooter to take back the shot it already predicted.
 		if sender != 1:
 			_fire_rejected.rpc_id(sender, shot_seq)
 
 
 # Server-only. Returns false if the shot is rejected for any reason.
-func _try_fire(weapon_index: int, shot_seq: int, client_muzzle: Transform3D, sender: int) -> bool:
+func _try_fire(weapon_index: int, shot_seq: int, client_muzzle: Transform3D, sender: int, reverse_force: bool = false) -> bool:
 	if weapon_index < 0 or weapon_index >= weapon_settings.size():
 		return false
 	var settings := weapon_settings[weapon_index]
@@ -257,7 +275,7 @@ func _try_fire(weapon_index: int, shot_seq: int, client_muzzle: Transform3D, sen
 	var fast_forward := 0.0
 	if sender != 1:
 		fast_forward = minf(match_node.peer_one_way_latency(sender), match_node.PROJECTILE_MAX_FAST_FORWARD)
-	match_node.spawn_projectile(path, team, muzzle, false, sender, shot_seq, fast_forward)
+	match_node.spawn_projectile(path, team, muzzle, false, sender, shot_seq, fast_forward, reverse_force)
 	return true
 
 

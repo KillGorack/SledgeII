@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="MineSettings" format=3 uid="uid://b8h0f655falxi"]
+
+[ext_resource type="PackedScene" uid="uid://c5y6qmv3cggb6" path="res://Weapons/Scenes/explosions/shockwave.tscn" id="1_bxn71"]
+[ext_resource type="AudioStream" uid="uid://bjr18hqat702y" path="res://Weapons/Sounds/Repulsor.mp3" id="2_bxn71"]
+[ext_resource type="PackedScene" uid="uid://m2yprlt7ell0" path="res://Weapons/Scenes/mines/land_mine_oct.tscn" id="3_bxn71"]
+[ext_resource type="Script" uid="uid://b0ajcemib05av" path="res://Weapons/_scripts/mine_settings.gd" id="4_vsy4t"]
+
+[resource]
+script = ExtResource("4_vsy4t")
+mine_name = "Force Mine"
+mine_lore = "No damage, all push. Launches whoever steps on it."
+max_count = 4
+explosive_force_distance = 10.0
+explosive_force = 325.0
+mine_prefab = ExtResource("3_bxn71")
+explosion_prefab = ExtResource("1_bxn71")
+explosion_sound = ExtResource("2_bxn71")

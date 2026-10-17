@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="MineSettings" format=3 uid="uid://c7vrxci754dlu"]
+
+[ext_resource type="PackedScene" uid="uid://c5y6qmv3cggb6" path="res://Weapons/Scenes/explosions/shockwave.tscn" id="1_dgfvb"]
+[ext_resource type="AudioStream" uid="uid://bfpc6t43o35qy" path="res://Weapons/Sounds/HitHard.wav" id="2_4ahpm"]
+[ext_resource type="PackedScene" uid="uid://by0j4sfh37xna" path="res://Weapons/Scenes/mines/land_mine_hex.tscn" id="3_vcrnr"]
+[ext_resource type="Script" uid="uid://b0ajcemib05av" path="res://Weapons/_scripts/mine_settings.gd" id="4_kypqt"]
+
+[resource]
+script = ExtResource("4_kypqt")
+mine_name = "Detno"
+mine_lore = "Your run of the mill general use mine. Set it and forget it."
+hit_points = 60.0
+explosive_force = 40.0
+mine_prefab = ExtResource("3_vcrnr")
+explosion_prefab = ExtResource("1_dgfvb")
+explosion_sound = ExtResource("2_4ahpm")

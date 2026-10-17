@@ -1,0 +1,17 @@
+[gd_scene format=3 uid="uid://m2yprlt7ell0"]
+
+[ext_resource type="Script" uid="uid://hrmv2kw11vxo" path="res://Weapons/_scripts/mine.gd" id="1_2o0vp"]
+[ext_resource type="Material" uid="uid://mcg6sqo4c1ig" path="res://Materials/PBR/digi_green.tres" id="2_010ne"]
+[ext_resource type="ArrayMesh" uid="uid://bdv6cdtm8wfj0" path="res://Models/Mine Octagon.obj" id="3_2o0vp"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_r1wdx"]
+
+[node name="Land_Mine" type="Area3D" unique_id=532984894]
+script = ExtResource("1_2o0vp")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=503172554]
+shape = SubResource("SphereShape3D_r1wdx")
+
+[node name="OctMine" type="MeshInstance3D" parent="." unique_id=719361631]
+material_override = ExtResource("2_010ne")
+mesh = ExtResource("3_2o0vp")
