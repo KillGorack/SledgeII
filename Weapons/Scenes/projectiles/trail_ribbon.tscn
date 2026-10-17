@@ -1,0 +1,38 @@
+[gd_scene format=3 uid="uid://cbbcjhhhvec5c"]
+
+[ext_resource type="Script" uid="uid://chokjov3awsjq" path="res://Weapons/_scripts/exhaust.gd" id="5_exh"]
+[ext_resource type="Script" uid="uid://bwdrqy4iifec4" path="res://_globals/twirl.gd" id="6_pplsq"]
+[ext_resource type="Script" uid="uid://dpr2qkc7glln2" path="res://Materials/Shaders/Trail3D.gd" id="7_nrnn8"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_x6uhk"]
+transparency = 1
+blend_mode = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_2d37w"]
+size = Vector2(0.001, 0.001)
+
+[node name="Exhaust" type="Node3D" unique_id=2031112470]
+script = ExtResource("5_exh")
+
+[node name="Spinner" type="Node3D" parent="." unique_id=2031112471]
+script = ExtResource("6_pplsq")
+spin_speed = 75.0
+enable_x = false
+enable_y = false
+
+[node name="TrailA" type="MeshInstance3D" parent="Spinner" unique_id=1135372619]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.025, 0, 0.19)
+material_override = SubResource("StandardMaterial3D_x6uhk")
+mesh = SubResource("PlaneMesh_2d37w")
+script = ExtResource("7_nrnn8")
+_lifeSpan = 0.35
+
+[node name="TrailB" type="MeshInstance3D" parent="Spinner" unique_id=1369374526]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.025, 0, 0.19)
+material_override = SubResource("StandardMaterial3D_x6uhk")
+mesh = SubResource("PlaneMesh_2d37w")
+script = ExtResource("7_nrnn8")
+_lifeSpan = 0.35

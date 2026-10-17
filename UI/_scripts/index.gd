@@ -19,23 +19,27 @@ var feedback_base_x: float
 @onready var txt_login: LineEdit = $"Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect/MarginContainer/TextureRect/MarginContainer/MarginContainer/VBoxContainer/hb_username/txt_username"
 @onready var txt_password: LineEdit = $"Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect/MarginContainer/TextureRect/MarginContainer/MarginContainer/VBoxContainer/hb_password/txt_password"
 @onready var btn_login: TextureButton = $"Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect/MarginContainer/TextureRect/MarginContainer/MarginContainer/VBoxContainer/HBoxContainer/btn_submit_login"
-@onready var world_list: Tree = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/LeftColumn/WorldList"
+@onready var world_list: Tree = %WorldList
+@onready var map_thumbnail: TextureRect = %MapThumbnail
+@onready var map_description: RichTextLabel = %MapDescription
 @onready var btn_host: Button = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/btn_host"
 @onready var game_list: Tree = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Join Game/MarginContainer/VBoxContainer/GameList"
 @onready var btn_refresh: Button = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Join Game/MarginContainer/VBoxContainer/btn_refresh"
 @onready var btn_join: Button = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Join Game/MarginContainer/VBoxContainer/btn_join"
 @onready var load_game_tabs: TabContainer = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer"
 @onready var game_list_poll_timer := Timer.new()
-@onready var day_night_check: CheckBox = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn/DayNightCheck"
-@onready var public_game_check: CheckBox = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn/PublicGameCheck"
+@onready var base_gun_respawn_spin: SpinBox = %BaseGunRespawnSpin
+@onready var mines_check: CheckBox = %MinesCheck
+@onready var day_night_check: CheckBox = %DayNightCheck
+@onready var public_game_check: CheckBox = %PublicGameCheck
 
 # Set by NetworkManager.port_forward_failed, read by _on_host_started - see
 # _on_host_pressed's comment for why this can't just be a set_ui_feedback()
 # call at the point it fires.
 var _pending_port_forward_warning: String = ""
-@onready var host_address_override: LineEdit = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn/HostAddressOverride"
-@onready var weapon_checklist: VBoxContainer = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn/WeaponChecklistScroll/WeaponChecklist"
-@onready var host_team_picker: OptionButton = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/HBoxContainer/RightColumn/HostTeamPicker"
+@onready var host_address_override: LineEdit = %HostAddressOverride
+@onready var weapon_checklist: VBoxContainer = %WeaponChecklist
+@onready var host_team_picker: OptionButton = %HostTeamPicker
 @onready var team_select_group: Control = $"Screen_layout/VBoxContainer/MarginContainer/Team Select"
 @onready var team_roster: VBoxContainer = $"Screen_layout/VBoxContainer/MarginContainer/Team Select/MarginContainer/VBoxContainer/TeamRoster"
 @onready var team_select_feedback: Label = $"Screen_layout/VBoxContainer/MarginContainer/Team Select/MarginContainer/VBoxContainer/TeamSelectFeedback"
@@ -168,6 +172,50 @@ func _on_level_selected():
 		selected_map_title = selected.get_text(0)
 		selected_map_file_id = int(selected.get_meta("fil_id", -1))
 		_last_selected_map_file_id = selected_map_file_id
+		_show_map_details(selected)
+
+
+# Same source the original Sledge uses for secret level thumbnails
+# (secret_levels.gd): the map's tan_id against the game_thumb download type.
+# Fetched on selection and cached, since flicking back through the list
+# shouldn't re-download. A map with no thumbnail just shows an empty frame.
+const THUMBNAIL_URL := "https://www.killgorack.com/PX4/downloader.php?ap=tanarusmaps&id=%s&type=game_thumb&cn=fls"
+var _thumb_request: HTTPRequest
+var _thumb_cache: Dictionary = {}
+
+
+func _show_map_details(row: TreeItem) -> void:
+	var description := str(row.get_meta("description", ""))
+	map_description.text = description if description != "" else "No description available."
+	var tan_id := int(row.get_meta("tan_id", -1))
+	if _thumb_cache.has(tan_id):
+		map_thumbnail.texture = _thumb_cache[tan_id]
+		return
+	map_thumbnail.texture = null
+	if tan_id < 0:
+		return
+	if _thumb_request == null:
+		_thumb_request = HTTPRequest.new()
+		add_child(_thumb_request)
+		_thumb_request.request_completed.connect(_on_thumbnail_loaded)
+	# Drops any request still in flight for a map that's no longer selected.
+	_thumb_request.cancel_request()
+	_thumb_request_id = tan_id
+	_thumb_request.request(THUMBNAIL_URL % str(tan_id))
+
+
+var _thumb_request_id: int = -1
+
+
+func _on_thumbnail_loaded(_result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
+	if response_code != 200:
+		return
+	var image := Image.new()
+	if image.load_png_from_buffer(body) != OK and image.load_jpg_from_buffer(body) != OK and image.load_webp_from_buffer(body) != OK:
+		return
+	var texture := ImageTexture.create_from_image(image)
+	_thumb_cache[_thumb_request_id] = texture
+	map_thumbnail.texture = texture
 
 
 func _on_game_selected():
@@ -230,7 +278,9 @@ func _on_host_pressed():
 		NetworkManager.TEAM_NAMES[host_team_picker.selected],
 		NetworkManager.DEFAULT_PORT,
 		20,
-		public_game_check.button_pressed
+		public_game_check.button_pressed,
+		base_gun_respawn_spin.value,
+		mines_check.button_pressed
 	)
 
 

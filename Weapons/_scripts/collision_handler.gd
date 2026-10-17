@@ -68,6 +68,7 @@ var _cosmetic_velocity := Vector3.ZERO
 var _position_error := Vector3.ZERO
 var _cosmetic_ended := false
 var _match_node: Node = null
+var _exhaust: ProjectileExhaust = null
 
 @onready var raycast: RayCast3D = $RayCast3D
 
@@ -95,7 +96,7 @@ func _ready() -> void:
 			_cosmetic_velocity = -global_transform.basis.z.normalized() * weapon_settings.projectile_speed
 	if weapon_settings:
 		_apply_projectile_color(weapon_settings.projectile_color)
-		_spawn_smoke_trail()
+		_spawn_exhaust()
 
 
 func _gravity() -> Vector3:
@@ -164,17 +165,21 @@ func _apply_projectile_color(color: Color) -> void:
 
 # Added as a sibling under get_parent() (same parent explosion/bullet-hole
 # effects use below), NOT as a child of this projectile - see
-# smoke_trail_prefab's own comment in weapon_settings.gd for why a
+# exhaust_prefab's own comment in weapon_settings.gd for why a
 # GPUParticles3D child would jitter with the replicated transform where
-# Trail3D doesn't. follow() makes the trail sample this projectile's
+# Trail3D doesn't. follow() makes the exhaust sample this projectile's
 # interpolated transform itself every frame instead, and keeps fading out
 # on its own after this projectile is gone.
-func _spawn_smoke_trail() -> void:
-	if not weapon_settings.smoke_trail_prefab or not get_parent():
+func _spawn_exhaust() -> void:
+	if not weapon_settings.exhaust_prefab or not get_parent():
 		return
-	var trail_instance = weapon_settings.smoke_trail_prefab.instantiate()
-	get_parent().add_child(trail_instance)
-	trail_instance.follow(self)
+	_exhaust = weapon_settings.exhaust_prefab.instantiate()
+	get_parent().add_child(_exhaust)
+	# Sibling, so _apply_projectile_color's walk of this projectile never
+	# reaches it - tint it the same way (opt-in per child, via
+	# apply_projectile_color()).
+	Utilities.apply_projectile_color_recursive(_exhaust, weapon_settings.projectile_color)
+	_exhaust.follow(self)
 
 
 # Same duck-typed walk as color above, for the same reason: rocket/laser/
@@ -183,6 +188,8 @@ func _spawn_smoke_trail() -> void:
 # Called from handle_ricochet() - see clear_trail() in Trail3D.gd for why.
 func _clear_trails() -> void:
 	_clear_trails_on(self)
+	if is_instance_valid(_exhaust):
+		_exhaust.clear_trails()
 
 
 func _clear_trails_on(node: Node) -> void:
@@ -510,7 +517,8 @@ func _apply_damage_to(body: Object, damage: float) -> void:
 		return
 	var health_node = body.get_node_or_null("health_node")
 	if health_node and health_node.has_method("apply_damage"):
-		health_node.apply_damage(damage, shooter_peer)
+		var cause: int = health_node.DeathCause.BASE_GUN if shooter_peer == 0 else health_node.DeathCause.WEAPON
+		health_node.apply_damage(damage, shooter_peer, cause)
 
 
 # Routed through the target's health_node instead of being applied straight

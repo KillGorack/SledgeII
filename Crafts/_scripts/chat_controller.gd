@@ -14,7 +14,7 @@ extends Control
 # hud_controller.gd/radar_controller.gd going through the "match" group
 # node rather than each other.
 @onready var line_edit: LineEdit = $Margin/VBox/LineEdit
-@onready var text_log: TextEdit = $Margin/VBox/TextEdit
+@onready var text_log: RichTextLabel = $Margin/VBox/TextEdit
 @onready var _match_node: Node = get_tree().get_first_node_in_group("match")
 
 var is_open: bool = false
@@ -69,5 +69,7 @@ func _on_submitted(text: String) -> void:
 # Called by match.gd::_broadcast_chat_message - public since that's a
 # different script driving this one, same shape as radar_controller.gd's
 # _color_for reading recon.captured_color from outside its own class.
-func receive_message(sender: String, text: String) -> void:
-	text_log.text += "%s: %s\n" % [sender, text]
+# The line arrives as finished BBCode (team-colored names, escaped text) -
+# the server builds it, see match.gd::_colored_name.
+func receive_line(line: String) -> void:
+	text_log.append_text(line + "\n")

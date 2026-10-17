@@ -1,5 +1,6 @@
 [gd_resource type="Resource" script_class="WeaponSettings" format=3 uid="uid://cooha1e6ktvx5"]
 
+[ext_resource type="PackedScene" uid="uid://cbbcjhhhvec5c" path="res://Weapons/Scenes/projectiles/trail_ribbon.tscn" id="1_1eydd"]
 [ext_resource type="PackedScene" uid="uid://dqu4r8p4yt5jp" path="res://Weapons/Scenes/explosions/sparks.tscn" id="1_p6lgk"]
 [ext_resource type="PackedScene" uid="uid://vdbvupiqax74" path="res://Weapons/Scenes/projectiles/plasma.tscn" id="2_1eydd"]
 [ext_resource type="Script" uid="uid://defwrtblkx02f" path="res://Weapons/_scripts/weapon_settings.gd" id="3_jqyat"]
@@ -7,12 +8,13 @@
 [resource]
 script = ExtResource("3_jqyat")
 weapon_name = "Base Gun"
-hit_points = 2.5
+hit_points = 10.0
 cool_down = 2.0
 projectile_prefab = ExtResource("2_1eydd")
 explosion_prefab = ExtResource("1_p6lgk")
+exhaust_prefab = ExtResource("1_1eydd")
 targeting_system = true
-target_rotation_speed = 12.0
+target_rotation_speed = 3.0
 target_system_scan_radius = 55.0
 projectile_range = 20.0
 projectile_speed = 25.0

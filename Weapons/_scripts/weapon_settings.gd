@@ -7,6 +7,11 @@ class_name WeaponSettings
 # at runtime (see UI/_scripts/index.gd and Networking/match.gd), never
 # written back to, since this Resource is shared/cached across every match.
 @export var default_available: bool = true
+# Which recon stations can refill this weapon's ammo (see weapon_node.gd::
+# refill_ammo). NEUTRAL: any station, whoever holds it. CAPTURED: only a
+# station captured by the craft's own team.
+enum ReloadOn { NEUTRAL, CAPTURED }
+@export var reload_on: ReloadOn = ReloadOn.NEUTRAL
 @export var hit_points: float = 0.0
 @export var crit_chance: float = 0.0
 @export var crit_multiplier: float = 1.0
@@ -25,16 +30,18 @@ class_name WeaponSettings
 @export_color_no_alpha var projectile_color: Color = Color.WHITE
 @export var explosion_prefab: PackedScene
 @export var bullet_hole_prefab: PackedScene
-# Continuous smoke trail (e.g. AP Shell) rather than explosion/bullet_hole's
-# one-shot cosmetics - spawned as a sibling of the projectile, not a child of
-# it, and tracks it every frame via smoke_trail.gd's own follow() rather than
-# normal scene-tree transform inheritance. See collision_handler.gd::_ready -
-# a GPUParticles3D actually parented under the projectile only sees its raw,
+# Continuous exhaust/trail effect (smoke, sparks, glow...) rather than
+# explosion/bullet_hole's one-shot cosmetics. The scene's root must carry
+# exhaust.gd (ProjectileExhaust); put any number of GPUParticles3D under it
+# to combine effects. Instanced as a sibling of the projectile, not a child,
+# and tracks it every frame via follow() rather than normal scene-tree
+# transform inheritance. See collision_handler.gd::_spawn_exhaust - a
+# GPUParticles3D actually parented under the projectile only sees its raw,
 # stepped replicated transform (unlike Trail3D, which samples
 # get_global_transform_interpolated() itself), so puffs would clump and jump
 # with every network update instead of trailing smoothly. Being a sibling
-# also lets the trail keep fading out after the projectile itself is freed.
-@export var smoke_trail_prefab: PackedScene
+# also lets the exhaust keep fading out after the projectile itself is freed.
+@export var exhaust_prefab: PackedScene
 
 @export var launch_sound: AudioStream
 @export var hit_sound: AudioStream

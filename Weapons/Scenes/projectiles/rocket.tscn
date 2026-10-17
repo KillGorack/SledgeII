@@ -2,24 +2,12 @@
 
 [ext_resource type="Material" uid="uid://nlfneyr4a2pn" path="res://Materials/PBR/rocket.tres" id="1_fmkds"]
 [ext_resource type="Script" uid="uid://75sa32sebpqn" path="res://Weapons/_scripts/collision_handler.gd" id="1_x6uhk"]
-[ext_resource type="Script" uid="uid://dpr2qkc7glln2" path="res://Materials/Shaders/Trail3D.gd" id="3_2d37w"]
-[ext_resource type="Script" uid="uid://bwdrqy4iifec4" path="res://_globals/twirl.gd" id="3_ddvmj"]
-[ext_resource type="Script" path="res://Materials/Shaders/colorable_mesh.gd" id="4_cmesh"]
-[ext_resource type="Script" path="res://Materials/Shaders/colorable_light.gd" id="4_clight"]
 [ext_resource type="ArrayMesh" uid="uid://ccndq1ey68q6u" path="res://Models/hornet.obj" id="3_x6uhk"]
+[ext_resource type="Script" uid="uid://l07kt7adidgn" path="res://Materials/Shaders/colorable_light.gd" id="4_clight"]
+[ext_resource type="Script" uid="uid://bmv00hvqj3l1f" path="res://Materials/Shaders/colorable_mesh.gd" id="4_cmesh"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_fmkds"]
 radius = 0.05
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_x6uhk"]
-transparency = 1
-blend_mode = 1
-cull_mode = 2
-shading_mode = 0
-vertex_color_use_as_albedo = true
-
-[sub_resource type="PlaneMesh" id="PlaneMesh_2d37w"]
-size = Vector2(0.001, 0.001)
 
 [node name="Rocket" type="RigidBody3D" unique_id=585907524]
 continuous_cd = true
@@ -39,25 +27,5 @@ shape = SubResource("SphereShape3D_fmkds")
 target_position = Vector3(0, 0, -1)
 
 [node name="OmniLight3D" type="OmniLight3D" parent="." unique_id=1739243305]
-script = ExtResource("4_clight")
 omni_range = 2.0
-
-[node name="Spinner" type="Node3D" parent="." unique_id=466324465]
-script = ExtResource("3_ddvmj")
-spin_speed = 75.0
-enable_x = false
-enable_y = false
-
-[node name="TrailA" type="MeshInstance3D" parent="Spinner" unique_id=1863005693]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.075, 0, 0.19)
-material_override = SubResource("StandardMaterial3D_x6uhk")
-mesh = SubResource("PlaneMesh_2d37w")
-script = ExtResource("3_2d37w")
-_lifeSpan = 0.35
-
-[node name="TrailB" type="MeshInstance3D" parent="Spinner" unique_id=1452047774]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.075, 0, 0.19)
-material_override = SubResource("StandardMaterial3D_x6uhk")
-mesh = SubResource("PlaneMesh_2d37w")
-script = ExtResource("3_2d37w")
-_lifeSpan = 0.35
+script = ExtResource("4_clight")

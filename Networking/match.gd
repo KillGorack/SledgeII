@@ -50,6 +50,16 @@ const SELF_RENDER_LAYER := 20
 # nothing else in the scene ever competes with it for "current".
 @onready var local_camera: Camera3D = $LocalCamera
 
+# Kill feed phrases, picked at random per defeat - see _announce_defeat.
+const DEFEAT_VERBS := ["kiboshed", "slayed", "wrecked", "obliterated", "demolished", "flattened", "vanquished", "scrapped", "annihilated", "dispatched", "trounced", "decommissioned", "pulverized", "toppled"]
+const DEFEAT_SHOVED := ["%s sent %s plummeting to their doom", "%s knocked %s into the abyss", "%s launched %s into oblivion", "%s sent %s to a long, fatal fall"]
+const DEFEAT_SELF := ["blew themselves up", "self-destructed", "was undone by their own hand", "met an explosive end"]
+const DEFEAT_FALL := ["took a fatal tumble", "met the ground a little too hard", "forgot how landings work", "was flattened by gravity", "fell to their doom"]
+const DEFEAT_VOID := ["fell off the world", "tumbled into the abyss", "drove off the edge of existence"]
+const DEFEAT_MINE := ["%s blew %s sky-high with a mine", "%s caught %s with a mine", "%s left a mine for %s"]
+const DEFEAT_STEPPED := ["stepped on a mine", "found a mine the hard way"]
+const DEFEAT_BASE_GUN := ["was blasted by a base gun", "wandered into a base gun's sights", "was vaporized by base defenses", "got on the wrong end of a base gun"]
+
 var _spawned_peers: Dictionary = {}
 # Server-only: peer_id -> username, for the join/leave lines in chat. Filled
 # from _notify_ready, so it only holds peers who actually made it into the
@@ -103,6 +113,7 @@ const SPAWN_HEIGHT_OFFSET := 0.3
 const BASE_GUN_SCENE := preload("res://Game_Objects/base_gun.tscn")
 const BASE_GUN_GRID_SPACING := 3.0
 const BASE_GUN_HEIGHT_ABOVE_PAD := 4.0
+const RECON_GUN_HEIGHT := 2.0
 
 # Per-team hull/turret material for lightning.tscn's Hull and Turret meshes
 # (see _spawn_craft) - deliberately separate resources rather than one shared
@@ -151,6 +162,8 @@ var _capturing_recons: Dictionary = {}
 # when it spawns (see _spawn_craft's own-craft branch), same moment
 # _attach_local_camera runs.
 var _my_craft: Node3D = null
+# Lays/blows/replicates mines - see mine_manager.gd.
+var mines: MineManager = null
 # This peer's own copy of env.tscn (see _apply_custom_environment) - kept so
 # _notify_ready can immediately hand a freshly-ready peer the server's
 # current time_of_day, rather than making them wait for env.gd's own
@@ -163,6 +176,9 @@ var _pending_unfreeze: Array = []
 
 func _ready() -> void:
 	add_to_group("match")
+	mines = MineManager.new()
+	mines.name = "MineManager"
+	add_child(mines)
 	local_camera.current = true
 	local_camera.cull_mask = ((1 << 20) - 1) & ~(1 << (SELF_RENDER_LAYER - 1))
 	spawner.spawn_function = _spawn_craft
@@ -266,11 +282,28 @@ func _unhandled_input(event: InputEvent) -> void:
 func _send_chat_message(sender: String, text: String) -> void:
 	if not multiplayer.is_server():
 		return
-	_broadcast_chat_message.rpc(sender, text)
+	# Remote sender id is 0 when the host calls this on itself.
+	var sender_id := multiplayer.get_remote_sender_id()
+	if sender_id == 0:
+		sender_id = 1
+	var chat_name: String = _peer_names.get(sender_id, sender)
+	_broadcast_chat_message.rpc("%s: %s" % [_colored_name(sender_id, chat_name), _bb_escape(text)])
+
+
+# BBCode for a name tinted with its peer's team color (white if no team yet).
+func _colored_name(peer_id: int, display_name: String) -> String:
+	var team: String = NetworkManager.peer_teams.get(peer_id, "")
+	var color := ReconStation.render_color_for_team(team)
+	return "[color=#%s]%s[/color]" % [color.to_html(false), _bb_escape(display_name)]
+
+
+# Player-supplied text must not be able to inject tags.
+func _bb_escape(text: String) -> String:
+	return text.replace("[", "[lb]")
 
 
 @rpc("authority", "call_local", "reliable")
-func _broadcast_chat_message(sender: String, text: String) -> void:
+func _broadcast_chat_message(line: String) -> void:
 	# Each peer only has its OWN craft's Chat visible (see hud_controller.gd
 	# hiding the whole HUD for every non-owning copy) - find and deliver to
 	# just that one rather than every craft's (mostly invisible) chat log.
@@ -279,7 +312,7 @@ func _broadcast_chat_message(sender: String, text: String) -> void:
 		return
 	var chat := my_craft.get_node_or_null("Hud_InGame/Chat")
 	if chat:
-		chat.receive_message(sender, text)
+		chat.receive_line(line)
 
 
 # Client-supplied, so keep it to one short line.
@@ -308,9 +341,9 @@ func _sync_roster(names: Dictionary, scores: Dictionary) -> void:
 # player ("Name: has entered the arena."). Only to peers whose match has
 # loaded - a broadcast would also hit peers still loading, which have no Match
 # node to receive it on.
-func _announce(sender: String, text: String) -> void:
+func _announce(line: String) -> void:
 	for peer_id in _ready_peers.keys():
-		_broadcast_chat_message.rpc_id(peer_id, sender, text)
+		_broadcast_chat_message.rpc_id(peer_id, line)
 
 
 func _exit_to_main_menu() -> void:
@@ -496,6 +529,13 @@ func _spawn_recon_stations(map_instance: Node) -> void:
 		# Crafts/_scripts/power_node.gd.
 		station.add_to_group("Recon")
 		anchor.add_child(station)
+		# Every station carries a gun of its own, hovering above the pad - it
+		# works for whichever team holds the station (see base_gun.gd::recon).
+		var gun := BASE_GUN_SCENE.instantiate()
+		gun.name = "ReconGun"
+		gun.recon = station
+		gun.position = Vector3.UP * RECON_GUN_HEIGHT
+		station.add_child(gun)
 
 
 func _find_named_node(node: Node, target_name: String) -> Node:
@@ -574,7 +614,7 @@ func _notify_ready(username: String = "") -> void:
 	_ready_peers[requester_id] = true
 	var display_name := _clean_name(username, requester_id)
 	_peer_names[requester_id] = display_name
-	_announce(display_name, "has entered the arena.")
+	_announce("%s has entered the arena." % _colored_name(requester_id, display_name))
 	_push_roster()
 	for other_peer_id in _spawned_peers.keys():
 		var craft = craft_container.get_node_or_null("Craft_%d" % other_peer_id)
@@ -602,6 +642,11 @@ func _notify_ready(username: String = "") -> void:
 		if recon.changeable and recon.captured_color != ReconStation.StationColor.NONE:
 			var team := ReconStation.team_for_color(recon.captured_color)
 			_sync_recon_capture.rpc_id(requester_id, get_path_to(recon), team)
+	# ...and every gun currently shot down, so it isn't standing there for them.
+	mines.sync_to(requester_id)
+	for gun in get_tree().get_nodes_in_group("BaseGunAll"):
+		if gun.is_dead:
+			gun._sync_dead.rpc_id(requester_id)
 
 
 # MultiplayerSpawner defers to a spawned node's own MultiplayerSynchronizer to
@@ -675,8 +720,9 @@ func _on_player_unregistered(peer_id: int) -> void:
 	_ready_peers.erase(peer_id)
 	if not multiplayer.is_server():
 		return
+	mines.remove_player_mines(peer_id)
 	if _peer_names.has(peer_id):
-		_announce(_peer_names[peer_id], "has left the arena.")
+		_announce("%s has left the arena." % _colored_name(peer_id, _peer_names[peer_id]))
 		_peer_names.erase(peer_id)
 		_peer_scores.erase(peer_id)
 		_push_roster()
@@ -811,8 +857,7 @@ func _spawn_base_guns(team: String, pads: Array) -> void:
 			# (the origin), not its actual grid slot.
 			gun.position = center + offset
 			base_guns_container.add_child(gun)
-			gun.team = team
-			gun.set_team_color(ReconStation.render_color_for_team(team))
+			gun.set_team(team)
 			# radar_controller.gd finds these the same generic group-based way
 			# it finds crafts/recon stations.
 			gun.add_to_group("BaseGun")
@@ -866,7 +911,7 @@ func _start_capture_request(requester_id: int, recon_path: NodePath) -> void:
 
 func _find_available_gun(team: String) -> Node:
 	for gun in _base_guns_by_team.get(team, []):
-		if not gun.is_busy:
+		if not gun.is_busy and not gun.is_dead:
 			return gun
 	return null
 
@@ -887,6 +932,10 @@ func _run_capture(gun_path: NodePath, recon_path: NodePath, team: String) -> voi
 		return
 	gun.begin_capture(recon, func():
 		recon.capture(team)
+		if multiplayer.is_server():
+			_capturing_recons.erase(recon)
+	, func():
+		# The gun was shot down mid-flight - recon is left as it was.
 		if multiplayer.is_server():
 			_capturing_recons.erase(recon)
 	)
@@ -1278,6 +1327,35 @@ func _record_defeat(peer_id: int, attacker_id: int) -> void:
 	_push_roster()
 
 
+# Server-only. Kill feed line in chat, e.g. "KillGorack kiboshed Webmaster".
+func _announce_defeat(peer_id: int, attacker_id: int, cause: int) -> void:
+	var victim := _colored_name(peer_id, _peer_names.get(peer_id, "Player %d" % peer_id))
+	var has_killer := attacker_id != 0 and _peer_names.has(attacker_id)
+	var killer := _colored_name(attacker_id, _peer_names[attacker_id]) if has_killer else ""
+	var line: String
+	match cause:
+		HealthNode.DeathCause.MINE:
+			if has_killer:
+				line = DEFEAT_MINE.pick_random() % [killer, victim]
+			else:
+				line = "%s %s" % [victim, DEFEAT_STEPPED.pick_random()]
+		HealthNode.DeathCause.BASE_GUN:
+			line = "%s %s" % [victim, DEFEAT_BASE_GUN.pick_random()]
+		HealthNode.DeathCause.FALL, HealthNode.DeathCause.VOID:
+			if has_killer:
+				line = DEFEAT_SHOVED.pick_random() % [killer, victim]
+			elif cause == HealthNode.DeathCause.FALL:
+				line = "%s %s" % [victim, DEFEAT_FALL.pick_random()]
+			else:
+				line = "%s %s" % [victim, DEFEAT_VOID.pick_random()]
+		_:
+			if has_killer:
+				line = "%s %s %s" % [killer, DEFEAT_VERBS.pick_random(), victim]
+			else:
+				line = "%s %s" % [victim, DEFEAT_SELF.pick_random()]
+	_announce(line)
+
+
 func _tint_emissive(mesh_instance: MeshInstance3D, color: Color) -> void:
 	var mat := mesh_instance.material_override
 	if not (mat is StandardMaterial3D):
@@ -1288,9 +1366,10 @@ func _tint_emissive(mesh_instance: MeshInstance3D, color: Color) -> void:
 	mesh_instance.material_override = mat
 
 
-func _on_craft_defeated(peer_id: int, attacker_id: int) -> void:
+func _on_craft_defeated(peer_id: int, attacker_id: int, cause: int) -> void:
 	if not multiplayer.is_server():
 		return
+	_announce_defeat(peer_id, attacker_id, cause)
 	_record_defeat(peer_id, attacker_id)
 	await get_tree().create_timer(RESPAWN_DELAY).timeout
 	if not NetworkManager.peer_teams.has(peer_id):

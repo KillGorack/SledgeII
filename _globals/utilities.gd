@@ -37,22 +37,22 @@ const GROUP_LAYER_SCOPE = {
 	# mechanism collision_handler.gd relies on, same as the old 2-team setup.
 	"projectile_team_red": {
 		"layer": 7,
-		"layer_mask": [2, 4, 5, 6],
+		"layer_mask": [2, 4, 5, 6, 12, 13, 14],
 		"target_groups": ["team_green", "team_blue", "team_gray"]
 	},
 	"projectile_team_green": {
 		"layer": 8,
-		"layer_mask": [2, 3, 5, 6],
+		"layer_mask": [2, 3, 5, 6, 11, 13, 14],
 		"target_groups": ["team_red", "team_blue", "team_gray"]
 	},
 	"projectile_team_blue": {
 		"layer": 9,
-		"layer_mask": [2, 3, 4, 6],
+		"layer_mask": [2, 3, 4, 6, 11, 12, 14],
 		"target_groups": ["team_red", "team_green", "team_gray"]
 	},
 	"projectile_team_gray": {
 		"layer": 10,
-		"layer_mask": [2, 3, 4, 5],
+		"layer_mask": [2, 3, 4, 5, 11, 12, 13],
 		"target_groups": ["team_red", "team_green", "team_blue"]
 	}
 }
@@ -141,6 +141,10 @@ func collect_bodies(space_state: PhysicsDirectSpaceState3D, origin: Vector3, n: 
 		if GROUP_LAYER_SCOPE.has(group_name):
 			var layer: int = GROUP_LAYER_SCOPE[group_name]["layer"]
 			mask |= 1 << (layer - 1)
+			# Base guns' hit bodies (base_gun.gd::HIT_LAYER_OFFSET) sit on
+			# their own layers, so splash has to look there too.
+			if group_name.begins_with("team_"):
+				mask |= 1 << (layer + 8 - 1)
 	if mask == 0:
 		mask = 0x7fffffff
 	query.collision_mask = mask

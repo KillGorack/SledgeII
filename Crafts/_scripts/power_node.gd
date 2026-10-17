@@ -44,7 +44,8 @@ func _process(delta: float) -> void:
 			continue
 		var distance = body.global_position.distance_to(recon.global_position)
 		if distance <= stats.max_effect_distance:
-			var closeness = 1.0 - (distance / stats.max_effect_distance)
+			var t: float = distance / stats.max_effect_distance
+			var closeness: float = stats.power_falloff_curve.sample_baked(t) if stats.power_falloff_curve else 1.0 - t
 			var rate = stats.power_gain_rate * closeness * delta
 			total_gain += rate if recon.captured_color == my_color else -rate
 	current_power = clamp(current_power + total_gain, 0.0, stats.power_capacity)

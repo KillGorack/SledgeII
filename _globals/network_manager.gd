@@ -70,6 +70,11 @@ var mounted_map_file_id: int = -1
 # match.gd's use of these two fields.
 var allowed_weapon_paths: Array[String] = []
 var day_night_enabled: bool = true
+# Server-only: seconds a shot-down base gun stays gone. Set by the host UI.
+var base_gun_respawn_seconds: float = 30.0
+# Server-only: host rule, whether mines can be laid at all.
+var mines_enabled: bool = true
+
 
 var _heartbeat_timer: Timer
 
@@ -194,7 +199,7 @@ func _clock_pong(client_time: float, server_clock: float) -> void:
 	_clock_synced = _clock_samples.size() >= 3
 
 
-func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] = [], day_night: bool = true, host_address_override: String = "", host_team: String = "team_red", port: int = DEFAULT_PORT, max_players: int = 20, public_game: bool = false) -> Error:
+func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] = [], day_night: bool = true, host_address_override: String = "", host_team: String = "team_red", port: int = DEFAULT_PORT, max_players: int = 20, public_game: bool = false, base_gun_respawn: float = 30.0, mines: bool = true) -> Error:
 	peer = ENetMultiplayerPeer.new()
 	var err = peer.create_server(port, max_players)
 	if err != OK:
@@ -208,6 +213,8 @@ func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] 
 	peer_teams = {1: host_team}
 	allowed_weapon_paths = weapon_paths
 	day_night_enabled = day_night
+	base_gun_respawn_seconds = base_gun_respawn
+	mines_enabled = mines
 	# _get_local_ip() just takes whatever address the OS happens to list
 	# first, which isn't stable if there's more than one active adapter (a
 	# VPN, a virtual bridge, Wi-Fi and Ethernet both up) - that's picked a

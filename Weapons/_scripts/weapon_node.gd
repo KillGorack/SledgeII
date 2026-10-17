@@ -66,6 +66,15 @@ func _physics_process(_delta: float) -> void:
 	# chat_controller.gd::is_open, same reasoning as movement.gd.
 	if chat.is_open:
 		return
+	# Mines are laid and blown by the server (mine_manager.gd); this is just
+	# the request.
+	if Input.is_action_just_pressed("lay_mine") or Input.is_action_just_pressed("blow_mines"):
+		var match_node = get_tree().get_first_node_in_group("match")
+		if match_node and match_node.mines:
+			if Input.is_action_just_pressed("lay_mine"):
+				match_node.mines.request_lay_mine.rpc_id(1)
+			else:
+				match_node.mines.request_blow_mines.rpc_id(1)
 	if Input.is_action_just_pressed("weapon_change"):
 		switch_weapon()
 	var now = Time.get_ticks_msec() / 1000.0
@@ -145,12 +154,15 @@ func is_on_cooldown() -> bool:
 # contributes nothing, and projectile_count_capacity == 0 ("unlimited", same
 # convention as power_consumption == 0) is skipped entirely below, same as it
 # always was, so power weapons never count toward this either.
-func refill_ammo() -> bool:
+func refill_ammo(station_color: int = ReconStation.StationColor.NONE) -> bool:
 	var refilled: Array = _ammo_remaining.duplicate()
 	var gained_ammo := false
+	var station_is_mine: bool = station_color != ReconStation.StationColor.NONE and station_color == ReconStation.color_for_team(team)
 	for i in range(weapon_settings.size()):
 		var settings := weapon_settings[i]
 		if settings and settings.projectile_count_capacity != 0:
+			if settings.reload_on == WeaponSettings.ReloadOn.CAPTURED and not station_is_mine:
+				continue
 			if refilled[i] < settings.projectile_count_capacity:
 				gained_ammo = true
 			refilled[i] = settings.projectile_count_capacity

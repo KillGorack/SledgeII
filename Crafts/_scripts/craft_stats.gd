@@ -43,4 +43,9 @@ class_name CraftStats
 @export var power_capacity: float = 100.0
 @export var power_gain_rate: float = 10.0
 @export var max_effect_distance: float = 25.0
+# Optional taper for the recon charge rate: x = distance from the station as a
+# fraction of max_effect_distance (0 = epicenter, 1 = edge), y = fraction of
+# power_gain_rate gained there. Empty = straight line from full at the
+# epicenter to nothing at the edge.
+@export var power_falloff_curve: Curve
  
