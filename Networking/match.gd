@@ -414,6 +414,8 @@ func _on_server_disconnected() -> void:
 # exits here just avoid a doomed RPC round trip for an obviously bad attempt
 # (not standing in a capturable pad, or it's already your own color).
 func _try_start_capture() -> void:
+	if not NetworkManager.recon_capture_enabled:
+		return
 	if _my_craft == null or not NetworkManager.peer_teams.has(multiplayer.get_unique_id()):
 		return
 	var my_team: String = NetworkManager.peer_teams[multiplayer.get_unique_id()]
@@ -921,6 +923,8 @@ func _request_capture(recon_path: NodePath) -> void:
 # plus the two things only the server can know: whether this recon already
 # has a capture in flight, and which of the team's 9 guns (if any) is free.
 func _start_capture_request(requester_id: int, recon_path: NodePath) -> void:
+	if not NetworkManager.recon_capture_enabled:
+		return
 	if not NetworkManager.peer_teams.has(requester_id):
 		return
 	var team: String = NetworkManager.peer_teams[requester_id]

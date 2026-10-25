@@ -2,12 +2,15 @@
 
 [ext_resource type="PackedScene" uid="uid://c5y6qmv3cggb6" path="res://Weapons/Scenes/explosions/shockwave.tscn" id="1_bxn71"]
 [ext_resource type="AudioStream" uid="uid://bjr18hqat702y" path="res://Weapons/Sounds/Repulsor.mp3" id="2_bxn71"]
+[ext_resource type="Texture2D" uid="uid://bts8ktk4cxw74" path="res://Weapons/icons/mine.png" id="3_4bgul"]
 [ext_resource type="PackedScene" uid="uid://m2yprlt7ell0" path="res://Weapons/Scenes/mines/land_mine_oct.tscn" id="3_bxn71"]
 [ext_resource type="Script" uid="uid://b0ajcemib05av" path="res://Weapons/_scripts/mine_settings.gd" id="4_vsy4t"]
 
 [resource]
 script = ExtResource("4_vsy4t")
 mine_name = "Force Mine"
+mine_icon = ExtResource("3_4bgul")
+mine_color = Color(0, 0.5372549, 1, 1)
 mine_lore = "No damage, all push. Launches whoever steps on it."
 max_count = 4
 explosive_force_distance = 10.0

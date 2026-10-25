@@ -6,10 +6,12 @@
 [ext_resource type="PackedScene" uid="uid://b2vljciuo54jp" path="res://Weapons/Scenes/projectiles/laser.tscn" id="2_fltvq"]
 [ext_resource type="PackedScene" uid="uid://cbbcjhhhvec5c" path="res://Weapons/Scenes/projectiles/trail_ribbon.tscn" id="2_jcek8"]
 [ext_resource type="AudioStream" uid="uid://d4kvrtidstm8e" path="res://Weapons/Sounds/laser5.mp3" id="3_gd237"]
+[ext_resource type="Texture2D" uid="uid://c4f4umlg3diaj" path="res://Weapons/icons/missile.png" id="7_i7783"]
 
 [resource]
 script = ExtResource("1_l7uby")
 weapon_name = "MK IV"
+weapon_icon = ExtResource("7_i7783")
 hit_points = 25.0
 power_consumption = 5.0
 projectile_prefab = ExtResource("2_fltvq")

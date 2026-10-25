@@ -80,6 +80,9 @@ var base_gun_respawn_seconds: float = BASE_GUN_RESPAWN_SECONDS
 var mines_enabled: bool = true
 # Host rule: rockets (the R key, movement.gd). Off = no rocket lift for anyone; flipping a craft over is separate and always works.
 var rockets_enabled: bool = true
+# Host rule: whether recons can be captured (capture_recon, match.gd). Off = they
+# stay as the map left them; healing and resupply at them still work.
+var recon_capture_enabled: bool = true
 # MineSettings paths the host allows (see allowed_weapon_paths); empty = all.
 var allowed_mine_paths: Array[String] = []
 
@@ -213,7 +216,7 @@ func _clock_pong(client_time: float, server_clock: float) -> void:
 	_clock_synced = _clock_samples.size() >= 3
 
 
-func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] = [], day_night: bool = true, host_address_override: String = "", host_team: String = "team_red", port: int = DEFAULT_PORT, max_players: int = 20, public_game: bool = false, base_gun_respawn: float = BASE_GUN_RESPAWN_SECONDS, mines: bool = true, mine_paths: Array[String] = [], rockets: bool = true) -> Error:
+func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] = [], day_night: bool = true, host_address_override: String = "", host_team: String = "team_red", port: int = DEFAULT_PORT, max_players: int = 20, public_game: bool = false, base_gun_respawn: float = BASE_GUN_RESPAWN_SECONDS, mines: bool = true, mine_paths: Array[String] = [], rockets: bool = true, recon_capture: bool = true) -> Error:
 	peer = ENetMultiplayerPeer.new()
 	var err = peer.create_server(port, max_players)
 	if err != OK:
@@ -231,6 +234,7 @@ func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] 
 	mines_enabled = mines
 	allowed_mine_paths = mine_paths
 	rockets_enabled = rockets
+	recon_capture_enabled = recon_capture
 	# _get_local_ip() just takes whatever address the OS happens to list
 	# first, which isn't stable if there's more than one active adapter (a
 	# VPN, a virtual bridge, Wi-Fi and Ethernet both up) - that's picked a
@@ -321,7 +325,7 @@ func _on_peer_connected(peer_id: int) -> void:
 	# One match-wide ruleset, not per-peer, so this is a single targeted send
 	# rather than the backfill loop below - there's nothing to backfill, the
 	# host is the only one who ever sets it.
-	_assign_ruleset.rpc_id(peer_id, allowed_weapon_paths, day_night_enabled, mines_enabled, allowed_mine_paths, rockets_enabled)
+	_assign_ruleset.rpc_id(peer_id, allowed_weapon_paths, day_night_enabled, mines_enabled, allowed_mine_paths, rockets_enabled, recon_capture_enabled)
 	# Backfill the roster so the newly joined peer sees everyone already
 	# assigned before picking their own - no auto-assignment anymore, the new
 	# peer isn't in peer_teams at all until request_team() below succeeds, so
@@ -363,12 +367,13 @@ func _reject_team_request(reason: String) -> void:
 
 
 @rpc("authority", "call_local", "reliable")
-func _assign_ruleset(weapon_paths: Array, day_night: bool, mines: bool, mine_paths: Array, rockets: bool) -> void:
+func _assign_ruleset(weapon_paths: Array, day_night: bool, mines: bool, mine_paths: Array, rockets: bool, recon_capture: bool) -> void:
 	allowed_weapon_paths.assign(weapon_paths)
 	day_night_enabled = day_night
 	mines_enabled = mines
 	allowed_mine_paths.assign(mine_paths)
 	rockets_enabled = rockets
+	recon_capture_enabled = recon_capture
 
 
 func _team_count(team: String) -> int:

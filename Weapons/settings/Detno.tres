@@ -7,10 +7,12 @@
 [ext_resource type="AudioStream" uid="uid://driqxc5owy7sw" path="res://Weapons/Sounds/hit.wav" id="3_ihveb"]
 [ext_resource type="AudioStream" uid="uid://okwlv5f3uhgb" path="res://Weapons/Sounds/Launch.mp3" id="4_b2xoo"]
 [ext_resource type="PackedScene" uid="uid://byxqkihhw08gb" path="res://Weapons/Scenes/projectiles/rocket.tscn" id="6_jpno1"]
+[ext_resource type="Texture2D" uid="uid://c4f4umlg3diaj" path="res://Weapons/icons/missile.png" id="8_jpno1"]
 
 [resource]
 script = ExtResource("1_lj0dn")
 weapon_name = "Detno"
+weapon_icon = ExtResource("8_jpno1")
 reload_on = 1
 hit_points = 150.0
 crit_chance = 0.125

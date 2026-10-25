@@ -25,6 +25,7 @@ var feedback_base_x: float
 @onready var btn_login: TextureButton = $"Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect/MarginContainer/TextureRect/MarginContainer/MarginContainer/VBoxContainer/HBoxContainer/btn_submit_login"
 @onready var world_list: Tree = %WorldList
 @onready var map_thumbnail: TextureRect = %MapThumbnail
+@onready var thumb_frame: AspectRatioContainer = %ThumbFrame
 @onready var map_description: RichTextLabel = %MapDescription
 @onready var map_title: Label = %MapTitle
 @onready var map_byline: Label = %MapByline
@@ -36,6 +37,7 @@ var feedback_base_x: float
 @onready var game_list_poll_timer := Timer.new()
 @onready var mine_checklist: VBoxContainer = %MineChecklist
 @onready var rockets_check: CheckBox = %RocketsCheck
+@onready var recon_capture_check: CheckBox = %ReconCaptureCheck
 @onready var day_night_check: CheckBox = %DayNightCheck
 @onready var public_game_check: CheckBox = %PublicGameCheck
 
@@ -79,6 +81,9 @@ var selected_map_file_id: int = -1
 # static so it outlives this scene - index.tscn is rebuilt from scratch every
 # time a match exits back here, and populate_levels_tree reselects it.
 static var _last_selected_map_file_id: int = -1
+# The host screen's choices, saved when Host is pressed and restored on the
+# next visit - even after a restart. See _save_host_settings.
+const HOST_SETTINGS_PATH := "user://host_settings.cfg"
 var selected_game_row = null
 
 
@@ -97,6 +102,7 @@ func _ready() -> void:
 	_build_mine_checklist()
 	for team in NetworkManager.TEAM_NAMES:
 		host_team_picker.add_item(team.trim_prefix("team_").capitalize())
+	_load_host_settings()
 	feedback_base_x = ui_feedback.position.x + 25
 	login_timer.connect("timeout", Callable(self, "_on_cooldown_finished"))
 	http_request.connect("request_completed", Callable(self, "_on_request_completed"))
@@ -105,6 +111,7 @@ func _ready() -> void:
 	login_timer.one_shot = true
 	btn_quit.pressed.connect(func(): _on_quit())
 	btn_play.pressed.connect(_on_play_pressed)
+	thumb_frame.resized.connect(_fit_thumb_frame)
 	btn_settings.pressed.connect(func(): _show_info_panel(settings_group))
 	btn_credits.pressed.connect(func(): _show_info_panel(credits_group))
 	btn_register.pressed.connect(func(): _on_register())
@@ -225,6 +232,12 @@ var _thumb_request: HTTPRequest
 var _thumb_cache: Dictionary = {}
 
 
+# An AspectRatioContainer sizes its child from its width but reports no minimum height of its own,
+# so the column above would draw over it. Reserve the 16:9 height explicitly.
+func _fit_thumb_frame() -> void:
+	thumb_frame.custom_minimum_size.y = thumb_frame.size.x / thumb_frame.ratio
+
+
 func _show_map_details(row: TreeItem) -> void:
 	var description := str(row.get_meta("description", ""))
 	map_description.text = description if description != "" else "No description available."
@@ -339,6 +352,7 @@ func _on_host_pressed():
 	# and changed the scene. Nothing useful is left to say here afterward -
 	# see _pending_port_forward_warning for where that message actually goes.
 	_pending_port_forward_warning = ""
+	_save_host_settings()
 	NetworkManager.host_game(
 		selected_map_title,
 		selected_map_file_id,
@@ -352,8 +366,61 @@ func _on_host_pressed():
 		NetworkManager.BASE_GUN_RESPAWN_SECONDS,
 		not _get_checked_mine_paths().is_empty(),
 		_get_checked_mine_paths(),
-		rockets_check.button_pressed
+		rockets_check.button_pressed,
+		recon_capture_check.button_pressed
 	)
+
+
+# Weapons and mines are saved as "every one the screen listed" plus "the ticked
+# ones", so one added to the game later still starts at its own default instead
+# of reading as unticked.
+func _save_host_settings() -> void:
+	var cfg := ConfigFile.new()
+	cfg.set_value("host", "map_file_id", selected_map_file_id)
+	cfg.set_value("host", "team", host_team_picker.selected)
+	cfg.set_value("host", "public_game", public_game_check.button_pressed)
+	cfg.set_value("host", "rockets", rockets_check.button_pressed)
+	cfg.set_value("host", "recon_capture", recon_capture_check.button_pressed)
+	cfg.set_value("host", "day_night", day_night_check.button_pressed)
+	cfg.set_value("host", "weapons_listed", _listed_paths(weapon_checklist, "weapon_path"))
+	cfg.set_value("host", "weapons_checked", _get_checked_weapon_paths())
+	cfg.set_value("host", "mines_listed", _listed_paths(mine_checklist, "mine_path"))
+	cfg.set_value("host", "mines_checked", _get_checked_mine_paths())
+	var err := cfg.save(HOST_SETTINGS_PATH)
+	if err != OK:
+		push_warning("Couldn't save host settings (%s)" % error_string(err))
+
+
+# Nothing saved yet (first run) just leaves the scene's defaults.
+func _load_host_settings() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load(HOST_SETTINGS_PATH) != OK:
+		return
+	if _last_selected_map_file_id == -1:
+		_last_selected_map_file_id = cfg.get_value("host", "map_file_id", -1)
+	var team: int = cfg.get_value("host", "team", host_team_picker.selected)
+	if team >= 0 and team < host_team_picker.item_count:
+		host_team_picker.select(team)
+	public_game_check.button_pressed = cfg.get_value("host", "public_game", public_game_check.button_pressed)
+	rockets_check.button_pressed = cfg.get_value("host", "rockets", rockets_check.button_pressed)
+	recon_capture_check.button_pressed = cfg.get_value("host", "recon_capture", recon_capture_check.button_pressed)
+	day_night_check.button_pressed = cfg.get_value("host", "day_night", day_night_check.button_pressed)
+	_restore_checklist(weapon_checklist, "weapon_path", cfg.get_value("host", "weapons_listed", []), cfg.get_value("host", "weapons_checked", []))
+	_restore_checklist(mine_checklist, "mine_path", cfg.get_value("host", "mines_listed", []), cfg.get_value("host", "mines_checked", []))
+
+
+func _listed_paths(checklist: VBoxContainer, meta: String) -> Array[String]:
+	var paths: Array[String] = []
+	for child in checklist.get_children():
+		if child is CheckBox:
+			paths.append(child.get_meta(meta))
+	return paths
+
+
+func _restore_checklist(checklist: VBoxContainer, meta: String, listed: Array, checked: Array) -> void:
+	for child in checklist.get_children():
+		if child is CheckBox and listed.has(child.get_meta(meta)):
+			child.button_pressed = checked.has(child.get_meta(meta))
 
 
 func _on_host_started(address: String) -> void:
@@ -577,9 +644,13 @@ func populate_levels_tree(response_data):
 	firstrow.set_selectable(0, false)
 	firstrow.set_selectable(1, false)
 	firstrow.set_selectable(2, false)
+	var first_row: TreeItem = null
+	var selected_any := false
 	for map_item in response_data.data:
 		if map_item.tan_prepared == 1:
 			var row = world_list.create_item()
+			if first_row == null:
+				first_row = row
 			row.set_text(0, map_item.tan_title)
 			row.set_text(1, map_item.tan_author)
 			row.set_text(2, map_item.tan_genre)
@@ -592,6 +663,11 @@ func populate_levels_tree(response_data):
 				# Deferred - the Tree hasn't laid out its new rows yet this frame.
 				world_list.scroll_to_item.call_deferred(row, true)
 				_on_level_selected()
+				selected_any = true
+	# Nothing remembered from a previous visit: start on the first map.
+	if not selected_any and first_row != null:
+		first_row.select(0)
+		_on_level_selected()
 
 
 

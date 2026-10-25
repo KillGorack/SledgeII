@@ -1,10 +1,5 @@
 [gd_scene format=4 uid="uid://wo657mkxalrd"]
 
-[ext_resource type="PackedScene" path="res://Game_Objects/damage_smoke.tscn" id="damage_smoke_scene"]
-[ext_resource type="Script" uid="uid://dmp6mofyfrsod" path="res://Crafts/_scripts/mine_counter.gd" id="mine_counter_script"]
-[ext_resource type="Resource" path="res://Weapons/settings_mines/mine_detno.tres" id="mine_settings_res"]
-[ext_resource type="Resource" path="res://Weapons/settings_mines/mine_force.tres" id="mine_force_res"]
-[ext_resource type="Script" path="res://Weapons/_scripts/mine_settings.gd" id="mine_settings_script"]
 [ext_resource type="Material" uid="uid://bgh0ehawiffev" path="res://Materials/PBR/emitting_stuff.tres" id="1_75qxs"]
 [ext_resource type="Material" uid="uid://cu6i37pttdjcl" path="res://Materials/PBR/Red_Metal.tres" id="1_gfhax"]
 [ext_resource type="Script" uid="uid://b32whv15op7uy" path="res://Crafts/_scripts/movement.gd" id="1_nm6mo"]
@@ -40,6 +35,11 @@
 [ext_resource type="Resource" uid="uid://dsxm45xl6xbcy" path="res://Crafts/Settings/blip_base_gun.tres" id="31_qkbj0"]
 [ext_resource type="Texture2D" uid="uid://weqhjf5tdahr" path="res://UI/images/CP_Back.png" id="32_a75n7"]
 [ext_resource type="Resource" uid="uid://bo28uys4u40w8" path="res://Crafts/Settings/Player.tres" id="32_xb8dm"]
+[ext_resource type="PackedScene" uid="uid://cyca6s4fhq6ra" path="res://Weapons/Scenes/explosions/damage_smoke.tscn" id="damage_smoke_scene"]
+[ext_resource type="Script" uid="uid://dmp6mofyfrsod" path="res://Crafts/_scripts/mine_counter.gd" id="mine_counter_script"]
+[ext_resource type="Resource" uid="uid://b8h0f655falxi" path="res://Weapons/settings_mines/mine_force.tres" id="mine_force_res"]
+[ext_resource type="Resource" uid="uid://c7vrxci754dlu" path="res://Weapons/settings_mines/mine_detno.tres" id="mine_settings_res"]
+[ext_resource type="Script" uid="uid://b0ajcemib05av" path="res://Weapons/_scripts/mine_settings.gd" id="mine_settings_script"]
 
 [sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_g7gqi"]
 points = PackedVector3Array(0.359591, 0.08753002, 0.36253202, -0.359594, 0.08753002, 0.36253202, 0.359591, -0.2351391, 0.36253202, 0.359591, 0.08753002, -1.233568, -0.359594, -0.2351391, 0.36253202, -0.359594, 0.08753002, -1.233568, 0.35677505, -0.25258067, 0.35971975, 0.359591, -0.2351391, -1.233568, -0.359594, -0.2351391, -1.233568, -0.35684848, -0.25258067, 0.35971975, 0.3487497, -0.2683152, 0.35159552, 0.35677505, -0.25258067, -1.230912, -0.35684848, -0.25258067, -1.230912, -0.3488231, -0.2683152, 0.35159552, 0.3362893, -0.28082117, 0.33909667, 0.3487497, -0.2683152, -1.2229439, -0.3488231, -0.2683152, -1.2229439, -0.3363627, -0.28082117, 0.33909667, 0.32052016, -0.2888369, 0.32347322, 0.3362893, -0.28082117, -1.2104452, -0.3363627, -0.28082117, -1.2104452, -0.32059354, -0.2888369, 0.32347322, 0.3030615, -0.291583, 0.30597484, 0.32052016, -0.2888369, -1.1946653, -0.32059354, -0.2888369, -1.1946653, -0.30313486, -0.291583, 0.30597484, 0.3030615, -0.291583, -1.177167, -0.30313486, -0.291583, -1.177167)
@@ -418,7 +418,7 @@ collision_mask = 2
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0014648438, -0.35, -0.43850708)
 shape = SubResource("BoxShape3D_r1wdx")
 
-[node name="DamageSmoke" parent="." instance=ExtResource("damage_smoke_scene")]
+[node name="DamageSmoke" parent="." unique_id=1023598428 instance=ExtResource("damage_smoke_scene")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0.3)
 
 [node name="Suspension" type="Node3D" parent="." unique_id=885553309]
@@ -525,8 +525,8 @@ public_visibility = false
 
 [node name="weapon_node" type="Node3D" parent="." unique_id=1782664371]
 script = ExtResource("7_weapon")
-mine_settings = Array[ExtResource("mine_settings_script")]([ExtResource("mine_settings_res"), ExtResource("mine_force_res")])
 weapon_settings = Array[ExtResource("10_4qjx5")]([ExtResource("12_cannon"), ExtResource("14_detno"), ExtResource("15_mkiv"), ExtResource("13_repulsor"), ExtResource("16_8hncv")])
+mine_settings = Array[ExtResource("mine_settings_script")]([ExtResource("mine_settings_res"), ExtResource("mine_force_res")])
 
 [node name="Hud_InGame" type="Control" parent="." unique_id=1814334772]
 layout_mode = 3
@@ -696,7 +696,7 @@ grow_vertical = 0
 text = "0 / 4"
 horizontal_alignment = 2
 
-[node name="MineCounter" type="Control" parent="Hud_InGame"]
+[node name="MineCounter" type="Control" parent="Hud_InGame" unique_id=81574236]
 layout_mode = 1
 anchors_preset = 7
 anchor_left = 0.5
@@ -789,3 +789,31 @@ scroll_following = true
 
 [node name="LineEdit" type="LineEdit" parent="Hud_InGame/Chat/Margin/VBox" unique_id=1571506855]
 layout_mode = 2
+
+[node name="P_ICON" type="TextureRect" parent="Hud_InGame" unique_id=1736639444]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -210.0
+offset_top = -122.0
+offset_right = -160.0
+offset_bottom = -72.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="S_ICON" type="TextureRect" parent="Hud_InGame" unique_id=1044169810]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = 160.0
+offset_top = -121.0
+offset_right = 210.0
+offset_bottom = -71.0
+grow_horizontal = 2
+grow_vertical = 0

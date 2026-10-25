@@ -1,6 +1,7 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://UI/mockups/host_game_mock.gd" id="1"]
+[ext_resource type="Theme" path="res://UI/theme/sledge_theme.tres" id="2_theme"]
 
 [node name="HostGameMock" type="Control"]
 layout_mode = 3
@@ -9,6 +10,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+theme = ExtResource("2_theme")
 script = ExtResource("1")
 
 [node name="Backdrop" type="ColorRect" parent="."]
@@ -18,7 +20,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.07, 0.08, 0.1, 1)
+color = Color(0.0784, 0.0784, 0.0784, 1)
 
 [node name="Margin" type="MarginContainer" parent="."]
 layout_mode = 1
@@ -38,8 +40,8 @@ theme_override_constants/separation = 12
 
 [node name="Title" type="Label" parent="Margin/Page"]
 layout_mode = 2
+theme_type_variation = &"TitleLabel"
 text = "Host a Game"
-theme_override_font_sizes/font_size = 28
 
 [node name="Columns" type="HBoxContainer" parent="Margin/Page"]
 layout_mode = 2
@@ -54,8 +56,8 @@ size_flags_stretch_ratio = 0.9
 
 [node name="MapsHeader" type="Label" parent="Margin/Page/Columns/MapsColumn"]
 layout_mode = 2
+theme_type_variation = &"HeaderLabel"
 text = "1   Pick a map"
-theme_override_font_sizes/font_size = 18
 
 [node name="MapList" type="Tree" parent="Margin/Page/Columns/MapsColumn"]
 unique_name_in_owner = true
@@ -82,7 +84,7 @@ theme_override_constants/separation = 8
 [node name="Thumbnail" type="ColorRect" parent="Margin/Page/Columns/PreviewColumn/Preview/Inner"]
 custom_minimum_size = Vector2(0, 280)
 layout_mode = 2
-color = Color(0.16, 0.2, 0.26, 1)
+color = Color(0.2, 0.2, 0.2, 1)
 
 [node name="ThumbLabel" type="Label" parent="Margin/Page/Columns/PreviewColumn/Preview/Inner/Thumbnail"]
 layout_mode = 1
@@ -126,8 +128,8 @@ size_flags_horizontal = 3
 
 [node name="RulesHeader" type="Label" parent="Margin/Page/Columns/RulesColumn"]
 layout_mode = 2
+theme_type_variation = &"HeaderLabel"
 text = "2   Match rules"
-theme_override_font_sizes/font_size = 18
 
 [node name="RulesPanel" type="PanelContainer" parent="Margin/Page/Columns/RulesColumn"]
 layout_mode = 2
@@ -161,8 +163,8 @@ text = "Day / night cycle"
 
 [node name="LoadoutHeader" type="Label" parent="Margin/Page/Columns/RulesColumn"]
 layout_mode = 2
+theme_type_variation = &"HeaderLabel"
 text = "3   Loadout   (the same for every player)"
-theme_override_font_sizes/font_size = 18
 
 [node name="LoadoutPanel" type="PanelContainer" parent="Margin/Page/Columns/RulesColumn"]
 layout_mode = 2
@@ -225,15 +227,7 @@ modulate = Color(1, 1, 1, 0.55)
 [node name="Footer" type="HBoxContainer" parent="Margin/Page"]
 layout_mode = 2
 
-[node name="Status" type="Label" parent="Margin/Page/Footer"]
-layout_mode = 2
-text = "Your address is detected automatically."
-modulate = Color(1, 1, 1, 0.55)
-size_flags_horizontal = 3
-vertical_alignment = 1
-
 [node name="HostButton" type="Button" parent="Margin/Page/Footer"]
-custom_minimum_size = Vector2(260, 48)
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
+size_flags_horizontal = 3
 text = "Host Game"

@@ -3,10 +3,12 @@
 [ext_resource type="Script" uid="uid://defwrtblkx02f" path="res://Weapons/_scripts/weapon_settings.gd" id="1_hmjdw"]
 [ext_resource type="PackedScene" uid="uid://dqu4r8p4yt5jp" path="res://Weapons/Scenes/explosions/sparks.tscn" id="1_ynubh"]
 [ext_resource type="PackedScene" uid="uid://vdbvupiqax74" path="res://Weapons/Scenes/projectiles/plasma.tscn" id="2_vb3si"]
+[ext_resource type="Texture2D" uid="uid://c4f4umlg3diaj" path="res://Weapons/icons/missile.png" id="4_vb3si"]
 
 [resource]
 script = ExtResource("1_hmjdw")
 weapon_name = "Plasma"
+weapon_icon = ExtResource("4_vb3si")
 reload_on = 1
 hit_points = 5.0
 cool_down = 0.1

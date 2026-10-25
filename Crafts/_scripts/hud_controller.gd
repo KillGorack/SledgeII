@@ -1,14 +1,22 @@
 extends Control
 
 const PLAYER_LIST := preload("res://Crafts/_scripts/player_list.gd")
+# Full-screen card shown while your own craft is destroyed (the respawn delay).
+const DEMISE_SCREEN := preload("res://UI/backgrounds/demise_screen.png")
+# Fades in, so the start of your own explosion still shows; gone on respawn.
+const DEMISE_FADE_IN := 0.6
 
 # Sibling nodes on the same craft, not children of this HUD.
 @onready var health_node: Node3D = get_node("../health_node")
 @onready var weapon_node: Node3D = get_node("../weapon_node")
 @onready var movement_node: Node3D = get_node("../movement_node")
 @onready var power_node: Node3D = get_node("../power_node")
-@onready var weapon_label: Label = $Weapon
-@onready var ammo_label: Label = $Weapon2
+# Bottom readouts: primary weapon on the left (count + icon), specials (mines)
+# on the right. The icons swap when you change weapon / special.
+@onready var primary_count_label: Label = $Weapon
+@onready var special_count_label: Label = $Weapon2
+@onready var primary_icon: TextureRect = $P_ICON
+@onready var special_icon: TextureRect = $S_ICON
 @onready var fps_label: Label = $FPS
 @onready var arena_label: Label = $Arena
 @onready var speedometer: Control = $Speedometer
@@ -29,6 +37,10 @@ var _last_shields: float = -1.0
 var _last_armor: float = -1.0
 var _last_life: float = -1.0
 var _last_weapon_index: int = -1
+var _last_mine_index: int = -1
+
+var _demise_screen: TextureRect
+var _demise_tween: Tween
 
 
 func _ready() -> void:
@@ -44,14 +56,60 @@ func _ready() -> void:
 	_match_node = get_tree().get_first_node_in_group("match")
 	arena_label.text = NetworkManager.current_map_title
 	add_child(PLAYER_LIST.new())
+	# Juice is only spent on recon captures, so with capture off the bar (and
+	# the Bezel frame that holds nothing else) has nothing to say. The ruleset
+	# reaches joiners on connect, well before their craft and HUD exist.
+	if not NetworkManager.recon_capture_enabled:
+		team_juice_bar.get_parent().visible = false
 	NetworkManager.team_juice_changed.connect(_on_team_juice_changed)
 	_update_team_juice_bar()
+	_build_demise_screen()
+	for icon in [primary_icon, special_icon]:
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	# The specials readout below replaces MineCounter's own icon + count.
+	var mine_counter := get_node_or_null("MineCounter")
+	if mine_counter:
+		mine_counter.set_process(false)
+		mine_counter.visible = false
+
+
+# Its own CanvasLayer, above the HUD and chat, so the whole view is the card.
+func _build_demise_screen() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 50
+	add_child(layer)
+	_demise_screen = TextureRect.new()
+	_demise_screen.texture = DEMISE_SCREEN
+	_demise_screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_demise_screen.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_demise_screen.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_demise_screen.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_demise_screen.visible = false
+	layer.add_child(_demise_screen)
+
+
+# Polled rather than signalled: health_node flips _is_destroyed on every peer
+# (destroy_self / respawn_at), and this runs every frame on the owner anyway.
+func _update_demise_screen() -> void:
+	var destroyed: bool = health_node._is_destroyed
+	if destroyed == _demise_screen.visible:
+		return
+	if _demise_tween:
+		_demise_tween.kill()
+	_demise_screen.visible = destroyed
+	if destroyed:
+		_demise_screen.modulate.a = 0.0
+		_demise_tween = create_tween()
+		_demise_tween.tween_property(_demise_screen, "modulate:a", 1.0, DEMISE_FADE_IN)
 
 
 func _process(_delta: float) -> void:
+	_update_demise_screen()
 	_update_health()
 	_update_weapon()
 	_update_ammo()
+	_update_specials()
 	# No change-detection cache here like the two above - speed is basically
 	# always changing while driving, so there'd be nothing to skip most frames.
 	speedometer.set_speed_ratio(movement_node.get_speed_ratio())
@@ -99,7 +157,9 @@ func _update_weapon() -> void:
 		return
 	_last_weapon_index = index
 	var settings: WeaponSettings = weapon_node.weapon_settings[index] if index >= 0 and index < weapon_node.weapon_settings.size() else null
-	weapon_label.text = settings.weapon_name
+	primary_icon.texture = settings.weapon_icon if settings else null
+	# Icons come in white/grayscale; the weapon's own colour tints them.
+	primary_icon.self_modulate = settings.projectile_color if settings else Color.WHITE
 
 
 # No change-detection cache like _update_weapon()'s - unlike the weapon
@@ -120,13 +180,30 @@ func _update_ammo() -> void:
 		return
 	if settings.power_consumption > 0.0:
 		var capacity: float = power_node.stats.power_capacity if power_node.stats else 0.0
-		ammo_label.text = "%d / %d" % [roundi(power_node.current_power), roundi(capacity)]
+		primary_count_label.text = "%d / %d" % [roundi(power_node.current_power), roundi(capacity)]
 	elif settings.projectile_count_capacity == 0:
-		ammo_label.text = "Unlimited"
+		primary_count_label.text = "Unlimited"
 	else:
 		# Bounds-checked, not a plain index - on a freshly-joined client the
 		# replicated Array may not have arrived yet (starts empty, unlike the
 		# old Dictionary's safe .get() fallback), so this still needs a
 		# fallback for that brief window before the first sync lands.
 		var remaining: int = weapon_node._ammo_remaining[index] if index < weapon_node._ammo_remaining.size() else settings.projectile_count_actual
-		ammo_label.text = "%d / %d" % [remaining, settings.projectile_count_capacity]
+		primary_count_label.text = "%d / %d" % [remaining, settings.projectile_count_capacity]
+
+
+# Selected mine's icon and "left / max". Hidden when the host turned mines off
+# or this craft has none.
+func _update_specials() -> void:
+	var manager = _match_node.mines if _match_node else null
+	var settings: MineSettings = weapon_node.current_mine()
+	var shown: bool = NetworkManager.mines_enabled and manager != null and settings != null and NetworkManager.is_online()
+	special_icon.visible = shown
+	special_count_label.visible = shown
+	if not shown:
+		return
+	if weapon_node.current_mine_index != _last_mine_index:
+		_last_mine_index = weapon_node.current_mine_index
+		special_icon.texture = settings.mine_icon
+		special_icon.self_modulate = settings.mine_color
+	special_count_label.text = "%d / %d" % [manager.mines_left(multiplayer.get_unique_id(), settings.max_count), settings.max_count]
