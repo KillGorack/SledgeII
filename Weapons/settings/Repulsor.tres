@@ -7,10 +7,12 @@
 [ext_resource type="AudioStream" uid="uid://bjr18hqat702y" path="res://Weapons/Sounds/Repulsor.mp3" id="3_7s2jk"]
 [ext_resource type="AudioStream" uid="uid://okwlv5f3uhgb" path="res://Weapons/Sounds/Launch.mp3" id="4_svrlh"]
 [ext_resource type="PackedScene" uid="uid://byxqkihhw08gb" path="res://Weapons/Scenes/projectiles/rocket.tscn" id="6_g3ac4"]
+[ext_resource type="Texture2D" uid="uid://c4f4umlg3diaj" path="res://Weapons/icons/missile.png" id="8_g3ac4"]
 
 [resource]
 script = ExtResource("1_k3735")
 weapon_name = "Repulsor"
+weapon_icon = ExtResource("8_g3ac4")
 projectile_prefab = ExtResource("6_g3ac4")
 projectile_color = Color(0, 0.5372549, 1, 1)
 explosion_prefab = ExtResource("1_icuoo")

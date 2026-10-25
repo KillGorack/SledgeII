@@ -1,6 +1,6 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://cyca6s4fhq6ra"]
 
-[ext_resource type="Texture2D" path="res://Materials/Textures/Particles/T_smoke_flipbook.png" id="1_g3jc6"]
+[ext_resource type="Texture2D" uid="uid://cejojjg67d8af" path="res://Materials/Textures/Particles/T_smoke_flipbook.png" id="1_g3jc6"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gckcn"]
 transparency = 1
@@ -47,13 +47,13 @@ anim_speed_max = 1.0
 
 [sub_resource type="QuadMesh" id="QuadMesh_gwyq5"]
 
-[node name="DamageSmoke" type="Node3D"]
+[node name="DamageSmoke" type="Node3D" unique_id=1184861000]
 
-[node name="GPUParticles3D" type="GPUParticles3D" parent="."]
+[node name="GPUParticles3D" type="GPUParticles3D" parent="." unique_id=562889444]
 material_override = SubResource("StandardMaterial3D_gckcn")
 emitting = false
 amount = 40
-lifetime = 2.0
+lifetime = 4.0
 fixed_fps = 60
 process_material = SubResource("ParticleProcessMaterial_fqp22")
 draw_pass_1 = SubResource("QuadMesh_gwyq5")

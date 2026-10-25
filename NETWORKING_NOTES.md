@@ -126,6 +126,8 @@ Next is a two-PC playtest of Phase 2 with real ping. Nothing else should be buil
 
 **Takedowns / wrecks (2026-10-15, uncommitted):** projectiles carry `shooter_peer`. `health_node.note_attacker` records the last attacker on damage (`apply_damage(damage, attacker)`) and on knockback (`apply_hit_force`, so the Repulsor counts). A death within `TAKEDOWN_CREDIT_MSEC` (5 s) credits them. `match._record_defeat` keeps `_peer_scores` (`[takedowns, wrecks]`, no credit for teammates) and ships them with `_sync_roster`; the F4 list shows them. Seen in a test: teleporting a client tank 80 m straight down dragged the host's parked tank through the floor on the host. Remote copies are kinematic and swept through it. Real falls are gradual, so this is probably harmless, but it's the same family as "bumping remote tanks" on the playtest checklist.
 
+**Recon capture host rule (2026-10-18, uncommitted):** "Recon capture" checkbox (`%ReconCaptureCheck`, index.tscn) → `host_game(..., recon_capture)` → `NetworkManager.recon_capture_enabled`, sent to joiners in `_assign_ruleset`. `match._start_capture_request` (server) and `_try_start_capture` (client) refuse when it's off. Healing and resupply are unaffected.
+
 **Known gaps, in suggested order**
 
 1. Rewind lag compensation: the server checks hits against remote tanks drawn 100 ms in the past. **On hold (user, 2026-10-15)**; revisit only if hits on moving tanks feel late.

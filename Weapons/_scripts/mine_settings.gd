@@ -15,6 +15,9 @@ class_name MineSettings
 # WeaponSettings.default_available.
 @export var default_available: bool = true
 @export var mine_icon: Texture
+# Tints mine_icon on the HUD - bring icons in white/grayscale and this colours them,
+# like WeaponSettings.projectile_color does for weapon icons.
+@export_color_no_alpha var mine_color: Color = Color.WHITE
 @export_multiline var mine_lore: String = ""
 
 @export_group("Limits")

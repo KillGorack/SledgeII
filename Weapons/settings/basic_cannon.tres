@@ -7,16 +7,19 @@
 [ext_resource type="AudioStream" uid="uid://bfpc6t43o35qy" path="res://Weapons/Sounds/HitHard.wav" id="3_djqd1"]
 [ext_resource type="Script" uid="uid://defwrtblkx02f" path="res://Weapons/_scripts/weapon_settings.gd" id="3_y8gcj"]
 [ext_resource type="AudioStream" uid="uid://dy0ecskx3n1b" path="res://Weapons/Sounds/Mortar2.wav" id="4_djqd1"]
+[ext_resource type="Texture2D" uid="uid://dcjjebx4kprxx" path="res://Weapons/icons/cannon.png" id="8_otocn"]
 
 [resource]
 script = ExtResource("3_y8gcj")
 weapon_name = "AP Shell"
+weapon_icon = ExtResource("8_otocn")
 reload_on = 1
 hit_points = 10.0
 crit_chance = 0.05
 crit_multiplier = 2.0
 cool_down = 2.0
 projectile_prefab = ExtResource("2_y8gcj")
+projectile_color = Color(0.60932976, 0.60933024, 0.60932994, 1)
 explosion_prefab = ExtResource("2_i4pwi")
 bullet_hole_prefab = ExtResource("1_y8gcj")
 exhaust_prefab = ExtResource("2_vcfcg")
