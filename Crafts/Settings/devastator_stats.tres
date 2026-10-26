@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="CraftStats" format=3 uid="uid://ctd0qb0wp61cm"]
+
+[ext_resource type="Script" uid="uid://bli8dn5pdiw60" path="res://Crafts/_scripts/craft_stats.gd" id="1_stats"]
+
+[sub_resource type="Curve" id="Curve_4eg04"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(0.3333333, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[resource]
+script = ExtResource("1_stats")
+recenter_speed = 64.0
+turn_speed = 1.4
+turn_acceleration = 4.0
+turn_deceleration = 12.0
+acceleration = 45.0
+deceleration = 6.0
+max_speed = 3.0
+thruster_force = 80.0
+shields = 120.0
+armor = 180.0
+life = 140.0
+power_gain_rate = 4.0
+power_falloff_curve = SubResource("Curve_4eg04")

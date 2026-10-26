@@ -11,7 +11,7 @@
 [ext_resource type="Texture2D" uid="uid://co231v8hb7frf" path="res://UI/images/btn_disabled.png" id="9_4q77j"]
 [ext_resource type="Texture2D" uid="uid://d0yhctug611wp" path="res://UI/images/CP_Back_light.png" id="9_8ykvq"]
 [ext_resource type="Texture2D" uid="uid://cy5kudvorqhtg" path="res://UI/images/Title.png" id="9_u58xb"]
-[ext_resource type="Theme" path="res://UI/theme/sledge_theme.tres" id="sledge_theme"]
+[ext_resource type="Theme" uid="uid://dmlpyqe111b7r" path="res://UI/theme/sledge_theme.tres" id="sledge_theme"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_u58xb"]
 shader = ExtResource("2_ijtma")
@@ -509,35 +509,35 @@ theme_override_constants/margin_bottom = 15
 layout_mode = 2
 theme_override_constants/separation = 16
 
-[node name="Columns" type="HBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer"]
+[node name="Columns" type="HBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer" unique_id=286601176]
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/separation = 16
 
-[node name="MapCard" type="PanelContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns"]
+[node name="MapCard" type="PanelContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns" unique_id=1398420296]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 size_flags_stretch_ratio = 2.3
 
-[node name="Body" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard"]
+[node name="Body" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard" unique_id=592529923]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="Header" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body"]
+[node name="Header" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body" unique_id=1354397533]
 layout_mode = 2
 theme_type_variation = &"HeaderLabel"
 text = "1   Pick a map"
 
-[node name="Rule" type="HSeparator" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body"]
+[node name="Rule" type="HSeparator" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body" unique_id=718786167]
 layout_mode = 2
 
-[node name="MapRow" type="HBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body"]
+[node name="MapRow" type="HBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body" unique_id=1513557442]
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/separation = 14
 
-[node name="WorldList" type="Tree" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body/MapRow"]
+[node name="WorldList" type="Tree" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body/MapRow" unique_id=1868414930]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(320, 0)
 layout_mode = 2
@@ -551,160 +551,158 @@ enable_drag_unfolding = false
 hide_root = true
 select_mode = 1
 
-[node name="Preview" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body/MapRow"]
+[node name="Preview" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body/MapRow" unique_id=728920934]
 layout_mode = 2
 size_flags_horizontal = 3
-size_flags_stretch_ratio = 1.0
 theme_override_constants/separation = 8
 
-[node name="ThumbFrame" type="AspectRatioContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body/MapRow/Preview"]
+[node name="ThumbFrame" type="AspectRatioContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body/MapRow/Preview" unique_id=1351058099]
 unique_name_in_owner = true
 layout_mode = 2
 ratio = 1.7778
 stretch_mode = 0
 alignment_vertical = 0
 
-[node name="ThumbBackdrop" type="Panel" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body/MapRow/Preview/ThumbFrame"]
+[node name="ThumbBackdrop" type="Panel" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body/MapRow/Preview/ThumbFrame" unique_id=999473513]
 layout_mode = 2
 theme_type_variation = &"InsetPanel"
 
-[node name="MapThumbnail" type="TextureRect" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body/MapRow/Preview/ThumbFrame"]
+[node name="MapThumbnail" type="TextureRect" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body/MapRow/Preview/ThumbFrame" unique_id=950501442]
 unique_name_in_owner = true
 layout_mode = 2
 expand_mode = 1
 stretch_mode = 6
 
-[node name="ThumbBorder" type="Panel" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body/MapRow/Preview/ThumbFrame"]
+[node name="ThumbBorder" type="Panel" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body/MapRow/Preview/ThumbFrame" unique_id=2100623155]
 layout_mode = 2
 mouse_filter = 2
 theme_type_variation = &"FrameBorder"
 
-[node name="MapTitle" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body/MapRow/Preview"]
+[node name="MapTitle" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body/MapRow/Preview" unique_id=199414167]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 22
 text = "Select a map"
 
-[node name="MapByline" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body/MapRow/Preview"]
+[node name="MapByline" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body/MapRow/Preview" unique_id=2019388533]
 unique_name_in_owner = true
-layout_mode = 2
 modulate = Color(1, 1, 1, 0.65)
+layout_mode = 2
 
-[node name="MapDescription" type="RichTextLabel" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body/MapRow/Preview"]
+[node name="MapDescription" type="RichTextLabel" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body/MapRow/Preview" unique_id=2030438395]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
 text = "Pick a map from the list to see its details."
 
-[node name="RulesCard" type="PanelContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns"]
+[node name="RulesCard" type="PanelContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns" unique_id=2063335051]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 size_flags_stretch_ratio = 0.9
 
-[node name="Body" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/RulesCard"]
+[node name="Body" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/RulesCard" unique_id=353694215]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="Header" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/RulesCard/Body"]
+[node name="Header" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/RulesCard/Body" unique_id=2097592250]
 layout_mode = 2
 theme_type_variation = &"HeaderLabel"
 text = "2   Match rules"
 
-[node name="Rule" type="HSeparator" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/RulesCard/Body"]
+[node name="Rule" type="HSeparator" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/RulesCard/Body" unique_id=1276254562]
 layout_mode = 2
 
-[node name="TeamRow" type="HBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/RulesCard/Body"]
+[node name="TeamRow" type="HBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/RulesCard/Body" unique_id=733419677]
 layout_mode = 2
 
-[node name="TeamLabel" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/RulesCard/Body/TeamRow"]
+[node name="TeamLabel" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/RulesCard/Body/TeamRow" unique_id=453384863]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Your team"
 
-[node name="HostTeamPicker" type="OptionButton" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/RulesCard/Body/TeamRow"]
+[node name="HostTeamPicker" type="OptionButton" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/RulesCard/Body/TeamRow" unique_id=2083672678]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(130, 0)
 layout_mode = 2
 
-[node name="PublicGameCheck" type="CheckBox" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/RulesCard/Body"]
+[node name="PublicGameCheck" type="CheckBox" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/RulesCard/Body" unique_id=934117626]
 unique_name_in_owner = true
 layout_mode = 2
 tooltip_text = "Lists the game so people outside your network can join (the port is forwarded automatically where possible). Untick for a LAN-only game."
 button_pressed = true
 text = "Public game"
 
-[node name="RocketsCheck" type="CheckBox" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/RulesCard/Body"]
+[node name="RocketsCheck" type="CheckBox" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/RulesCard/Body" unique_id=257568465]
 unique_name_in_owner = true
 layout_mode = 2
 tooltip_text = "Rockets (R) lift your craft. Off: nobody can use them. Flipping an overturned craft back over always works."
 button_pressed = true
 text = "Rockets"
 
-[node name="ReconCaptureCheck" type="CheckBox" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/RulesCard/Body"]
+[node name="ReconCaptureCheck" type="CheckBox" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/RulesCard/Body" unique_id=1146339297]
 unique_name_in_owner = true
 layout_mode = 2
 tooltip_text = "Lets players capture recons. Off: recons stay as the map set them; they still heal and resupply."
 button_pressed = true
 text = "Recon capture"
 
-[node name="DayNightCheck" type="CheckBox" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/RulesCard/Body"]
+[node name="DayNightCheck" type="CheckBox" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/RulesCard/Body" unique_id=948644691]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Day / night cycle"
 
-[node name="LoadoutCard" type="PanelContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns"]
+[node name="LoadoutCard" type="PanelContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns" unique_id=2084578260]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
-size_flags_stretch_ratio = 1.0
 
-[node name="Body" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard"]
+[node name="Body" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard" unique_id=1009361224]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="Header" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body"]
+[node name="Header" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body" unique_id=1372371072]
 layout_mode = 2
 theme_type_variation = &"HeaderLabel"
 text = "3   Loadout   (the same for every player)"
 
-[node name="Rule" type="HSeparator" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body"]
+[node name="Rule" type="HSeparator" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body" unique_id=1698851439]
 layout_mode = 2
 
-[node name="Scroll" type="ScrollContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body"]
+[node name="Scroll" type="ScrollContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body" unique_id=2015633301]
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="Sections" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body/Scroll"]
+[node name="Sections" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body/Scroll" unique_id=2103875170]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="WeaponsLabel" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body/Scroll/Sections"]
+[node name="WeaponsLabel" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body/Scroll/Sections" unique_id=1737002571]
 layout_mode = 2
 text = "Available weapons"
 
-[node name="WeaponChecklist" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body/Scroll/Sections"]
+[node name="WeaponChecklist" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body/Scroll/Sections" unique_id=116037264]
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="WeaponsSeparator" type="HSeparator" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body/Scroll/Sections"]
+[node name="WeaponsSeparator" type="HSeparator" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body/Scroll/Sections" unique_id=259917462]
 layout_mode = 2
 
-[node name="SpecialsLabel" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body/Scroll/Sections"]
+[node name="SpecialsLabel" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body/Scroll/Sections" unique_id=803802168]
 layout_mode = 2
 text = "Specials"
 
-[node name="MineChecklist" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body/Scroll/Sections"]
+[node name="MineChecklist" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body/Scroll/Sections" unique_id=1329960903]
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="SpecialsSeparator" type="HSeparator" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body/Scroll/Sections"]
+[node name="SpecialsSeparator" type="HSeparator" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body/Scroll/Sections" unique_id=61158418]
 layout_mode = 2
 
-[node name="VehicleLabel" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body/Scroll/Sections"]
+[node name="VehicleLabel" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body/Scroll/Sections" unique_id=1674211488]
+unique_name_in_owner = true
 layout_mode = 2
-modulate = Color(1, 1, 1, 0.55)
-text = "Vehicle   (coming soon)"
+text = "Vehicle"
 
 [node name="Footer" type="HBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer" unique_id=1234641443]
 layout_mode = 2
@@ -746,7 +744,7 @@ enable_drag_unfolding = false
 hide_root = true
 select_mode = 1
 
-[node name="ListGap" type="Control" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Join Game/MarginContainer/VBoxContainer"]
+[node name="ListGap" type="Control" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Join Game/MarginContainer/VBoxContainer" unique_id=1222254781]
 custom_minimum_size = Vector2(0, 8)
 layout_mode = 2
 

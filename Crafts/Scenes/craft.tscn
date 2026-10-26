@@ -1,0 +1,447 @@
+[gd_scene format=4]
+
+[ext_resource type="Script" uid="uid://b32whv15op7uy" path="res://Crafts/_scripts/movement.gd" id="1_nm6mo"]
+[ext_resource type="Resource" uid="uid://csey8qhg0e4rt" path="res://Crafts/Settings/lightning_stats.tres" id="4_stats"]
+[ext_resource type="AudioStream" uid="uid://cjmg1eqi1eacq" path="res://Crafts/Sounds/vehicle.mp3" id="4_tqpc5"]
+[ext_resource type="PhysicsMaterial" path="res://Physics/physics_craft.tres" id="5_physmat"]
+[ext_resource type="Script" uid="uid://cs0sh685407yx" path="res://Crafts/_scripts/health_node.gd" id="6_health"]
+[ext_resource type="Script" uid="uid://dfcysnykxpal7" path="res://Weapons/_scripts/weapon_node.gd" id="7_weapon"]
+[ext_resource type="Script" uid="uid://bsrg8o0bdngbb" path="res://Crafts/_scripts/hud_controller.gd" id="8_hud"]
+[ext_resource type="Script" uid="uid://defwrtblkx02f" path="res://Weapons/_scripts/weapon_settings.gd" id="10_4qjx5"]
+[ext_resource type="Script" uid="uid://du7bg1pw2tnpr" path="res://Crafts/_scripts/reticle.gd" id="11_wiinl"]
+[ext_resource type="Resource" uid="uid://cra5ynqajpxse" path="res://Weapons/settings/basic_cannon.tres" id="12_cannon"]
+[ext_resource type="Resource" uid="uid://qqc2vwxrscfy" path="res://Weapons/settings/Repulsor.tres" id="13_repulsor"]
+[ext_resource type="Resource" uid="uid://b5trap215xo20" path="res://Weapons/settings/Detno.tres" id="14_detno"]
+[ext_resource type="Resource" uid="uid://d2bcvfd5dw7pj" path="res://Weapons/settings/MKIV_CEB.tres" id="15_mkiv"]
+[ext_resource type="Resource" uid="uid://bryidariyxws7" path="res://Weapons/settings/plasma.tres" id="16_8hncv"]
+[ext_resource type="Script" uid="uid://ccjvxuanm2neh" path="res://Crafts/_scripts/speedometer.gd" id="16_speedo"]
+[ext_resource type="Texture2D" uid="uid://davch07lrofb0" path="res://Crafts/Images/hud_bezel_resize.png" id="17_jva1l"]
+[ext_resource type="Texture2D" uid="uid://clajwwr25kbxg" path="res://Crafts/Images/speedo_hole_fill_resize.png" id="19_jva1l"]
+[ext_resource type="Script" uid="uid://byqfsxl7qfit0" path="res://Crafts/_scripts/resourcemeter.gd" id="20_pax5p"]
+[ext_resource type="Script" uid="uid://mu2kfxlynak5" path="res://Crafts/_scripts/health_rings.gd" id="20_rings"]
+[ext_resource type="Texture2D" uid="uid://6cg8aygvgxoq" path="res://Crafts/Images/resource_hole_fill_resize.png" id="21_cusvd"]
+[ext_resource type="Script" uid="uid://cyck4l7d4j2ln" path="res://Crafts/_scripts/power_node.gd" id="22_power"]
+[ext_resource type="Script" uid="uid://mepex6j2kosh" path="res://Crafts/_scripts/team_juice_bar.gd" id="23_juice"]
+[ext_resource type="Texture2D" uid="uid://bmlkfo0a5b7jw" path="res://UI/images/Juice_Bar.png" id="24_g7gqi"]
+[ext_resource type="Script" uid="uid://bhb2fc32wr4yj" path="res://Crafts/_scripts/radar_controller.gd" id="27_i28qn"]
+[ext_resource type="Texture2D" uid="uid://d2fcmxoatss3r" path="res://UI/images/Radar_Ring.png" id="28_i28qn"]
+[ext_resource type="Script" uid="uid://dc7nvy010cc26" path="res://Crafts/_scripts/radar_target_def.gd" id="29_kqlfo"]
+[ext_resource type="Script" uid="uid://b8ja1utj1l0jw" path="res://Crafts/_scripts/chat_controller.gd" id="30_chat"]
+[ext_resource type="Resource" uid="uid://c5rwld4fk2qvr" path="res://Crafts/Settings/blip_recon.tres" id="30_qkbj0"]
+[ext_resource type="Resource" uid="uid://dsxm45xl6xbcy" path="res://Crafts/Settings/blip_base_gun.tres" id="31_qkbj0"]
+[ext_resource type="Texture2D" uid="uid://weqhjf5tdahr" path="res://UI/images/CP_Back.png" id="32_a75n7"]
+[ext_resource type="Resource" uid="uid://bo28uys4u40w8" path="res://Crafts/Settings/Player.tres" id="32_xb8dm"]
+[ext_resource type="PackedScene" uid="uid://cyca6s4fhq6ra" path="res://Weapons/Scenes/explosions/damage_smoke.tscn" id="damage_smoke_scene"]
+[ext_resource type="Script" uid="uid://dmp6mofyfrsod" path="res://Crafts/_scripts/mine_counter.gd" id="mine_counter_script"]
+[ext_resource type="Resource" uid="uid://b8h0f655falxi" path="res://Weapons/settings_mines/mine_force.tres" id="mine_force_res"]
+[ext_resource type="Resource" uid="uid://c7vrxci754dlu" path="res://Weapons/settings_mines/mine_detno.tres" id="mine_settings_res"]
+[ext_resource type="Script" uid="uid://b0ajcemib05av" path="res://Weapons/_scripts/mine_settings.gd" id="mine_settings_script"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_r1wdx"]
+size = Vector3(0.7373047, 0.35, 1.6203003)
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_lightning"]
+properties/0/path = NodePath("movement_node:net_state")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+properties/1/path = NodePath("movement_node:net_time")
+properties/1/spawn = true
+properties/1/replication_mode = 1
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_health"]
+properties/0/path = NodePath(".:shields")
+properties/0/spawn = true
+properties/0/replication_mode = 2
+properties/1/path = NodePath(".:armor")
+properties/1/spawn = true
+properties/1/replication_mode = 2
+properties/2/path = NodePath(".:life")
+properties/2/spawn = true
+properties/2/replication_mode = 2
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_power"]
+properties/0/path = NodePath(".:current_power")
+properties/0/spawn = true
+properties/0/replication_mode = 2
+
+[node name="Craft" type="RigidBody3D" unique_id=223635602]
+mass = 5.0
+physics_material_override = ExtResource("5_physmat")
+center_of_mass_mode = 1
+center_of_mass = Vector3(0, -0.3, -0.44)
+can_sleep = false
+
+[node name="movement_node" type="Node3D" parent="." unique_id=1513453241]
+script = ExtResource("1_nm6mo")
+stats = ExtResource("4_stats")
+SUSPENSION_RAY_LENGTH = 0.05
+SUSPENSION_SPRING_STRENGTH = 10000.0
+SUSPENSION_DAMPING = 75.0
+
+[node name="Collider" type="CollisionShape3D" parent="." unique_id=517869810]
+visible = false
+
+[node name="FloorDetection" type="Area3D" parent="." unique_id=1417860519]
+visible = false
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="FloorDetection" unique_id=2106407594]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0014648438, -0.35, -0.43850708)
+shape = SubResource("BoxShape3D_r1wdx")
+
+[node name="DamageSmoke" parent="." unique_id=1023598428 instance=ExtResource("damage_smoke_scene")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0.3)
+
+[node name="Suspension" type="Node3D" parent="." unique_id=885553309]
+
+[node name="FrontLeft" type="RayCast3D" parent="Suspension" unique_id=1867380839]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.28, -0.291583, 0.15)
+target_position = Vector3(0, -0.2, 0)
+collision_mask = 2
+
+[node name="FrontRight" type="RayCast3D" parent="Suspension" unique_id=1052375616]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.28, -0.291583, 0.15)
+target_position = Vector3(0, -0.2, 0)
+collision_mask = 2
+
+[node name="RearLeft" type="RayCast3D" parent="Suspension" unique_id=1041660743]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.28, -0.291583, -1.05)
+target_position = Vector3(0, -0.2, 0)
+collision_mask = 2
+
+[node name="RearRight" type="RayCast3D" parent="Suspension" unique_id=1962439744]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.28, -0.291583, -1.05)
+target_position = Vector3(0, -0.2, 0)
+collision_mask = 2
+
+[node name="Engine Sound" type="AudioStreamPlayer3D" parent="." unique_id=208324712]
+stream = ExtResource("4_tqpc5")
+volume_db = -80.0
+max_db = -24.0
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="." unique_id=899119704]
+replication_interval = 0.033299
+replication_config = SubResource("SceneReplicationConfig_lightning")
+public_visibility = false
+
+[node name="Hull" type="MeshInstance3D" parent="." unique_id=920658557]
+
+[node name="Turret" type="MeshInstance3D" parent="." unique_id=2047150270]
+
+[node name="Barrel" type="MeshInstance3D" parent="Turret" unique_id=1260033873]
+
+[node name="RayCast3D" type="RayCast3D" parent="Turret/Barrel" unique_id=954080200]
+target_position = Vector3(0, 0, -10000)
+
+[node name="health_node" type="Node3D" parent="." unique_id=1043745793]
+script = ExtResource("6_health")
+stats = ExtResource("4_stats")
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="health_node" unique_id=1586067962]
+delta_interval = 0.1
+replication_config = SubResource("SceneReplicationConfig_health")
+public_visibility = false
+
+[node name="power_node" type="Node3D" parent="." unique_id=1782664372]
+script = ExtResource("22_power")
+stats = ExtResource("4_stats")
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="power_node" unique_id=1782664373]
+delta_interval = 0.1
+replication_config = SubResource("SceneReplicationConfig_power")
+public_visibility = false
+
+[node name="weapon_node" type="Node3D" parent="." unique_id=1782664371]
+script = ExtResource("7_weapon")
+weapon_settings = Array[ExtResource("10_4qjx5")]([ExtResource("12_cannon"), ExtResource("14_detno"), ExtResource("15_mkiv"), ExtResource("13_repulsor"), ExtResource("16_8hncv")])
+mine_settings = Array[ExtResource("mine_settings_script")]([ExtResource("mine_settings_res"), ExtResource("mine_force_res")])
+
+[node name="Hud_InGame" type="Control" parent="." unique_id=1814334772]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("8_hud")
+
+[node name="Reticle" type="CenterContainer" parent="Hud_InGame" unique_id=858538656]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -50.0
+offset_top = -50.0
+offset_right = 50.0
+offset_bottom = 50.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("11_wiinl")
+
+[node name="HudBezel" type="TextureRect" parent="Hud_InGame" unique_id=19719761]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -250.0
+offset_top = -179.0
+offset_right = 250.0
+grow_horizontal = 2
+grow_vertical = 0
+texture = ExtResource("17_jva1l")
+expand_mode = 1
+stretch_mode = 4
+
+[node name="Speedometer" type="Control" parent="Hud_InGame" unique_id=1416703361]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -250.0
+offset_top = -179.0
+offset_right = 250.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+script = ExtResource("16_speedo")
+hole_texture = ExtResource("19_jva1l")
+fill_color = Color(0, 0.73333335, 1, 1)
+
+[node name="Resourcemeter" type="Control" parent="Hud_InGame" unique_id=1672611301]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -250.0
+offset_top = -179.0
+offset_right = 250.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+script = ExtResource("20_pax5p")
+hole_texture = ExtResource("21_cusvd")
+
+[node name="HealthRings" type="Control" parent="Hud_InGame" unique_id=224277607]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -250.0
+offset_top = -179.0
+offset_right = 250.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+script = ExtResource("20_rings")
+track_color = Color(0, 0, 0, 0.54509807)
+
+[node name="Bezel" type="TextureRect" parent="Hud_InGame" unique_id=1136739785]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -162.5
+offset_top = 10.0
+offset_right = 162.5
+offset_bottom = 41.0
+grow_horizontal = 2
+texture = ExtResource("24_g7gqi")
+expand_mode = 1
+
+[node name="TeamJuiceBar" type="Control" parent="Hud_InGame/Bezel" unique_id=1301515583]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 5.5
+offset_top = 5.0
+offset_right = -4.5
+offset_bottom = -5.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("23_juice")
+
+[node name="FPS" type="Label" parent="Hud_InGame" unique_id=457254272]
+layout_mode = 1
+offset_left = 5.0
+offset_right = 130.0
+offset_bottom = 46.0
+theme_override_colors/font_color = Color(1, 1, 0, 1)
+text = "FPS: 116"
+
+[node name="Arena" type="Label" parent="Hud_InGame" unique_id=1491971939]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -200.0
+offset_top = 47.0
+offset_right = 200.0
+offset_bottom = 70.0
+grow_horizontal = 2
+text = "Arena"
+horizontal_alignment = 1
+
+[node name="Weapon" type="Label" parent="Hud_InGame" unique_id=1301515584]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -226.5
+offset_top = -45.0
+offset_right = -110.0
+offset_bottom = -22.0
+grow_horizontal = 2
+grow_vertical = 0
+text = "Repulsor"
+
+[node name="Weapon2" type="Label" parent="Hud_InGame" unique_id=1927917682]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = 115.0
+offset_top = -45.0
+offset_right = 225.0
+offset_bottom = -22.0
+grow_horizontal = 2
+grow_vertical = 0
+text = "0 / 4"
+horizontal_alignment = 2
+
+[node name="MineCounter" type="Control" parent="Hud_InGame" unique_id=81574236]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -226.5
+offset_top = -85.0
+offset_right = -106.5
+offset_bottom = -51.0
+grow_horizontal = 2
+grow_vertical = 0
+script = ExtResource("mine_counter_script")
+
+[node name="Radar_Bezel" type="TextureRect" parent="Hud_InGame" unique_id=640715911]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -310.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = 310.0
+grow_horizontal = 0
+texture = ExtResource("28_i28qn")
+expand_mode = 1
+
+[node name="Radar" type="Control" parent="Hud_InGame/Radar_Bezel" unique_id=2004694216]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 9.0
+offset_top = 9.0
+offset_right = -9.0
+offset_bottom = -9.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("27_i28qn")
+target_defs = Array[ExtResource("29_kqlfo")]([ExtResource("30_qkbj0"), ExtResource("31_qkbj0"), ExtResource("32_xb8dm")])
+self_size = Vector2(8, 8)
+
+[node name="Chat" type="Control" parent="Hud_InGame" unique_id=1427117481]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = -160.0
+offset_right = 410.0
+offset_bottom = -10.0
+grow_vertical = 0
+script = ExtResource("30_chat")
+
+[node name="Background" type="TextureRect" parent="Hud_InGame/Chat" unique_id=156771628]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("32_a75n7")
+expand_mode = 1
+
+[node name="Margin" type="MarginContainer" parent="Hud_InGame/Chat" unique_id=1593695201]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="VBox" type="VBoxContainer" parent="Hud_InGame/Chat/Margin" unique_id=29147259]
+layout_mode = 2
+
+[node name="TextEdit" type="RichTextLabel" parent="Hud_InGame/Chat/Margin/VBox" unique_id=1382944740]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_font_sizes/normal_font_size = 14
+theme_override_font_sizes/bold_font_size = 14
+theme_override_font_sizes/bold_italics_font_size = 14
+theme_override_font_sizes/italics_font_size = 14
+theme_override_font_sizes/mono_font_size = 14
+bbcode_enabled = true
+scroll_following = true
+
+[node name="LineEdit" type="LineEdit" parent="Hud_InGame/Chat/Margin/VBox" unique_id=1571506855]
+layout_mode = 2
+
+[node name="P_ICON" type="TextureRect" parent="Hud_InGame" unique_id=1736639444]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -210.0
+offset_top = -122.0
+offset_right = -160.0
+offset_bottom = -72.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="S_ICON" type="TextureRect" parent="Hud_InGame" unique_id=1044169810]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = 160.0
+offset_top = -121.0
+offset_right = 210.0
+offset_bottom = -71.0
+grow_horizontal = 2
+grow_vertical = 0

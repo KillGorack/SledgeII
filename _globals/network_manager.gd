@@ -49,6 +49,11 @@ var _upnp: UPNP
 var _upnp_port: int = -1
 var is_host: bool = false
 var peer_teams: Dictionary = {}
+# peer_id -> CraftDef id, written alongside peer_teams (same request/assign path).
+var peer_crafts: Dictionary = {}
+# What this machine picked in the UI (create-game / team-select) - sent with
+# request_team() and used for the host's own craft in host_game().
+var local_craft_id: StringName = CraftCatalog.DEFAULT_ID
 # peer_id -> username for everyone in the match, pushed by the server
 # (match.gd::_sync_roster). Read by the F4 player list.
 var peer_names: Dictionary = {}
@@ -228,6 +233,7 @@ func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] 
 	current_map_file_id = map_file_id
 	current_map_title = game_name
 	peer_teams = {1: host_team}
+	peer_crafts = {1: local_craft_id}
 	allowed_weapon_paths = weapon_paths
 	day_night_enabled = day_night
 	base_gun_respawn_seconds = base_gun_respawn
@@ -295,6 +301,7 @@ func stop_hosting() -> void:
 	multiplayer.multiplayer_peer = null
 	is_host = false
 	peer_teams.clear()
+	peer_crafts.clear()
 	peer_names.clear()
 	peer_scores.clear()
 
@@ -309,6 +316,7 @@ func leave_game() -> void:
 		multiplayer.multiplayer_peer.close()
 		multiplayer.multiplayer_peer = null
 	peer_teams.clear()
+	peer_crafts.clear()
 	peer_names.clear()
 	peer_scores.clear()
 	current_map_file_id = -1
@@ -331,18 +339,18 @@ func _on_peer_connected(peer_id: int) -> void:
 	# peer isn't in peer_teams at all until request_team() below succeeds, so
 	# match.gd never spawns a craft for them until they've actually chosen.
 	for existing_id in peer_teams.keys():
-		_assign_team.rpc_id(peer_id, existing_id, peer_teams[existing_id])
+		_assign_team.rpc_id(peer_id, existing_id, peer_teams[existing_id], peer_crafts.get(existing_id, CraftCatalog.DEFAULT_ID))
 
 
 # Called by a client's own UI once they've picked a color. Not authoritative
 # by itself - just forwards the request to the host, which is the only one
 # allowed to actually decide (see _request_team below).
 func request_team(team: String) -> void:
-	_request_team.rpc_id(1, team)
+	_request_team.rpc_id(1, team, local_craft_id)
 
 
 @rpc("any_peer", "call_local", "reliable")
-func _request_team(team: String) -> void:
+func _request_team(team: String, craft_id: StringName = CraftCatalog.DEFAULT_ID) -> void:
 	if not multiplayer.is_server():
 		return
 	var requester_id := multiplayer.get_remote_sender_id()
@@ -354,8 +362,11 @@ func _request_team(team: String) -> void:
 	if _team_count(team) >= MAX_PLAYERS_PER_TEAM:
 		_reject_team_request.rpc_id(requester_id, "%s is full." % team.trim_prefix("team_").capitalize())
 		return
+	if not CraftCatalog.has_id(craft_id):
+		craft_id = CraftCatalog.DEFAULT_ID
 	peer_teams[requester_id] = team
-	_assign_team.rpc(requester_id, team)
+	peer_crafts[requester_id] = craft_id
+	_assign_team.rpc(requester_id, team, craft_id)
 
 
 # player_registered never fires for a rejected request (peer_teams never
@@ -400,12 +411,14 @@ func suggest_team() -> String:
 
 func _on_peer_disconnected(peer_id: int) -> void:
 	peer_teams.erase(peer_id)
+	peer_crafts.erase(peer_id)
 	player_unregistered.emit(peer_id)
 
 
 @rpc("authority", "call_local", "reliable")
-func _assign_team(peer_id: int, team: String) -> void:
+func _assign_team(peer_id: int, team: String, craft_id: StringName = CraftCatalog.DEFAULT_ID) -> void:
 	peer_teams[peer_id] = team
+	peer_crafts[peer_id] = craft_id
 	player_registered.emit(peer_id, team)
 
 
