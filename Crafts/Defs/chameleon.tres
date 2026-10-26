@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="CraftDef" format=3 uid="uid://bt60a5lxx3equ"]
+
+[ext_resource type="Script" uid="uid://36yf6f5pq2ss" path="res://Crafts/_scripts/craft_def.gd" id="1_def"]
+[ext_resource type="PackedScene" uid="uid://50k0chl43p32" path="res://Crafts/Models/Chameleon/Chameleon.glb" id="2_model"]
+[ext_resource type="Resource" uid="uid://c53amsofp58kw" path="res://Crafts/Settings/chameleon_stats.tres" id="3_stats"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"chameleon"
+display_name = "Chameleon"
+description = "Stealth specialist. Lightly armored."
+model = ExtResource("2_model")
+stats = ExtResource("3_stats")

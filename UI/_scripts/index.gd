@@ -48,6 +48,7 @@ var _pending_port_forward_warning: String = ""
 @onready var weapon_checklist: VBoxContainer = %WeaponChecklist
 @onready var host_team_picker: OptionButton = %HostTeamPicker
 @onready var team_select_group: Control = $"Screen_layout/VBoxContainer/MarginContainer/Team Select"
+@onready var vehicle_label: Label = %VehicleLabel
 @onready var team_roster: VBoxContainer = $"Screen_layout/VBoxContainer/MarginContainer/Team Select/MarginContainer/VBoxContainer/TeamRoster"
 @onready var team_select_feedback: Label = $"Screen_layout/VBoxContainer/MarginContainer/Team Select/MarginContainer/VBoxContainer/TeamSelectFeedback"
 
@@ -102,6 +103,8 @@ func _ready() -> void:
 	_build_mine_checklist()
 	for team in NetworkManager.TEAM_NAMES:
 		host_team_picker.add_item(team.trim_prefix("team_").capitalize())
+	_add_vehicle_picker(vehicle_label)
+	_add_vehicle_picker(team_roster, true)
 	_load_host_settings()
 	feedback_base_x = ui_feedback.position.x + 25
 	login_timer.connect("timeout", Callable(self, "_on_cooldown_finished"))
@@ -480,6 +483,26 @@ func _on_team_request_rejected(reason: String) -> void:
 # same reasoning as _build_weapon_checklist: the whole list is cheap to
 # regenerate and this is only ever a handful of rows (4 teams), so there's no
 # real cost to not tracking a diff.
+# One OptionButton bound to NetworkManager.local_craft_id, placed right after
+# `anchor` (create-game's Vehicle label) or at the top of `anchor`'s parent
+# (the team-select roster, so joiners can choose too).
+func _add_vehicle_picker(anchor: Control, before_anchor: bool = false) -> void:
+	var picker := OptionButton.new()
+	for def in CraftCatalog.DEFS:
+		picker.add_item(def.display_name)
+		picker.set_item_tooltip(picker.item_count - 1, def.description)
+	picker.select(0)
+	picker.item_selected.connect(func(index: int): NetworkManager.local_craft_id = CraftCatalog.DEFS[index].id)
+	var parent := anchor.get_parent()
+	parent.add_child(picker)
+	parent.move_child(picker, anchor.get_index() + (0 if before_anchor else 1))
+	if before_anchor:
+		var caption := Label.new()
+		caption.text = "Vehicle"
+		parent.add_child(caption)
+		parent.move_child(caption, picker.get_index())
+
+
 func _build_team_roster() -> void:
 	for child in team_roster.get_children():
 		child.queue_free()

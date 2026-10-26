@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="CraftDef" format=3]
+
+[ext_resource type="Script" path="res://Crafts/_scripts/craft_def.gd" id="1_def"]
+[ext_resource type="PackedScene" path="res://Crafts/Models/Devastator/Devastator.glb" id="2_model"]
+[ext_resource type="Resource" path="res://Crafts/Settings/devastator_stats.tres" id="3_stats"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"devastator"
+display_name = "Devastator"
+description = "Slow, heavily armored heavy hitter."
+model = ExtResource("2_model")
+stats = ExtResource("3_stats")

@@ -1,6 +1,6 @@
 extends Node3D
 
-const LIGHTNING_SCENE := preload("res://Crafts/Scenes/lightning.tscn")
+const CRAFT_SCENE := preload("res://Crafts/Scenes/craft.tscn")
 const MAP_SCENE_PATH := "res://secret_level.tscn"
 # Each downloaded map gets its own file, named by file_id, rather than one
 # shared filename every download used to overwrite - see _load_map/_download_map.
@@ -117,15 +117,15 @@ const BASE_PAD_GROUPS := {
 const SPAWN_SLOT_EDGE_MARGIN := 1.0
 const SPAWN_SLOT_SPACING := 2.25
 const DEFAULT_BASE_PAD_SIZE := Vector2(7.0, 7.0)
-# The craft's own origin sits at the turret's center, not its bottom - Y
-# range on its main collider (Crafts/Scenes/lightning.tscn) runs -0.29 to
-# +0.08, and FloorDetection's own collider bottoms out around -0.30, so
-# spawning/respawning AT a marker's exact position buries about a third of
-# the hull in the pad. Lifting here, once, centrally, means spawn markers
+# The craft's own origin sits at the turret's center, not its bottom, and every
+# hull sits at a different depth below it, so spawning/respawning AT a marker's
+# exact position buries the hull in the pad. The lift is therefore per craft -
+# see _spawn_lift_for_peer / CraftBuilder.spawn_lift, applied by the two
+# callers of _pick_spawn_transform - and this shared offset stays at zero. Lifting here, once, centrally, means spawn markers
 # can just sit naturally at ground level in the map editor - no per-marker
 # manual offset for every map author to get right (or re-do if the craft's
 # own dimensions ever change).
-const SPAWN_HEIGHT_OFFSET := 0.40
+const SPAWN_HEIGHT_OFFSET := 0.0
 # 9 of these hover in a 3x3 grid above each team's base (centered on the
 # average position of that team's own base_pad markers), waiting to fly out
 # and capture a recon on that team's behalf - see _spawn_base_guns and
@@ -620,11 +620,13 @@ func _on_player_registered(peer_id: int, team: String) -> void:
 	_spawned_peers[peer_id] = true
 	_peer_bounty[peer_id] = BOUNTY_START
 	var spawn_transform := _pick_spawn_transform(team)
+	spawn_transform.origin.y += _spawn_lift_for_peer(peer_id)
 	var craft: Node = spawner.spawn({
 		"peer_id": peer_id,
 		"team": team,
 		"position": spawn_transform.origin,
-		"basis": spawn_transform.basis
+		"basis": spawn_transform.basis,
+		"craft": NetworkManager.peer_crafts.get(peer_id, CraftCatalog.DEFAULT_ID)
 	})
 	# Starts invisible to everyone (see lightning.tscn's synchronizers, all
 	# public_visibility=false) - grant it to every peer already fully caught
@@ -827,6 +829,10 @@ func _spawn_axis_offsets(axis_size: float) -> Array[float]:
 		return [0.0]
 	var offset := minf(SPAWN_SLOT_SPACING, available_extent)
 	return [-offset, 0.0, offset]
+
+
+func _spawn_lift_for_peer(peer_id: int) -> float:
+	return CraftBuilder.spawn_lift(CraftCatalog.get_def(NetworkManager.peer_crafts.get(peer_id, CraftCatalog.DEFAULT_ID)))
 
 
 func _lift_spawn_transform(spawn_transform: Transform3D) -> Transform3D:
@@ -1252,7 +1258,7 @@ func _attach_local_camera(craft: Node) -> void:
 
 
 func _spawn_craft(data: Dictionary) -> Node:
-	var craft := LIGHTNING_SCENE.instantiate()
+	var craft := CRAFT_SCENE.instantiate()
 	craft.name = "Craft_%d" % data["peer_id"]
 	# radar_controller.gd finds other crafts the same generic group-based way
 	# it finds anything else in its target_defs table.
@@ -1261,20 +1267,10 @@ func _spawn_craft(data: Dictionary) -> Node:
 	var weapon_node = craft.get_node("weapon_node")
 	weapon_node.team = data["team"]
 	# Runs identically on every peer, same as the team assignments above -
-	# purely a local visual, no authority/RPC involved.
-	var team_material: Material = TEAM_CRAFT_MATERIALS.get(data["team"])
-	if team_material:
-		craft.get_node("Hull").material_override = team_material
-		craft.get_node("Turret").material_override = team_material
-	# Hover Pad and Lights share one material (emitting_stuff.tres) across
-	# every team - unlike Hull/Turret above, this one isn't expected to grow
-	# into different per-team designs, just different colors, so it gets
-	# duplicated-then-tinted per craft instead of swapped for a separate
-	# resource (same pattern as base_gun.gd/colorable_mesh.gd elsewhere).
-	var team_color := ReconStation.render_color_for_team(data["team"])
-	_tint_emissive(craft.get_node("Hover Pad"), team_color)
-	_tint_emissive(craft.get_node("Lights"), team_color)
-	# lightning.tscn bakes in the full weapon catalog - filter it down to this
+	# purely local visuals/collider, no authority/RPC involved. The craft id
+	# rides in the spawn data so every peer builds the same tank.
+	CraftBuilder.build(craft, CraftCatalog.get_def(data.get("craft", CraftCatalog.DEFAULT_ID)), data["team"])
+	# craft.tscn bakes in the full weapon catalog - filter it down to this
 	# match's ruleset here so it's identical on every peer (this function runs
 	# locally on all of them, same as team above). Empty means unrestricted -
 	# see the comment on NetworkManager.allowed_weapon_paths for why. This is
@@ -1512,5 +1508,6 @@ func _on_craft_defeated(peer_id: int, attacker_id: int, cause: int) -> void:
 	if not is_instance_valid(craft):
 		return
 	var spawn_transform := _pick_spawn_transform(NetworkManager.peer_teams[peer_id])
+	spawn_transform.origin.y += _spawn_lift_for_peer(peer_id)
 	craft.get_node("health_node").respawn_at.rpc(spawn_transform.origin, spawn_transform.basis)
 	_sync_bounty(peer_id)
