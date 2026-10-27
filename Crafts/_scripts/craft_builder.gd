@@ -99,7 +99,7 @@ static func _apply_team_materials(mi: MeshInstance3D, def: CraftDef, team: Strin
 # team color is applied as the material's albedo tint, so all four teams share
 # one texture per surface and hue never has to be "shifted" (which wrecked
 # near-gray and red pixels).
-static func _team_material(src: Material, def: CraftDef, team: String) -> Material:
+static func _team_material(src: Material, _def: CraftDef, team: String) -> Material:
 	var std := src as StandardMaterial3D
 	if std == null or std.albedo_texture == null:
 		return src
