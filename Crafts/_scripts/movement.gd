@@ -223,8 +223,11 @@ func _track_fall() -> void:
 			_airborne = false
 			_thrust_locked = false
 			_on_landed(_fall_peak_y - y, now - _air_start_msec)
-		elif _thrust_locked and now - _thrust_lock_msec > THRUST_LOCK_GROUNDED_MSEC:
-			_thrust_locked = false
+		else:
+			# Spawned already touching the pad: there is no landing to swallow.
+			_ignore_next_landing = false
+			if _thrust_locked and now - _thrust_lock_msec > THRUST_LOCK_GROUNDED_MSEC:
+				_thrust_locked = false
 	elif not _airborne:
 		_airborne = true
 		_fall_peak_y = y
@@ -322,11 +325,14 @@ func _physics_process(delta: float) -> void:
 		return
 	_write_net_state()
 	var health_node = body.get_node_or_null("health_node")
-	if health_node and health_node.has_method("_is_destroyed"):
+	# _is_destroyed is a variable, not a method - has_method() on it is always
+	# false, which silently disabled this whole guard.
+	if health_node and "_is_destroyed" in health_node:
 		if health_node._is_destroyed:
 			# Whatever the corpse does (or the respawn teleport that follows)
 			# must never count as a fall.
 			_airborne = false
+			_last_air_down_speed = 0.0
 			_ignore_next_landing = true
 			return
 	if stop_forces or stats == null:

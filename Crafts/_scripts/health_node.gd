@@ -161,7 +161,7 @@ func apply_damage(damage: float, attacker_id: int = 0, cause: int = DeathCause.W
 		life -= damage
 	if life <= 0:
 		_death_cause = cause
-		_broadcast_destroyed.rpc()
+		_broadcast_destroyed.rpc(NetworkManager.server_time())
 
 
 # Server-only. 0 (base guns, falls) and the craft's own owner never count.
@@ -179,8 +179,8 @@ func _credited_attacker() -> int:
 
 
 @rpc("authority", "call_local", "reliable")
-func _broadcast_destroyed() -> void:
-	destroy_self()
+func _broadcast_destroyed(death_time: float = 0.0) -> void:
+	destroy_self(death_time)
 
 
 # Client-requested, same shape as weapon_node.gd's request_fire(): movement.gd
@@ -248,7 +248,7 @@ func _at_own_captured_station() -> bool:
 
 # Runs on every peer via _broadcast_destroyed above - that's what makes it
 # visible to everyone, not just the host.
-func destroy_self() -> void:
+func destroy_self(death_time: float = 0.0) -> void:
 	# Two projectiles landing in the same frame both push life below zero and
 	# both arrive here. Without this guard that is two explosions and, worse,
 	# two craft_defeated emissions - so a second respawn fires four seconds
@@ -257,6 +257,16 @@ func destroy_self() -> void:
 		return
 	_is_destroyed = true
 
+	# Other peers draw this craft INTERP_DELAY in the past (movement.gd::
+	# _interpolate_remote), so on arrival of the death the wreck is still
+	# visibly in the air - the explosion and the vanish wait for the drawn
+	# craft to reach the moment it actually died.
+	var visual_wait := _remote_visual_delay(death_time)
+	if visual_wait > 0.0:
+		await get_tree().create_timer(visual_wait).timeout
+		# A respawn can't arrive this fast, but never blow up a live craft.
+		if not _is_destroyed:
+			return
 	var explosion := VEHICLE_EXPLOSION.instantiate()
 	body.get_parent().add_child(explosion)
 	explosion.global_position = body.global_position
@@ -284,6 +294,18 @@ func destroy_self() -> void:
 	if multiplayer.is_server():
 		craft_defeated.emit(body.get_multiplayer_authority(), _credited_attacker(), _death_cause)
 		_last_attacker = 0
+
+
+# How long a peer that only watches this craft should hold the explosion, so
+# it lands where the interpolated craft is drawn rather than where it already is.
+func _remote_visual_delay(death_time: float) -> float:
+	if death_time <= 0.0 or body.is_multiplayer_authority() or not NetworkManager.is_clock_synced():
+		return 0.0
+	var movement_node = body.get_node_or_null("movement_node")
+	if movement_node == null:
+		return 0.0
+	var drawn_time: float = NetworkManager.server_time() - movement_node.INTERP_DELAY
+	return clampf(death_time - drawn_time, 0.0, movement_node.MAX_EXTRAPOLATION)
 
 
 # Called by match.gd once per respawn. Broadcast (not server-only) so every
