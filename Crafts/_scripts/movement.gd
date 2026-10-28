@@ -114,6 +114,8 @@ func _ready() -> void:
 		body.contact_monitor = true
 		body.max_contacts_reported = 8
 	engine_audio = engine_audio_path as AudioStreamPlayer3D
+	if engine_audio and stats and stats.engine_sound:
+		engine_audio.stream = stats.engine_sound
 	if engine_audio and is_multiplayer_authority():
 		engine_audio.pitch_scale = target_pitch
 		engine_audio.volume_db = target_volume

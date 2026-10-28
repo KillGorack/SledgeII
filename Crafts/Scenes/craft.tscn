@@ -1,4 +1,4 @@
-[gd_scene format=4]
+[gd_scene format=3 uid="uid://b1yc1twedwnnd"]
 
 [ext_resource type="Script" uid="uid://b32whv15op7uy" path="res://Crafts/_scripts/movement.gd" id="1_nm6mo"]
 [ext_resource type="Resource" uid="uid://csey8qhg0e4rt" path="res://Crafts/Settings/lightning_stats.tres" id="4_stats"]

@@ -1033,8 +1033,8 @@ var _projectiles: Dictionary = {}
 var _predicted_shots: Dictionary = {}
 
 
-# Server-only. shooter_peer 0 = not a player (base guns), which also means
-# no launch sound (same as before - only crafts ever played one).
+# Server-only. shooter_peer 0 = not a player (base guns). The launch sound
+# plays either way, whenever the weapon's settings define one.
 func spawn_projectile(weapon_settings_path: String, team: String, muzzle_transform: Transform3D, use_team_color: bool = false, shooter_peer: int = 0, shot_seq: int = -1, fast_forward: float = 0.0, reverse_force: bool = false) -> void:
 	if not multiplayer.is_server():
 		return
@@ -1043,7 +1043,7 @@ func spawn_projectile(weapon_settings_path: String, team: String, muzzle_transfo
 		return
 	var first_id := _next_projectile_id
 	_next_projectile_id += maxi(settings.projectile_count, 1)
-	_create_volley(first_id, weapon_settings_path, team, muzzle_transform, use_team_color, fast_forward, shooter_peer != 0, shooter_peer, reverse_force)
+	_create_volley(first_id, weapon_settings_path, team, muzzle_transform, use_team_color, fast_forward, true, shooter_peer, reverse_force)
 	var team_index := NetworkManager.TEAM_NAMES.find(team)
 	# Only to peers whose match scene actually exists - see _ready_peers.
 	for peer_id in _ready_peers:
@@ -1064,7 +1064,7 @@ func _spawn_projectile_event(first_id: int, weapon_settings_path: String, team_i
 				_projectiles[first_id + i] = predicted[i]
 		return
 	var team: String = NetworkManager.TEAM_NAMES[team_index] if team_index >= 0 and team_index < NetworkManager.TEAM_NAMES.size() else ""
-	_create_volley(first_id, weapon_settings_path, team, muzzle_transform, use_team_color, fast_forward + _one_way_latency(), shooter_peer != 0, shooter_peer)
+	_create_volley(first_id, weapon_settings_path, team, muzzle_transform, use_team_color, fast_forward + _one_way_latency(), true, shooter_peer)
 
 
 # Shooter-only (never the host - its shots are the real ones already). Spawns

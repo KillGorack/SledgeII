@@ -1,5 +1,6 @@
 [gd_resource type="Resource" script_class="CraftStats" format=3 uid="uid://csey8qhg0e4rt"]
 
+[ext_resource type="AudioStream" uid="uid://csci3j3dffcry" path="res://Crafts/Sounds/s36.wav" id="1_ed3b1"]
 [ext_resource type="Script" uid="uid://bli8dn5pdiw60" path="res://Crafts/_scripts/craft_stats.gd" id="1_stats"]
 
 [sub_resource type="Curve" id="Curve_4eg04"]
@@ -8,6 +9,7 @@ point_count = 3
 
 [resource]
 script = ExtResource("1_stats")
+engine_sound = ExtResource("1_ed3b1")
 recenter_speed = 64.0
 turn_speed = 2.0
 turn_acceleration = 6.0
