@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://defwrtblkx02f" path="res://Weapons/_scripts/weapon_settings.gd" id="1_hmjdw"]
 [ext_resource type="PackedScene" uid="uid://dqu4r8p4yt5jp" path="res://Weapons/Scenes/explosions/sparks.tscn" id="1_ynubh"]
+[ext_resource type="AudioStream" uid="uid://coocy2cpld5nw" path="res://Weapons/Sounds/base_gun.wav" id="2_7eo7u"]
 [ext_resource type="PackedScene" uid="uid://vdbvupiqax74" path="res://Weapons/Scenes/projectiles/plasma.tscn" id="2_vb3si"]
 [ext_resource type="Texture2D" uid="uid://c4f4umlg3diaj" path="res://Weapons/icons/missile.png" id="4_vb3si"]
 
@@ -15,6 +16,7 @@ cool_down = 0.1
 projectile_prefab = ExtResource("2_vb3si")
 projectile_color = Color(0, 1, 0, 1)
 explosion_prefab = ExtResource("1_ynubh")
+launch_sound = ExtResource("2_7eo7u")
 target_system_scan_radius = 0.0
 projectile_range = 120.0
 projectile_speed = 25.0

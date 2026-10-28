@@ -2,6 +2,8 @@ extends Resource
 class_name CraftStats
 
 @export var target_audio_pitch: float = 2.0
+# Looping engine sound for this craft. Empty = keep the stream set on the craft scene's Engine Sound node.
+@export var engine_sound: AudioStream
 @export var look_sensitivity: float = 1.0
 @export var fine_aim_multiplier: float = 0.35
 @export var recenter_speed: float = 16.0

@@ -1,6 +1,7 @@
 [gd_resource type="Resource" script_class="CraftStats" format=3 uid="uid://uq7h7gd0ea86"]
 
 [ext_resource type="Script" uid="uid://bli8dn5pdiw60" path="res://Crafts/_scripts/craft_stats.gd" id="1_stats"]
+[ext_resource type="AudioStream" uid="uid://dwb1b1qpndl5t" path="res://Crafts/Sounds/s37.wav" id="1_u2roj"]
 
 [sub_resource type="Curve" id="Curve_4eg04"]
 _data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(0.3333333, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
@@ -8,13 +9,14 @@ point_count = 3
 
 [resource]
 script = ExtResource("1_stats")
+engine_sound = ExtResource("1_u2roj")
 recenter_speed = 64.0
 turn_speed = 1.8
 turn_acceleration = 6.0
 turn_deceleration = 12.0
 acceleration = 60.0
 deceleration = 6.0
-max_speed = 3.6
+max_speed = 2.0
 thruster_force = 80.0
 armor = 120.0
 power_gain_rate = 4.0
