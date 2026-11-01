@@ -4,6 +4,9 @@ class_name CraftStats
 @export var target_audio_pitch: float = 2.0
 # Looping engine sound for this craft. Empty = keep the stream set on the craft scene's Engine Sound node.
 @export var engine_sound: AudioStream
+# Multiplies the engine sound's pitch at every speed (it still rises as the craft speeds up). 1 = as recorded;
+# below 1 is deeper (0.75 is about a fifth lower), above 1 higher. For crafts whose engine sounds too high or too low.
+@export_range(0.25, 2.0, 0.01) var engine_pitch: float = 1.0
 @export var look_sensitivity: float = 1.0
 @export var fine_aim_multiplier: float = 0.35
 @export var recenter_speed: float = 16.0
@@ -37,6 +40,11 @@ class_name CraftStats
 # fall_damage_safe_speed nothing happens at all, same as any normal landing;
 # above it, damage scales with the SQUARE of the excess speed (kinetic
 # energy, not linear) so a landing twice as hard hurts four times as much.
+# Weight (kg). The craft's own driving forces are scaled by it (see movement.gd's _weight_scale), so speed,
+# acceleration and turning feel the same whatever it weighs; what changes is how much it is pushed around by
+# everything else: the tornado, explosions, recoil, ramming. 5 is the Lightning, the weight everything was tuned at.
+@export var mass: float = 5.0
+
 @export var fall_damage_safe_speed: float = 2.5
 @export var fall_damage_coefficient: float = 1.5
 

@@ -11,4 +11,6 @@ class_name CraftDef
 @export_multiline var description: String
 # glb with Body / Turret / Barrel meshes, origin at the turret pivot, nose on -Z
 @export var model: PackedScene
+# Simplified hull mesh (convex-hulled) used for physics instead of the visual body/turret
+@export var collider: Mesh
 @export var stats: CraftStats

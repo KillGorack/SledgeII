@@ -140,6 +140,10 @@ func _update_smoke() -> void:
 func apply_damage(damage: float, attacker_id: int = 0, cause: int = DeathCause.WEAPON) -> void:
 	if not multiplayer.is_server() or _is_destroyed:
 		return
+	# A creator who is building takes no damage (falls, base guns, anything); only the void still
+	# counts, or a craft knocked off the map would never come back. Testing is the real thing.
+	if NetworkManager.creative_building and cause != DeathCause.VOID:
+		return
 	note_attacker(attacker_id)
 	_regeneration_timer.start()
 	_is_regenerating = false

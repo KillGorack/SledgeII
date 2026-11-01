@@ -91,6 +91,19 @@ var recon_capture_enabled: bool = true
 # MineSettings paths the host allows (see allowed_weapon_paths); empty = all.
 var allowed_mine_paths: Array[String] = []
 
+# Community level (Creative origin) the match builds from data instead of
+# mounting a .pck - see match.gd::_load_map. Empty = a normal .pck map.
+# creative_editing turns on the in-game builder (Creative/creative_editor.gd).
+var creative_level: Dictionary = {}
+var creative_editing: bool = false
+# True only while actually building; false while driving/testing (B key), which
+# is how an editing session starts.
+var creative_building: bool = false
+# CreativeStore record being edited ("" when playing someone else's level).
+var creative_level_id: String = ""
+# True for a local-only session (build/test): never registered with the lobby API.
+var creative_session: bool = false
+
 
 var _heartbeat_timer: Timer
 
@@ -277,6 +290,48 @@ func join_game(address: String, port: int, map_file_id: int, map_title: String =
 	return OK
 
 
+# Single-player session on a creative level: a loopback server with room for
+# one, not listed in the lobby. Same match scene as a hosted game, so what you
+# test is exactly what others will play. `editing` enables the builder.
+func start_creative_session(level_data: Dictionary, editing: bool, team: String = "team_red", level_id: String = "") -> Error:
+	# Loopback only, so the port doesn't matter: take the first free one, which
+	# keeps this working next to a real hosted game or another running copy.
+	var err := ERR_CANT_CREATE
+	for port in range(DEFAULT_PORT, DEFAULT_PORT + 20):
+		peer = ENetMultiplayerPeer.new()
+		peer.set_bind_ip("127.0.0.1")
+		err = peer.create_server(port, 1)
+		if err == OK:
+			break
+	if err != OK:
+		host_failed.emit("Could not start a local session (%s)" % error_string(err))
+		return err
+	multiplayer.multiplayer_peer = peer
+	is_host = true
+	creative_session = true
+	creative_level = level_data
+	creative_editing = editing
+	# Editing sessions open in test mode (B to start building), so a stray
+	# click or key can't change the level before you've looked at it.
+	creative_building = false
+	creative_level_id = level_id
+	current_map_file_id = -1
+	current_map_title = str(level_data.get("name", "Creative level"))
+	peer_teams = {1: team}
+	peer_crafts = {1: local_craft_id}
+	allowed_weapon_paths = []
+	allowed_mine_paths = []
+	# Fixed daylight while building: a moving sun changes how a level looks
+	# from one minute to the next.
+	day_night_enabled = false
+	mines_enabled = true
+	rockets_enabled = true
+	recon_capture_enabled = true
+	host_started.emit("127.0.0.1")
+	player_registered.emit(1, team)
+	return OK
+
+
 # Range-coder compression on every ENet packet - cheap CPU-wise and a
 # meaningful cut for this game's traffic (lots of small, similar float
 # payloads). Has to match on both ends: a build without this can't talk to a
@@ -289,7 +344,8 @@ func stop_hosting() -> void:
 	if not is_host:
 		return
 	_stop_heartbeat()
-	_unregister_host()
+	if not creative_session:
+		_unregister_host()
 	if _upnp:
 		# Otherwise the mapping just sits on the router until it reboots -
 		# harmless but pointless once nobody's listening on this port anymore.
@@ -321,6 +377,11 @@ func leave_game() -> void:
 	peer_scores.clear()
 	current_map_file_id = -1
 	current_map_title = ""
+	creative_level = {}
+	creative_editing = false
+	creative_building = false
+	creative_level_id = ""
+	creative_session = false
 
 
 func list_open_games() -> void:

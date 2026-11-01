@@ -6,7 +6,7 @@
 [ext_resource type="PackedScene" uid="uid://b2vljciuo54jp" path="res://Weapons/Scenes/projectiles/laser.tscn" id="2_fltvq"]
 [ext_resource type="PackedScene" uid="uid://cbbcjhhhvec5c" path="res://Weapons/Scenes/projectiles/trail_ribbon.tscn" id="2_jcek8"]
 [ext_resource type="AudioStream" uid="uid://d4kvrtidstm8e" path="res://Weapons/Sounds/laser5.mp3" id="3_gd237"]
-[ext_resource type="Texture2D" uid="uid://c4f4umlg3diaj" path="res://Weapons/icons/missile.png" id="7_i7783"]
+[ext_resource type="Texture2D" uid="uid://f1wurbicpq7e" path="res://Weapons/icons/MKIV.png" id="7_i7783"]
 
 [resource]
 script = ExtResource("1_l7uby")

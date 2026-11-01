@@ -35,6 +35,15 @@ var _sync_elapsed := 0.0
 @onready var sky_material: ShaderMaterial = world_environment.environment.sky.sky_material
 
 var _base_light_energy: float
+# A Creative level's own look (CreativeLevel.ENVIRONMENT): multipliers on what this scene is set up with.
+var _sun_scale := 1.0
+var _base_ambient_energy: float
+var _base_sdfgi_energy: float
+var _base_brightness: float
+var _base_contrast: float
+var _base_saturation: float
+var _base_fog_density: float
+var _base_glow_intensity: float
 var _base_moon_energy: float
 var _base_star_brightness: float
 
@@ -43,6 +52,14 @@ func _ready() -> void:
 	_base_light_energy = sun.light_energy
 	_base_moon_energy = moon.light_energy
 	_base_star_brightness = sky_material.get_shader_parameter("star_brightness")
+	var environment := world_environment.environment
+	_base_ambient_energy = environment.ambient_light_energy
+	_base_sdfgi_energy = environment.sdfgi_energy
+	_base_brightness = environment.adjustment_brightness
+	_base_contrast = environment.adjustment_contrast
+	_base_saturation = environment.adjustment_saturation
+	_base_fog_density = environment.volumetric_fog_density
+	_base_glow_intensity = environment.glow_intensity
 	time_of_day = start_time_of_day
 	_update_sun()
 
@@ -84,6 +101,23 @@ func sync_time_to(server_time_of_day: float) -> void:
 	time_of_day = server_time_of_day
 
 
+# Applies a level's environment settings (any missing key is 1.0 = the normal look). Time of day is left
+# alone: the sun and moon still follow it, this only scales how strong they are.
+func apply_level(settings: Dictionary) -> void:
+	var environment := world_environment.environment
+	_sun_scale = float(settings.get("sun", 1.0))
+	# With SDFGI on (it is, in env.tscn) the bounced light replaces the plain sky ambient wherever it reaches,
+	# so ambient_light_energy alone did nothing visible; scale both.
+	var ambient := float(settings.get("ambient", 1.0))
+	environment.ambient_light_energy = _base_ambient_energy * ambient
+	environment.sdfgi_energy = _base_sdfgi_energy * ambient
+	environment.adjustment_brightness = _base_brightness * float(settings.get("brightness", 1.0))
+	environment.adjustment_contrast = _base_contrast * float(settings.get("contrast", 1.0))
+	environment.adjustment_saturation = _base_saturation * float(settings.get("saturation", 1.0))
+	environment.volumetric_fog_density = _base_fog_density * float(settings.get("fog", 1.0))
+	environment.glow_intensity = _base_glow_intensity * float(settings.get("glow", 1.0))
+
+
 func _update_sun() -> void:
 	var sun_angle_deg = time_of_day * 360.0
 	sky_material.set_shader_parameter("sun_angle", sun_angle_deg)
@@ -96,13 +130,13 @@ func _update_sun() -> void:
 	sun.global_transform.basis = Basis.looking_at(-sun_direction, up)
 
 	var day_factor = clamp(sun_direction.y / 0.15, 0.0, 1.0)
-	sun.light_energy = _base_light_energy * day_factor
+	sun.light_energy = _base_light_energy * _sun_scale * day_factor
 	sun.shadow_enabled = day_factor > 0.02
 	var night_factor = clamp(-sun_direction.y / 0.15, 0.0, 1.0)
 	sky_material.set_shader_parameter("star_brightness", _base_star_brightness * night_factor)
 
 	moon.global_transform.basis = Basis.looking_at(sun_direction, up)
-	moon.light_energy = _base_moon_energy * night_factor
+	moon.light_energy = _base_moon_energy * _sun_scale * night_factor
 	moon.shadow_enabled = night_factor > 0.02
 
 	var twilight_blend = 1.0 - smoothstep(0.0, HUE_TRANSITION_WIDTH, sun_direction.y)

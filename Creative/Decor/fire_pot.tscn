@@ -1,0 +1,31 @@
+[gd_scene format=3 uid="uid://dgle41txsdal3"]
+
+[ext_resource type="PackedScene" path="res://Creative/Decor/fire.tscn" id="1_fire"]
+[ext_resource type="Material" uid="uid://b84jpoiuv2y56" path="res://Materials/Creative/roof/terracotta.tres" id="2_tmhy5"]
+[ext_resource type="Material" uid="uid://b3623ydvswr47" path="res://Materials/Creative/floors/sand_dark.tres" id="3_styu7"]
+
+[sub_resource type="CylinderMesh" id="PotMesh"]
+lightmap_size_hint = Vector2i(11, 9)
+top_radius = 0.3
+bottom_radius = 0.2
+height = 0.4
+
+[sub_resource type="CylinderMesh" id="RimMesh"]
+top_radius = 0.3
+bottom_radius = 0.3
+height = 0.075
+
+[node name="FirePot" type="Node3D" unique_id=130224012]
+
+[node name="Fire" parent="." unique_id=1837212884 instance=ExtResource("1_fire")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.483103, 0)
+
+[node name="Pot" type="MeshInstance3D" parent="." unique_id=1405973567]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 0)
+material_override = ExtResource("2_tmhy5")
+mesh = SubResource("PotMesh")
+
+[node name="Rim" type="MeshInstance3D" parent="." unique_id=1507998076]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.369315, 0)
+material_override = ExtResource("3_styu7")
+mesh = SubResource("RimMesh")

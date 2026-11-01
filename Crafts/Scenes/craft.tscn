@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://b1yc1twedwnnd"]
 
 [ext_resource type="Script" uid="uid://b32whv15op7uy" path="res://Crafts/_scripts/movement.gd" id="1_nm6mo"]
-[ext_resource type="Resource" uid="uid://csey8qhg0e4rt" path="res://Crafts/Settings/lightning_stats.tres" id="4_stats"]
+[ext_resource type="Resource" uid="uid://csey8qhg0e4rt" path="res://Crafts/Settings/paladin_stats.tres" id="4_stats"]
 [ext_resource type="AudioStream" uid="uid://cjmg1eqi1eacq" path="res://Crafts/Sounds/vehicle.mp3" id="4_tqpc5"]
 [ext_resource type="PhysicsMaterial" path="res://Physics/physics_craft.tres" id="5_physmat"]
 [ext_resource type="Script" uid="uid://cs0sh685407yx" path="res://Crafts/_scripts/health_node.gd" id="6_health"]

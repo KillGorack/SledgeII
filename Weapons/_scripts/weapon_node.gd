@@ -76,6 +76,9 @@ func _physics_process(_delta: float) -> void:
 	# chat_controller.gd::is_open, same reasoning as movement.gd.
 	if chat.is_open:
 		return
+	# The community level builder uses Space/Tab for placing and cycling.
+	if NetworkManager.creative_building:
+		return
 	# Mines are laid and blown by the server (mine_manager.gd); this is just
 	# the request.
 	if Input.is_action_just_pressed("change_specials", true) and not mine_settings.is_empty():

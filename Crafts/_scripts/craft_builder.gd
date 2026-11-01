@@ -37,9 +37,13 @@ static func build(craft: RigidBody3D, def: CraftDef, team: String) -> void:
 	_apply_team_materials(barrel, def, team)
 
 	var body_box := body_src.mesh.get_aabb()
-	var hull_points := body_src.mesh.get_faces()
-	if turret_src:
-		hull_points.append_array(turret_src.mesh.get_faces())
+	var hull_points: PackedVector3Array
+	if def.collider:
+		hull_points = def.collider.get_faces()
+	else:
+		hull_points = body_src.mesh.get_faces()
+		if turret_src:
+			hull_points.append_array(turret_src.mesh.get_faces())
 	var top := body_box.end.y
 	if turret_src:
 		top = maxf(top, turret_src.mesh.get_aabb().end.y)
@@ -65,6 +69,7 @@ static func build(craft: RigidBody3D, def: CraftDef, team: String) -> void:
 	rays.get_node("RearRight").position = Vector3(-x, bottom, centre.z + z)
 
 	craft.center_of_mass = Vector3(centre.x, bottom, centre.z)
+	craft.mass = maxf(def.stats.mass, 0.1)
 	craft.get_node("DamageSmoke").position = Vector3(centre.x, top, body_box.end.z - body_box.size.z * 0.2)
 
 	craft.get_node("movement_node").stats = def.stats

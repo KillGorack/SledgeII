@@ -7,7 +7,8 @@ extends Node
 # live in base_gun.gd.
 const DeathCause := HealthNode.DeathCause
 
-@onready var _gun: BaseGun = get_parent().get_parent()
+# A BaseGun or a Sentry: anything with take_damage(damage, attacker_id).
+@onready var _gun: Node = get_parent().get_parent()
 
 
 func apply_damage(damage: float, attacker_id: int = 0, _cause: int = DeathCause.WEAPON) -> void:

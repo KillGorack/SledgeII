@@ -84,6 +84,9 @@ func _physics_process(_delta: float) -> void:
 	# guns per map, every physics tick, made this the loudest of the error spam).
 	if not NetworkManager.is_live_server():
 		return
+	# Nothing shoots at a creator who is building (Creative/creative_editor.gd); testing is the real thing.
+	if NetworkManager.creative_building:
+		return
 	if weapon_settings == null or team == "":
 		return
 	var now := Time.get_ticks_msec() / 1000.0

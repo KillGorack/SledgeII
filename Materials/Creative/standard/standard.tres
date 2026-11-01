@@ -1,0 +1,12 @@
+[gd_resource type="StandardMaterial3D" load_steps=2 format=3]
+
+[ext_resource type="Texture2D" path="res://Materials/Creative/Textures/Standard/Standard.png" id="1_rg5m5"]
+
+[resource]
+albedo_texture = ExtResource("1_rg5m5")
+metallic = 0.41
+metallic_specular = 1.0
+roughness = 0.0
+emission_enabled = true
+emission_energy_multiplier = 0.1
+emission_texture = ExtResource("1_rg5m5")

@@ -82,6 +82,15 @@ var selected_map_file_id: int = -1
 # static so it outlives this scene - index.tscn is rebuilt from scratch every
 # time a match exits back here, and populate_levels_tree reselects it.
 static var _last_selected_map_file_id: int = -1
+# Same for the tab (Create Game / Join Game / Community Levels) the player was on.
+static var _last_load_tab: int = 0
+
+# The map list as the server sent it, and the two filters over it (built in
+# code above the list). "" means no filter.
+const ORIGIN_NAMES: Array[String] = ["Tanarus Original", "Submitted CAD model", "Creative level"]
+var _level_rows: Array = []
+var _origin_filter: OptionButton
+var _genre_filter: OptionButton
 # The host screen's choices, saved when Host is pressed and restored on the
 # next visit - even after a restart. See _save_host_settings.
 const HOST_SETTINGS_PATH := "user://host_settings.cfg"
@@ -90,7 +99,14 @@ var selected_game_row = null
 
 
 
+# The Settings screen is built but left out of the menu for now; set this to true to bring its button back.
+const SHOW_SETTINGS := false
+
+
 func _ready() -> void:
+	btn_settings.visible = SHOW_SETTINGS
+	_build_credits()
+	_add_version_label()
 	add_child(login_timer)
 	add_child(game_list_poll_timer)
 	# Same cadence NetworkManager already uses to keep a hosted game's own
@@ -110,6 +126,7 @@ func _ready() -> void:
 	login_timer.connect("timeout", Callable(self, "_on_cooldown_finished"))
 	http_request.connect("request_completed", Callable(self, "_on_request_completed"))
 	world_list.connect("item_selected", Callable(self, "_on_level_selected"))
+	_build_level_filters()
 	game_list.connect("item_selected", Callable(self, "_on_game_selected"))
 	login_timer.one_shot = true
 	btn_quit.pressed.connect(func(): _on_quit())
@@ -117,6 +134,7 @@ func _ready() -> void:
 	thumb_frame.resized.connect(_fit_thumb_frame)
 	btn_settings.pressed.connect(func(): _show_info_panel(settings_group))
 	btn_credits.pressed.connect(func(): _show_info_panel(credits_group))
+	# host_started (see _on_host_started) takes it from there into match.tscn.
 	btn_register.pressed.connect(func(): _on_register())
 	btn_login.pressed.connect(func(): _on_login())
 	btn_host.pressed.connect(func(): _on_host_pressed())
@@ -190,8 +208,12 @@ func _enter_load_screen(feedback_message: String) -> void:
 	login_group.visible = false
 	load_group.visible = true
 	_hide_info_panels()
-	load_game_tabs.current_tab = 0
+	load_game_tabs.current_tab = clampi(_last_load_tab, 0, load_game_tabs.get_tab_count() - 1)
 	set_ui_feedback(feedback_message, "OK")
+	# Ask the server about the player's own levels now, whichever tab is showing, so My Creations is right when opened.
+	var my_creations := load_game_tabs.get_node_or_null("Community Levels/My Creations")
+	if my_creations and my_creations.has_method("check_server"):
+		my_creations.check_server()
 	getLevels()
 	await get_tree().create_timer(1).timeout
 	NetworkManager.list_open_games()
@@ -200,7 +222,56 @@ func _enter_load_screen(feedback_message: String) -> void:
 # Keeps the Join Game list current for as long as it's actually on screen,
 # without polling the lobby API in the background the rest of the time (e.g.
 # while the player is just picking a map to host).
+# The Credits screen's text, and a Licenses button that shows the engine's notices.
+func _build_credits() -> void:
+	var text_label := credits_group.get_node("Margin/Text") as RichTextLabel
+	text_label.text = Credits.text()
+	var button := Button.new()
+	button.text = "Licenses"
+	button.focus_mode = Control.FOCUS_NONE
+	button.custom_minimum_size = Vector2(140, 44)
+	button.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	button.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	button.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	button.offset_right = -20.0
+	button.offset_bottom = -20.0
+	credits_group.add_child(button)
+	var dialog := AcceptDialog.new()
+	dialog.title = "Licenses"
+	dialog.exclusive = false
+	dialog.min_size = Vector2i(900, 640)
+	var box := TextEdit.new()
+	box.editable = false
+	box.custom_minimum_size = Vector2(860, 560)
+	box.text = Credits.licenses_text()
+	dialog.add_child(box)
+	add_child(dialog)
+	button.pressed.connect(func() -> void: dialog.popup_centered())
+
+
+# The build's version (Project Settings > Application > Config > Version), small in the bottom-right corner, so a
+# bug report can say which build it came from.
+func _add_version_label() -> void:
+	var version := str(ProjectSettings.get_setting("application/config/version", ""))
+	if version.is_empty():
+		return
+	var layer := CanvasLayer.new()
+	layer.layer = 100
+	add_child(layer)
+	var label := Label.new()
+	label.text = "v" + version
+	label.modulate = Color(1.0, 1.0, 1.0, 0.55)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	label.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	label.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	label.offset_right = -10.0
+	label.offset_bottom = -6.0
+	layer.add_child(label)
+
+
 func _on_load_game_tab_changed(tab: int) -> void:
+	_last_load_tab = tab
 	if tab == JOIN_GAME_TAB_INDEX:
 		NetworkManager.list_open_games() # don't make them wait a full interval for the first refresh
 		game_list_poll_timer.start()
@@ -246,6 +317,8 @@ func _show_map_details(row: TreeItem) -> void:
 	map_description.text = description if description != "" else "No description available."
 	map_title.text = row.get_text(0)
 	map_byline.text = "by %s   -   %s" % [row.get_text(1), row.get_text(2)]
+	if row.get_meta("origin", "") == "Creative level":
+		map_byline.text += "   -   Community level"
 	var tan_id := int(row.get_meta("tan_id", -1))
 	if _thumb_cache.has(tan_id):
 		map_thumbnail.texture = _thumb_cache[tan_id]
@@ -657,7 +730,54 @@ func _on_request_completed(_result, response_code, _headers, body):
 
 
 
+# Origin and genre filters above the map list, added next to the list itself so
+# the scene file doesn't change.
+func _build_level_filters() -> void:
+	var map_row := world_list.get_parent()
+	var bar := HBoxContainer.new()
+	bar.add_theme_constant_override("separation", 8)
+	_origin_filter = OptionButton.new()
+	_origin_filter.add_item("All origins")
+	for origin in ORIGIN_NAMES:
+		_origin_filter.add_item(origin)
+	_genre_filter = OptionButton.new()
+	_genre_filter.add_item("All genres")
+	for filter in [_origin_filter, _genre_filter]:
+		filter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		filter.item_selected.connect(func(_i): _fill_levels_tree())
+		bar.add_child(filter)
+	# The list is fetched at login; levels approved since then show up on a refresh.
+	var refresh := Button.new()
+	refresh.text = "Refresh"
+	refresh.pressed.connect(func(): getLevels())
+	bar.add_child(refresh)
+	map_row.get_parent().add_child(bar)
+	map_row.get_parent().move_child(bar, map_row.get_index())
+
+
 func populate_levels_tree(response_data):
+	_level_rows = response_data.data
+	# Genres come from what the server actually lists, keeping the current pick if it is still there.
+	var picked := _genre_filter.get_item_text(_genre_filter.selected) if _genre_filter.selected > 0 else ""
+	var genres: Array[String] = []
+	for map_item in _level_rows:
+		var genre := str(map_item.tan_genre)
+		if not genre.is_empty() and not genres.has(genre):
+			genres.append(genre)
+	genres.sort()
+	_genre_filter.clear()
+	_genre_filter.add_item("All genres")
+	for genre in genres:
+		_genre_filter.add_item(genre)
+		if genre == picked:
+			_genre_filter.select(_genre_filter.item_count - 1)
+	_fill_levels_tree()
+
+
+func _fill_levels_tree() -> void:
+	world_list.clear()
+	var origin := _origin_filter.get_item_text(_origin_filter.selected) if _origin_filter.selected > 0 else ""
+	var genre_pick := _genre_filter.get_item_text(_genre_filter.selected) if _genre_filter.selected > 0 else ""
 	var rootrow = world_list.create_item()
 	rootrow.set_text(0, "")
 	var firstrow = world_list.create_item()
@@ -669,8 +789,12 @@ func populate_levels_tree(response_data):
 	firstrow.set_selectable(2, false)
 	var first_row: TreeItem = null
 	var selected_any := false
-	for map_item in response_data.data:
+	for map_item in _level_rows:
 		if map_item.tan_prepared == 1:
+			if not origin.is_empty() and str(map_item.get("tan_origin", "Tanarus Original")) != origin:
+				continue
+			if not genre_pick.is_empty() and str(map_item.tan_genre) != genre_pick:
+				continue
 			var row = world_list.create_item()
 			if first_row == null:
 				first_row = row
@@ -681,6 +805,7 @@ func populate_levels_tree(response_data):
 			row.set_meta("fil_id", map_item.file_id)
 			row.set_meta("tan_id", map_item.tan_id)
 			row.set_meta("thm_id", map_item.thm_id)
+			row.set_meta("origin", str(map_item.get("tan_origin", "Tanarus Original")))
 			if int(map_item.file_id) == _last_selected_map_file_id:
 				row.select(0)
 				# Deferred - the Tree hasn't laid out its new rows yet this frame.
@@ -691,6 +816,10 @@ func populate_levels_tree(response_data):
 	if not selected_any and first_row != null:
 		first_row.select(0)
 		_on_level_selected()
+	elif first_row == null:
+		# The filters left nothing: Host must not carry on with the map picked before.
+		selected_map_title = ""
+		selected_map_file_id = -1
 
 
 

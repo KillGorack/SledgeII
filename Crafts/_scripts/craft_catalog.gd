@@ -1,11 +1,9 @@
 class_name CraftCatalog
 
-const DEFAULT_ID := &"lightning"
+const DEFAULT_ID := &"paladin"
 const DEFS: Array[CraftDef] = [
-	preload("res://Crafts/Defs/lightning.tres"),
-	preload("res://Crafts/Defs/vanguard.tres"),
-	preload("res://Crafts/Defs/chameleon.tres"),
-	preload("res://Crafts/Defs/devastator.tres"),
+	preload("res://Crafts/Defs/paladin.tres"),
+	preload("res://Crafts/Defs/aegis.tres"),
 ]
 
 

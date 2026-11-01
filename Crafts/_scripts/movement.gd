@@ -34,6 +34,9 @@ const KNOCKBACK_FALL_IMMUNITY := 0.5
 @export var SUSPENSION_DAMPING := 100.0
 const LATERAL_GRIP_STRENGTH := 10.0
 const LONGITUDINAL_GRIP_STRENGTH := 2.0
+# The weight every force in this file was tuned at (the Lightning). A heavier craft's own forces are scaled up by
+# its weight over this, so it drives the same; see CraftStats.mass.
+const REFERENCE_MASS := 5.0
 # Remote-copy snapshot interpolation (see _interpolate_remote). Remote craft
 # are drawn INTERP_DELAY in the past, blending between the two real
 # snapshots around that moment - ~3 snapshots deep at the root
@@ -340,7 +343,7 @@ func _physics_process(delta: float) -> void:
 	if stop_forces or stats == null:
 		return
 	if not target_pitch:
-		target_pitch = stats.target_audio_pitch
+		target_pitch = stats.target_audio_pitch * stats.engine_pitch
 	# While chatting, arrow keys/WASD/etc. are being typed, not driving the
 	# craft - see chat_controller.gd::is_open. Physics below (suspension,
 	# grounding, landing, engine sound) still runs as normal either way; only
@@ -486,11 +489,11 @@ func move_player(forward_input):
 		return
 	var direction = body.transform.basis.z
 	if forward_input != 0:
-		var force = direction * forward_input * stats.acceleration
+		var force = direction * forward_input * stats.acceleration * _weight_scale()
 		body.apply_central_force(force)
 	else:
 		var current_velocity = body.get_linear_velocity()
-		var deceleration_force = -current_velocity * stats.deceleration
+		var deceleration_force = -current_velocity * stats.deceleration * _weight_scale()
 		body.apply_central_force(deceleration_force)
 	if isGrounded and not _is_knockback_active():
 		var clamped_velocity = body.get_linear_velocity().limit_length(stats.max_speed)
@@ -504,10 +507,10 @@ func update_engine_sound():
 	if engine_audio:
 		var speed : float = body.get_linear_velocity().length()
 		if isGrounded:
-			target_pitch = clamp(2.0 + speed / max(stats.max_speed, 1.0) * 2.0, 2.0, 4.0) * ui_pitch
+			target_pitch = clamp(2.0 + speed / max(stats.max_speed, 1.0) * 2.0, 2.0, 4.0) * ui_pitch * stats.engine_pitch
 			target_volume = clamp(-20 + 10 * (speed / max(stats.max_speed, 1.0)), -60.0, -20.0)
 		else:
-			target_pitch = 2.0 * ui_pitch
+			target_pitch = 2.0 * ui_pitch * stats.engine_pitch
 			target_volume = -20.0
 		engine_audio.pitch_scale = lerp(engine_audio.pitch_scale, target_pitch, pitch_transition_speed * get_process_delta_time())
 		engine_audio.volume_db = lerp(engine_audio.volume_db, target_volume, volume_transition_speed * get_process_delta_time())
@@ -520,6 +523,7 @@ func _apply_suspension_forces(forward_input: float) -> void:
 	var right: Vector3 = body.global_transform.basis.x
 	var forward: Vector3 = body.global_transform.basis.z
 	var is_accelerating := not is_zero_approx(forward_input)
+	var weight := _weight_scale()
 	for ray in suspension_rays:
 		if not ray.is_colliding():
 			continue
@@ -532,14 +536,14 @@ func _apply_suspension_forces(forward_input: float) -> void:
 		var offset: Vector3 = ray.global_position - body.global_position
 		var point_velocity: Vector3 = body.linear_velocity + body.angular_velocity.cross(offset)
 		var closing_speed := point_velocity.dot(ray_up)
-		var force_magnitude := (compression * SUSPENSION_SPRING_STRENGTH) - (closing_speed * SUSPENSION_DAMPING)
+		var force_magnitude := ((compression * SUSPENSION_SPRING_STRENGTH) - (closing_speed * SUSPENSION_DAMPING)) * weight
 		if force_magnitude > 0.0:
 			body.apply_force(ray_up * force_magnitude, offset)
 		var lateral_speed := point_velocity.dot(right)
-		body.apply_force(-right * lateral_speed * LATERAL_GRIP_STRENGTH, offset)
+		body.apply_force(-right * lateral_speed * LATERAL_GRIP_STRENGTH * weight, offset)
 		if not is_accelerating:
 			var longitudinal_speed := point_velocity.dot(forward)
-			body.apply_force(-forward * longitudinal_speed * LONGITUDINAL_GRIP_STRENGTH, offset)
+			body.apply_force(-forward * longitudinal_speed * LONGITUDINAL_GRIP_STRENGTH * weight, offset)
 
 
 
@@ -573,25 +577,30 @@ func _unturtle(turn_input: float, delta: float) -> bool:
 		direction = 1.0
 	if direction != 0.0:
 		var roll_axis := -body.global_basis.z
-		body.apply_torque_impulse(roll_axis * direction * stats.rotation_speed * UNTURTLE_TORQUE_MULT * delta)
-		body.apply_central_force(Vector3.UP * stats.thruster_force * UNTURTLE_LIFT_RATIO)
+		body.apply_torque_impulse(roll_axis * direction * stats.rotation_speed * UNTURTLE_TORQUE_MULT * delta * _weight_scale())
+		body.apply_central_force(Vector3.UP * stats.thruster_force * UNTURTLE_LIFT_RATIO * _weight_scale())
 	return true
 
 
 func activate_thrusters(delta):
-	body.apply_central_force(Vector3.UP * stats.thruster_force)
+	body.apply_central_force(Vector3.UP * stats.thruster_force * _weight_scale())
 	var current_up = body.transform.basis.y
 	var target_up = Vector3.UP
 	var rotation_axis = current_up.cross(target_up).normalized()
 	var angle_diff = acos(current_up.dot(target_up))
 	if angle_diff > 0.1:
-		var torque = rotation_axis * min(stats.rotation_speed * delta, angle_diff)
+		var torque = rotation_axis * min(stats.rotation_speed * delta, angle_diff) * _weight_scale()
 		body.apply_torque_impulse(torque)
 	else:
 		rotational_velocity_set_to_zero = true
 
 
 
+
+
+# How much heavier than the tuning weight this craft is. Its own pushes are multiplied by this so it drives as tuned.
+func _weight_scale() -> float:
+	return (stats.mass if stats else REFERENCE_MASS) / REFERENCE_MASS
 
 
 func is_right_side_up() -> bool:

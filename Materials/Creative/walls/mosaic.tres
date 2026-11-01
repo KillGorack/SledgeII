@@ -1,0 +1,16 @@
+[gd_resource type="StandardMaterial3D" load_steps=5 format=3]
+
+[ext_resource type="Texture2D" path="res://Materials/Creative/Textures/mosaic/Mosaic_C_diffuse_Alpha.png" id="1_3283t"]
+[ext_resource type="Texture2D" path="res://Materials/Creative/Textures/mosaic/Mosaic_C_ao.png" id="2_6eanv"]
+[ext_resource type="Texture2D" path="res://Materials/Creative/Textures/mosaic/Mosaic_C_height.png" id="3_jr7bh"]
+[ext_resource type="Texture2D" path="res://Materials/Creative/Textures/mosaic/Mosaic_C_normal.png" id="4_w2exs"]
+
+[resource]
+albedo_texture = ExtResource("1_3283t")
+normal_enabled = true
+normal_scale = -1.0
+normal_texture = ExtResource("4_w2exs")
+ao_enabled = true
+ao_texture = ExtResource("2_6eanv")
+heightmap_enabled = true
+heightmap_texture = ExtResource("3_jr7bh")

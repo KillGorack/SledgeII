@@ -1,0 +1,67 @@
+[gd_scene load_steps=11 format=3]
+
+[ext_resource type="Texture2D" path="res://Materials/Textures/Particles/T_smoke_flipbook.png" id="1_54ske"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_74hon"]
+transparency = 1
+vertex_color_use_as_albedo = true
+vertex_color_is_srgb = true
+albedo_texture = ExtResource("1_54ske")
+billboard_mode = 3
+particles_anim_h_frames = 8
+particles_anim_v_frames = 8
+particles_anim_loop = false
+
+[sub_resource type="Curve" id="Curve_c0diy"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(0.503846, 0), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_jcmj7"]
+curve = SubResource("Curve_c0diy")
+
+[sub_resource type="Gradient" id="Gradient_yk0kn"]
+offsets = PackedFloat32Array(0, 0.271552)
+colors = PackedColorArray(1, 0.5, 0, 1, 1, 0.5, 0, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_gv15y"]
+gradient = SubResource("Gradient_yk0kn")
+
+[sub_resource type="Curve" id="Curve_y8w3w"]
+_limits = [0.0, 50.0, 0.0, 1.0]
+_data = [Vector2(0, 99), 0.0, 0.0, 0, 0, Vector2(1e-05, 50), 0.0, 0.0, 0, 0, Vector2(0.369231, 0), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_f4ilf"]
+curve = SubResource("Curve_y8w3w")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_a5s18"]
+particle_flag_rotate_y = true
+emission_shape = 1
+emission_sphere_radius = 0.1
+angle_min = -180.0
+angle_max = 180.0
+direction = Vector3(0, 0, 0)
+spread = 0.0
+angular_velocity_min = -50.0
+angular_velocity_max = 50.0
+gravity = Vector3(0, 3, 0)
+scale_min = 0.9
+scale_max = 2.2
+color = Color(0.678944, 0.678944, 0.678944, 1)
+color_ramp = SubResource("GradientTexture1D_gv15y")
+alpha_curve = SubResource("CurveTexture_jcmj7")
+emission_curve = SubResource("CurveTexture_f4ilf")
+anim_speed_min = 1.0
+anim_speed_max = 1.0
+
+[sub_resource type="QuadMesh" id="QuadMesh_jr1s2"]
+
+[node name="Fire" type="Node3D"]
+
+[node name="Particle System" type="GPUParticles3D" parent="."]
+material_override = SubResource("StandardMaterial3D_74hon")
+amount = 30
+lifetime = 2.0
+fixed_fps = 60
+process_material = SubResource("ParticleProcessMaterial_a5s18")
+draw_pass_1 = SubResource("QuadMesh_jr1s2")

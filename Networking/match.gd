@@ -114,6 +114,14 @@ const BASE_PAD_GROUPS := {
 }
 # Keep spawned craft centers at least this far from each pad edge. The
 # resulting grid gives a 7x7 pad nine separated spawn spots.
+const BASE_AMBIENCE := {
+	"team_red": preload("res://Crafts/Sounds/base_red.ogg"),
+	"team_green": preload("res://Crafts/Sounds/base_green.ogg"),
+	"team_blue": preload("res://Crafts/Sounds/base_blue.ogg"),
+	"team_gray": preload("res://Crafts/Sounds/base_gray.ogg"),
+}
+const BASE_AMBIENCE_UNIT_SIZE := 6.0
+const BASE_AMBIENCE_MAX_DISTANCE := 12.0
 const SPAWN_SLOT_EDGE_MARGIN := 1.0
 const SPAWN_SLOT_SPACING := 2.25
 const DEFAULT_BASE_PAD_SIZE := Vector2(7.0, 7.0)
@@ -438,6 +446,18 @@ func _try_start_capture() -> void:
 
 func _load_map() -> void:
 	var target_file_id = NetworkManager.current_map_file_id
+	if not NetworkManager.creative_level.is_empty():
+		var editing: bool = NetworkManager.creative_editing
+		var creative_map := CreativeLevelBuilder.build(NetworkManager.creative_level, editing)
+		add_child(creative_map)
+		if editing:
+			var editor := CreativeEditor.new()
+			editor.name = "CreativeEditor"
+			editor.setup(NetworkManager.creative_level, creative_map, local_camera)
+			add_child(editor)
+		await _finish_map_setup(creative_map)
+		apply_level_environment(NetworkManager.creative_level.get("environment", {}))
+		return
 	if target_file_id > 0:
 		# Every map's .pck exports the same virtual path, so "does
 		# res://secret_level.tscn already exist" can't tell maps apart - the
@@ -452,6 +472,20 @@ func _load_map() -> void:
 				await _download_map(target_file_id, pck_path)
 			if not FileAccess.file_exists(pck_path):
 				push_warning("Match: map %d unavailable, download failed" % target_file_id)
+				return
+			# The file is either a map pack or a Creative level's data (a published level is listed
+			# and downloaded exactly like a map); the first bytes say which, so nothing else has to
+			# travel through the lobby for a joining player.
+			if not _is_map_pack(pck_path):
+				var level := CreativeLevel.parse(FileAccess.get_file_as_string(pck_path))
+				if level.is_empty():
+					push_warning("Match: file %d is neither a map pack nor level data" % target_file_id)
+					DirAccess.remove_absolute(pck_path)   # don't keep a bad download (e.g. an error page) as the cache
+					return
+				var creative_map := CreativeLevelBuilder.build(level, false)
+				add_child(creative_map)
+				await _finish_map_setup(creative_map)
+				apply_level_environment(level.get("environment", {}))
 				return
 			ProjectSettings.load_resource_pack(pck_path)
 			NetworkManager.mounted_map_file_id = target_file_id
@@ -472,14 +506,39 @@ func _load_map() -> void:
 	var map_scene: PackedScene = ResourceLoader.load(MAP_SCENE_PATH, "", ResourceLoader.CACHE_MODE_REPLACE)
 	var map_instance := map_scene.instantiate()
 	add_child(map_instance)
+	await _finish_map_setup(map_instance)
+
+
+func _finish_map_setup(map_instance: Node) -> void:
 	await _prewarm_effect_shaders()
 	_apply_custom_environment(map_instance)
 	_spawn_recon_stations(map_instance)
 	for team in BASE_PAD_GROUPS:
 		_spawn_points_by_team[team] = get_tree().get_nodes_in_group(BASE_PAD_GROUPS[team])
 		_spawn_base_guns(team, _spawn_points_by_team[team])
+		_spawn_base_ambience(team, _spawn_points_by_team[team])
 	var overrides = get_tree().get_nodes_in_group("PlayerSpawnOverride")
 	_fallback_spawn_points = overrides if overrides.size() > 0 else get_tree().get_nodes_in_group("PlayerSpawn")
+
+
+# One looping hum per team base (each team has its own), at the average position of its pad markers.
+# Local and cosmetic - never replicated - and parented to the first marker so it
+# goes away with the map. Skipped on a headless server.
+func _spawn_base_ambience(team: String, pads: Array) -> void:
+	if pads.is_empty() or DisplayServer.get_name() == "headless":
+		return
+	var centre := Vector3.ZERO
+	for pad in pads:
+		centre += _pad_center(pad)
+	centre /= pads.size()
+	var player := AudioStreamPlayer3D.new()
+	player.name = "BaseAmbience"
+	player.stream = BASE_AMBIENCE[team]
+	player.unit_size = BASE_AMBIENCE_UNIT_SIZE
+	player.max_distance = BASE_AMBIENCE_MAX_DISTANCE
+	player.autoplay = true
+	pads[0].add_child(player)
+	player.global_position = centre
 
 
 # A fresh machine has no shader cache, so the GPU driver has to actually
@@ -526,6 +585,13 @@ func _apply_custom_environment(map_instance: Node) -> void:
 	add_child(_env)
 
 
+# A Creative level's look (see CreativeLevel.ENVIRONMENT). Public: the editor's Environment tool previews
+# its sliders through it.
+func apply_level_environment(settings: Dictionary) -> void:
+	if _env and _env.has_method("apply_level"):
+		_env.apply_level(settings)
+
+
 func _find_world_environment(node: Node) -> WorldEnvironment:
 	if node is WorldEnvironment:
 		return node
@@ -559,18 +625,24 @@ func _spawn_recon_stations(map_instance: Node) -> void:
 	if not recon_locations:
 		return
 	for anchor in recon_locations.get_children():
-		var station := RECON_STATION_SCENE.instantiate()
-		# power_node.gd charges craft near any node in this group - see
-		# Crafts/_scripts/power_node.gd.
-		station.add_to_group("Recon")
-		anchor.add_child(station)
-		# Every station carries a gun of its own, hovering above the pad - it
-		# works for whichever team holds the station (see base_gun.gd::recon).
-		var gun := BASE_GUN_SCENE.instantiate()
-		gun.name = "ReconGun"
-		gun.recon = station
-		gun.position = Vector3.UP * RECON_GUN_HEIGHT
-		station.add_child(gun)
+		spawn_recon_station(anchor)
+
+
+# One station (with its gun) on an anchor. Public because the Creative editor fills the anchors it places
+# while building, so a recon shows as the real thing straight away.
+func spawn_recon_station(anchor: Node3D) -> void:
+	var station := RECON_STATION_SCENE.instantiate()
+	# power_node.gd charges craft near any node in this group - see
+	# Crafts/_scripts/power_node.gd.
+	station.add_to_group("Recon")
+	anchor.add_child(station)
+	# Every station carries a gun of its own, hovering above the pad - it
+	# works for whichever team holds the station (see base_gun.gd::recon).
+	var gun := BASE_GUN_SCENE.instantiate()
+	gun.name = "ReconGun"
+	gun.recon = station
+	gun.position = Vector3.UP * RECON_GUN_HEIGHT
+	station.add_child(gun)
 
 
 func _find_named_node(node: Node, target_name: String) -> Node:
@@ -581,6 +653,12 @@ func _find_named_node(node: Node, target_name: String) -> Node:
 		if found:
 			return found
 	return null
+
+
+# Godot packs start with "GDPC".
+func _is_map_pack(path: String) -> bool:
+	var file := FileAccess.open(path, FileAccess.READ)
+	return file != null and file.get_buffer(4).get_string_from_ascii() == "GDPC"
 
 
 func _cached_map_path(file_id: int) -> String:
@@ -802,6 +880,15 @@ func _pick_spawn_transform(team: String) -> Transform3D:
 	return roomiest
 
 
+# A pad's position, or for a Creative level's pad (origin at a corner) the middle of its footprint. Maps made
+# any other way keep using the pad's own origin, exactly as before.
+func _pad_center(pad: Node3D) -> Vector3:
+	if pad.has_meta("corner_origin") and pad is MeshInstance3D and pad.mesh:
+		var middle: Vector3 = pad.mesh.get_aabb().get_center()
+		return pad.global_transform * Vector3(middle.x, 0.0, middle.z)
+	return pad.global_position
+
+
 func _spawn_transforms_for_pad(pad: Node3D) -> Array[Transform3D]:
 	var pad_size := DEFAULT_BASE_PAD_SIZE
 	var local_center := Vector3.ZERO
@@ -873,7 +960,7 @@ func _spawn_base_guns(team: String, pads: Array) -> void:
 		return
 	var center := Vector3.ZERO
 	for pad in pads:
-		center += pad.global_position
+		center += _pad_center(pad)
 	center /= pads.size()
 	center.y += BASE_GUN_HEIGHT_ABOVE_PAD
 	var guns: Array = []
