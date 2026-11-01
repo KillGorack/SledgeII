@@ -11,8 +11,8 @@ const DEMISE_FADE_IN := 0.6
 @onready var weapon_node: Node3D = get_node("../weapon_node")
 @onready var movement_node: Node3D = get_node("../movement_node")
 @onready var power_node: Node3D = get_node("../power_node")
-# Bottom readouts: primary weapon on the left (count + icon), specials (mines)
-# on the right. The icons swap when you change weapon / special.
+# Bottom readouts: primary weapon on the left (count + icon), specials (mines,
+# Controller) on the right. The icons swap when you change weapon / special.
 @onready var primary_count_label: Label = $Weapon
 @onready var special_count_label: Label = $Weapon2
 @onready var primary_icon: TextureRect = $P_ICON
@@ -37,7 +37,7 @@ var _last_shields: float = -1.0
 var _last_armor: float = -1.0
 var _last_life: float = -1.0
 var _last_weapon_index: int = -1
-var _last_mine_index: int = -1
+var _last_special_index: int = -1
 
 var _demise_screen: TextureRect
 var _demise_tween: Tween
@@ -119,9 +119,10 @@ func _process(_delta: float) -> void:
 	# rolling average, not something worth recomputing by hand here.
 	# Second line: takedowns/wrecks and bounty. The bounty is read live (see
 	# match.gd::get_my_bounty), the F4 list only refreshes it on events.
-	var score: Array = NetworkManager.peer_scores.get(multiplayer.get_unique_id(), [0, 0, 0]) if NetworkManager.is_online() else [0, 0, 0]
+	# Third: score, which (unlike bounty) is never lost.
+	var score: Array = NetworkManager.peer_scores.get(multiplayer.get_unique_id(), [0, 0, 0, 0]) if NetworkManager.is_online() else [0, 0, 0, 0]
 	var bounty := int(_match_node.get_my_bounty()) if _match_node else 0
-	fps_label.text = "FPS: %d\n%d/%d %d" % [Engine.get_frames_per_second(), score[0], score[1], bounty]
+	fps_label.text = "FPS: %d\n%d/%d %d\nScore: %d" % [Engine.get_frames_per_second(), score[0], score[1], bounty, score[3] if score.size() > 3 else 0]
 func _on_team_juice_changed(team: String, _amount: float) -> void:
 	if team == weapon_node.team:
 		_update_team_juice_bar()
@@ -192,18 +193,25 @@ func _update_ammo() -> void:
 		primary_count_label.text = "%d / %d" % [remaining, settings.projectile_count_capacity]
 
 
-# Selected mine's icon and "left / max". Hidden when the host turned mines off
-# or this craft has none.
+# Selected special's icon and count: a mine shows "left / max", the Controller
+# "guns at base / guns". Hidden when the host allowed no specials.
 func _update_specials() -> void:
-	var manager = _match_node.mines if _match_node else null
-	var settings: MineSettings = weapon_node.current_mine()
-	var shown: bool = NetworkManager.mines_enabled and manager != null and settings != null and NetworkManager.is_online()
+	var special = weapon_node.current_special()
+	var shown: bool = special != null and _match_node != null and NetworkManager.is_online()
 	special_icon.visible = shown
 	special_count_label.visible = shown
 	if not shown:
 		return
-	if weapon_node.current_mine_index != _last_mine_index:
-		_last_mine_index = weapon_node.current_mine_index
-		special_icon.texture = settings.mine_icon
-		special_icon.self_modulate = settings.mine_color
-	special_count_label.text = "%d / %d" % [manager.mines_left(multiplayer.get_unique_id(), settings.max_count), settings.max_count]
+	if weapon_node.current_special_index != _last_special_index:
+		_last_special_index = weapon_node.current_special_index
+		if special is MineSettings:
+			special_icon.texture = special.mine_icon
+			special_icon.self_modulate = special.mine_color
+		else:
+			special_icon.texture = SpecialCatalog.icon(special)
+			special_icon.self_modulate = ReconStation.render_color_for_team(weapon_node.team)
+	if special is MineSettings:
+		special_count_label.text = "%d / %d" % [_match_node.mines.mines_left(multiplayer.get_unique_id(), special.max_count), special.max_count]
+	elif special == SpecialCatalog.CONTROLLER:
+		var guns: GunController = _match_node.gun_control
+		special_count_label.text = "%d / %d" % [guns.guns_at_base(weapon_node.team), guns.gun_count(weapon_node.team)]

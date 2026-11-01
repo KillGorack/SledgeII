@@ -94,9 +94,9 @@ func _refresh() -> void:
 		entry.add_child(label)
 		var score: Array = NetworkManager.peer_scores.get(peer_id, [0, 0, 0])
 		var score_label := Label.new()
-		# kills/deaths bounty, e.g. "0/7 2450"
-		score_label.text = "%d/%d %d" % [score[0], score[1], score[2] if score.size() > 2 else 0]
-		score_label.custom_minimum_size.x = 100.0
+		# kills/deaths bounty score, e.g. "0/7 2450 S1225"
+		score_label.text = "%d/%d %d S%d" % [score[0], score[1], score[2] if score.size() > 2 else 0, score[3] if score.size() > 3 else 0]
+		score_label.custom_minimum_size.x = 150.0
 		score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		score_label.add_theme_color_override("font_color", color)
 		entry.add_child(score_label)

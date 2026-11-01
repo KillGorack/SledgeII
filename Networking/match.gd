@@ -82,6 +82,12 @@ const BOUNTY_GUN_DESTROYED := 100
 const BOUNTY_RECON_NEUTRAL := 200
 const BOUNTY_RECON_ENEMY := 400
 var _peer_bounty: Dictionary = {}
+# Score - [3] in _peer_scores. Every credit a player is awarded (kill payouts,
+# base guns, recons; not the slow burn) times SCORE_PER_CREDIT, and unlike the
+# bounty it never resets on death. Each client posts its own gains to the site
+# (NetworkManager._upload_stats). Server-only, kept as a float so halves add up.
+const SCORE_PER_CREDIT := 0.5
+var _peer_score_points: Dictionary = {}
 # Client side: this player's own bounty as last told by the server, and when.
 # The slow burn is perfectly linear while alive, so the HUD extrapolates
 # between syncs (see get_my_bounty) instead of the server streaming it - the
@@ -192,6 +198,8 @@ var _capturing_recons: Dictionary = {}
 var _my_craft: Node3D = null
 # Lays/blows/replicates mines - see mine_manager.gd.
 var mines: MineManager = null
+# The Controller special: calling base guns out and home - see gun_controller.gd.
+var gun_control: GunController = null
 # This peer's own copy of env.tscn (see _apply_custom_environment) - kept so
 # _notify_ready can immediately hand a freshly-ready peer the server's
 # current time_of_day, rather than making them wait for env.gd's own
@@ -207,6 +215,9 @@ func _ready() -> void:
 	mines = MineManager.new()
 	mines.name = "MineManager"
 	add_child(mines)
+	gun_control = GunController.new()
+	gun_control.name = "GunController"
+	add_child(gun_control)
 	local_camera.current = true
 	local_camera.cull_mask = ((1 << 20) - 1) & ~(1 << (SELF_RENDER_LAYER - 1))
 	spawner.spawn_function = _spawn_craft
@@ -355,11 +366,12 @@ func _clean_name(username: String, peer_id: int) -> String:
 # Server-only. The whole name list to every loaded peer, on every join/leave -
 # a handful of short strings, so not worth sending diffs.
 func _push_roster() -> void:
-	# [takedowns, wrecks, bounty]: the bounty is as of this push, so the F4
-	# list only refreshes it on events, not as the slow burn ticks.
+	# [takedowns, wrecks, bounty, score]: the bounty is as of this push, so the
+	# F4 list only refreshes it on events, not as the slow burn ticks.
 	for peer_id in _peer_names.keys():
 		var score := _score_of(peer_id)
 		score[2] = int(_peer_bounty.get(peer_id, BOUNTY_START))
+		score[3] = int(_peer_score_points.get(peer_id, 0.0))
 		_peer_scores[peer_id] = score
 	for peer_id in _ready_peers.keys():
 		_sync_roster.rpc_id(peer_id, _peer_names, _peer_scores)
@@ -492,7 +504,8 @@ func _load_map() -> void:
 	elif not ResourceLoader.exists(MAP_SCENE_PATH):
 		# No map selected (e.g. match.tscn opened directly for testing) -
 		# fall back to whatever local test pack is sitting in the project.
-		ProjectSettings.load_resource_pack(LOCAL_TEST_PACK)
+		if FileAccess.file_exists(LOCAL_TEST_PACK):
+			ProjectSettings.load_resource_pack(LOCAL_TEST_PACK)
 	if not ResourceLoader.exists(MAP_SCENE_PATH):
 		push_warning("Match: could not load map scene at %s" % MAP_SCENE_PATH)
 		return
@@ -764,6 +777,8 @@ func _notify_ready(username: String = "") -> void:
 	for gun in get_tree().get_nodes_in_group("BaseGunAll"):
 		if gun.is_dead:
 			gun._sync_dead.rpc_id(requester_id)
+	# ...and every gun a player called out, so it's where everyone else sees it.
+	gun_control.sync_to(requester_id)
 
 
 # MultiplayerSpawner defers to a spawned node's own MultiplayerSynchronizer to
@@ -838,11 +853,13 @@ func _on_player_unregistered(peer_id: int) -> void:
 	if not multiplayer.is_server():
 		return
 	mines.remove_player_mines(peer_id)
+	gun_control.remove_player(peer_id)
 	if _peer_names.has(peer_id):
 		_announce("%s has left the arena." % _colored_name(peer_id, _peer_names[peer_id]))
 		_peer_names.erase(peer_id)
 		_peer_scores.erase(peer_id)
 		_peer_bounty.erase(peer_id)
+		_peer_score_points.erase(peer_id)
 		_push_roster()
 	# Only the server frees it. Every craft now always goes through the real
 	# spawner (see _on_player_registered/_notify_ready) - MultiplayerSpawner
@@ -1030,7 +1047,7 @@ func _start_capture_request(requester_id: int, recon_path: NodePath) -> void:
 		return
 	if _team_juice.get(team, 0.0) < JUICE_CAPTURE_COST:
 		return
-	var gun := _find_available_gun(team)
+	var gun := _find_available_gun(team, recon.global_position)
 	if gun == null:
 		return
 	# Spent up front, when the gun actually launches - not refunded if the
@@ -1042,11 +1059,19 @@ func _start_capture_request(requester_id: int, recon_path: NodePath) -> void:
 	_run_capture.rpc(get_path_to(gun), recon_path, team)
 
 
-func _find_available_gun(team: String) -> Node:
+# A gun at base first. With none left, captures outrank the Controller special:
+# the called-out gun nearest the recon is taken (it flies home after, see
+# base_gun.gd::begin_capture).
+func _find_available_gun(team: String, near: Vector3) -> Node:
+	var nearest: Node = null
 	for gun in _base_guns_by_team.get(team, []):
-		if not gun.is_busy and not gun.is_dead:
+		if gun.is_busy or gun.is_dead:
+			continue
+		if gun.deployed_owner == 0:
 			return gun
-	return null
+		if nearest == null or gun.global_position.distance_squared_to(near) < nearest.global_position.distance_squared_to(near):
+			nearest = gun
+	return nearest
 
 
 # Broadcast (call_local so the host's own gun/recon play it too) - every peer
@@ -1444,20 +1469,21 @@ func _spawn_craft(data: Dictionary) -> Node:
 	return craft
 
 
-# Server-only. Scores are [takedowns, wrecks, bounty]; older 2-element
+# Server-only. Scores are [takedowns, wrecks, bounty, score]; shorter
 # entries are padded.
 func _score_of(peer_id: int) -> Array:
-	var score: Array = _peer_scores.get(peer_id, [0, 0, 0])
-	while score.size() < 3:
+	var score: Array = _peer_scores.get(peer_id, [0, 0, 0, 0])
+	while score.size() < 4:
 		score.append(0)
 	return score
 
 
 # Server-only. Every defeat is a wreck for the victim and resets their
 # bounty; a takedown goes to the credited attacker if they're still here and
-# on another team, and pays them the victim's bounty plus a kill bonus.
-# Returns the bounty collected (0 if none).
-func _record_defeat(peer_id: int, attacker_id: int) -> int:
+# on another team, and pays them the victim's bounty plus a kill bonus, times
+# the juggle multiplier (their hits on the victim while it was in the air,
+# air_juggle.gd). Returns the bounty collected (0 if none).
+func _record_defeat(peer_id: int, attacker_id: int, multiplier: int = 1) -> int:
 	var victim_score := _score_of(peer_id)
 	victim_score[1] += 1
 	_peer_scores[peer_id] = victim_score
@@ -1466,10 +1492,11 @@ func _record_defeat(peer_id: int, attacker_id: int) -> int:
 	if attacker_id != 0 and teams.has(attacker_id) and teams.get(attacker_id) != teams.get(peer_id):
 		var attacker_score := _score_of(attacker_id)
 		attacker_score[0] += 1
-		collected = int(_peer_bounty.get(peer_id, BOUNTY_START)) + BOUNTY_KILL_BONUS
+		collected = (int(_peer_bounty.get(peer_id, BOUNTY_START)) + BOUNTY_KILL_BONUS) * multiplier
 		_peer_scores[attacker_id] = attacker_score
 		# The victim's bounty (plus the bonus) joins the killer's own.
 		_peer_bounty[attacker_id] = _peer_bounty.get(attacker_id, BOUNTY_START) + collected
+		_add_score(attacker_id, collected)
 		_sync_bounty(attacker_id)
 	_peer_bounty[peer_id] = BOUNTY_START
 	_sync_bounty(peer_id)
@@ -1509,9 +1536,15 @@ func _add_bounty(peer_id: int, amount: int, reason: String) -> void:
 	if not _peer_names.has(peer_id):
 		return
 	_peer_bounty[peer_id] = _peer_bounty.get(peer_id, BOUNTY_START) + amount
+	_add_score(peer_id, amount)
 	_sync_bounty(peer_id)
 	_push_roster()
 	_say_to(peer_id, "[color=yellow]Bounty +%d: %s[/color]" % [amount, reason])
+
+
+# Server-only. Callers push the roster afterwards (it rides in _peer_scores[3]).
+func _add_score(peer_id: int, credits: float) -> void:
+	_peer_score_points[peer_id] = _peer_score_points.get(peer_id, 0.0) + credits * SCORE_PER_CREDIT
 
 
 # Server-only. A chat line for one player only.
@@ -1585,9 +1618,13 @@ func _on_craft_defeated(peer_id: int, attacker_id: int, cause: int) -> void:
 	if not multiplayer.is_server():
 		return
 	_announce_defeat(peer_id, attacker_id, cause)
-	var collected := _record_defeat(peer_id, attacker_id)
+	# Read now: the health_node clears its air hits once this signal returns.
+	var victim = craft_container.get_node_or_null("Craft_%d" % peer_id)
+	var multiplier: int = victim.get_node("health_node").juggle_multiplier(attacker_id) if is_instance_valid(victim) and attacker_id != 0 else 1
+	var collected := _record_defeat(peer_id, attacker_id, multiplier)
 	if collected > 0:
-		_announce("[color=yellow]Bounty collected by[/color] %s[color=yellow]: %d credits[/color]" % [_colored_name(attacker_id, _peer_names.get(attacker_id, "")), collected])
+		var juggle := " [color=orange]Juggled x%d![/color]" % multiplier if multiplier > 1 else ""
+		_announce("[color=yellow]Bounty collected by[/color] %s[color=yellow]: %d credits[/color]%s" % [_colored_name(attacker_id, _peer_names.get(attacker_id, "")), collected, juggle])
 	await get_tree().create_timer(RESPAWN_DELAY).timeout
 	if not NetworkManager.peer_teams.has(peer_id):
 		return # player left during the respawn delay

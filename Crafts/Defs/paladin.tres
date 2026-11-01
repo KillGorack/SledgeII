@@ -1,8 +1,9 @@
-[gd_resource type="Resource" script_class="CraftDef" format=3]
+[gd_resource type="Resource" script_class="CraftDef" format=3 uid="uid://c8jpp1ow4522f"]
 
-[ext_resource type="Script" path="res://Crafts/_scripts/craft_def.gd" id="1_def"]
-[ext_resource type="PackedScene" path="res://Crafts/Models/Paladin/Paladin.glb" id="2_model"]
-[ext_resource type="Resource" path="res://Crafts/Settings/paladin_stats.tres" id="3_stats"]
+[ext_resource type="Script" uid="uid://36yf6f5pq2ss" path="res://Crafts/_scripts/craft_def.gd" id="1_def"]
+[ext_resource type="PackedScene" uid="uid://dki5ssnejxrkf" path="res://Crafts/Models/Paladin/Paladin.glb" id="2_model"]
+[ext_resource type="Resource" uid="uid://csey8qhg0e4rt" path="res://Crafts/Settings/paladin_stats.tres" id="3_stats"]
+[ext_resource type="ArrayMesh" uid="uid://brgqvco1m2ga" path="res://Crafts/Models/Paladin/paladin_collider.obj" id="9_collider"]
 
 [resource]
 script = ExtResource("1_def")
@@ -10,4 +11,5 @@ id = &"paladin"
 display_name = "Paladin"
 description = "Fast and nimble. The all-rounder."
 model = ExtResource("2_model")
+collider = ExtResource("9_collider")
 stats = ExtResource("3_stats")

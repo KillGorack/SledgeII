@@ -90,6 +90,25 @@ var rockets_enabled: bool = true
 var recon_capture_enabled: bool = true
 # MineSettings paths the host allows (see allowed_weapon_paths); empty = all.
 var allowed_mine_paths: Array[String] = []
+# Built-in specials the host ticked (SpecialCatalog ids). Unlike the two lists
+# above, empty means none: these are extras, off unless asked for.
+var allowed_specials: Array[StringName] = []
+
+# Site stats (usr.game_score / game_vanquishes / game_falls, gameAPI addUserStats).
+# Each player posts only their OWN gains - only their client has their session
+# key - and only what changed, never totals, so a lost post or a second session
+# can't wipe anything. Amounts are [score, vanquishes, falls], read off this
+# player's own peer_scores entry (match.gd). _stats_seen is this match's totals
+# already counted; _stats_unsent is earned but not yet accepted by the site, and
+# outlives the match until a post succeeds. The site levels the player up itself.
+const STATS_UPLOAD_SECONDS := 60.0
+# The site drops posts closer together than 30s; retry just after that.
+const STATS_RETRY_SECONDS := 31.0
+# Per-post ceilings, matching gameAPI's; anything over waits for the next post.
+const STATS_POST_CAPS := [100000, 50, 50]
+var _stats_seen: Array = [0, 0, 0]
+var _stats_unsent: Array = [0, 0, 0]
+var _stats_in_flight: bool = false
 
 # Community level (Creative origin) the match builds from data instead of
 # mounting a .pck - see match.gd::_load_map. Empty = a normal .pck map.
@@ -140,6 +159,43 @@ func _ready() -> void:
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 	multiplayer.connected_to_server.connect(_reset_clock)
 	multiplayer.server_disconnected.connect(_reset_clock)
+	var stats_timer := Timer.new()
+	stats_timer.wait_time = STATS_UPLOAD_SECONDS
+	stats_timer.autostart = true
+	stats_timer.timeout.connect(_upload_stats)
+	add_child(stats_timer)
+
+
+# Moves whatever this player's match totals gained since last time into _stats_unsent.
+func _absorb_stats() -> void:
+	if not is_online():
+		return
+	var score: Array = peer_scores.get(multiplayer.get_unique_id(), [])
+	if score.size() < 4:
+		return
+	var totals := [int(score[3]), int(score[0]), int(score[1])]
+	for i in 3:
+		_stats_unsent[i] += maxi(0, totals[i] - _stats_seen[i])
+		_stats_seen[i] = totals[i]
+
+
+func _upload_stats() -> void:
+	_absorb_stats()
+	if _stats_in_flight or creative_session or not CreativeApi.logged_in():
+		return
+	var sending := [0, 0, 0]
+	for i in 3:
+		sending[i] = mini(_stats_unsent[i], STATS_POST_CAPS[i])
+	if sending == [0, 0, 0]:
+		return
+	_stats_in_flight = true
+	var result := await CreativeApi.request(self, "addUserStats", {"score": sending[0], "vanquishes": sending[1], "falls": sending[2]})
+	_stats_in_flight = false
+	if result.ok:
+		for i in 3:
+			_stats_unsent[i] -= sending[i]
+	elif result.body.get("status", "") == "too_soon":
+		get_tree().create_timer(STATS_RETRY_SECONDS).timeout.connect(_upload_stats)
 
 
 # True only while this peer is hosting a live match. multiplayer.is_server()
@@ -234,7 +290,7 @@ func _clock_pong(client_time: float, server_clock: float) -> void:
 	_clock_synced = _clock_samples.size() >= 3
 
 
-func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] = [], day_night: bool = true, host_address_override: String = "", host_team: String = "team_red", port: int = DEFAULT_PORT, max_players: int = 20, public_game: bool = false, base_gun_respawn: float = BASE_GUN_RESPAWN_SECONDS, mines: bool = true, mine_paths: Array[String] = [], rockets: bool = true, recon_capture: bool = true) -> Error:
+func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] = [], day_night: bool = true, host_address_override: String = "", host_team: String = "team_red", port: int = DEFAULT_PORT, max_players: int = 20, public_game: bool = false, base_gun_respawn: float = BASE_GUN_RESPAWN_SECONDS, mines: bool = true, mine_paths: Array[String] = [], rockets: bool = true, recon_capture: bool = true, specials: Array[StringName] = []) -> Error:
 	peer = ENetMultiplayerPeer.new()
 	var err = peer.create_server(port, max_players)
 	if err != OK:
@@ -254,6 +310,7 @@ func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] 
 	allowed_mine_paths = mine_paths
 	rockets_enabled = rockets
 	recon_capture_enabled = recon_capture
+	allowed_specials = specials
 	# _get_local_ip() just takes whatever address the OS happens to list
 	# first, which isn't stable if there's more than one active adapter (a
 	# VPN, a virtual bridge, Wi-Fi and Ethernet both up) - that's picked a
@@ -321,6 +378,7 @@ func start_creative_session(level_data: Dictionary, editing: bool, team: String 
 	peer_crafts = {1: local_craft_id}
 	allowed_weapon_paths = []
 	allowed_mine_paths = []
+	allowed_specials = []
 	# Fixed daylight while building: a moving sun changes how a level looks
 	# from one minute to the next.
 	day_night_enabled = false
@@ -343,6 +401,7 @@ func _enable_compression() -> void:
 func stop_hosting() -> void:
 	if not is_host:
 		return
+	_absorb_stats()
 	_stop_heartbeat()
 	if not creative_session:
 		_unregister_host()
@@ -360,12 +419,15 @@ func stop_hosting() -> void:
 	peer_crafts.clear()
 	peer_names.clear()
 	peer_scores.clear()
+	_stats_seen = [0, 0, 0]
 
 
 # Covers both sides of leaving a match: unhosts (unregisters from the lobby,
 # stops the heartbeat) if we're the host, or just tears down the connection
 # if we're a joined client.
 func leave_game() -> void:
+	# Last of this match's stats, read while still connected, posted once torn down.
+	_absorb_stats()
 	if is_host:
 		stop_hosting()
 	elif multiplayer.multiplayer_peer:
@@ -375,6 +437,8 @@ func leave_game() -> void:
 	peer_crafts.clear()
 	peer_names.clear()
 	peer_scores.clear()
+	_stats_seen = [0, 0, 0]
+	_upload_stats()
 	current_map_file_id = -1
 	current_map_title = ""
 	creative_level = {}
@@ -394,7 +458,7 @@ func _on_peer_connected(peer_id: int) -> void:
 	# One match-wide ruleset, not per-peer, so this is a single targeted send
 	# rather than the backfill loop below - there's nothing to backfill, the
 	# host is the only one who ever sets it.
-	_assign_ruleset.rpc_id(peer_id, allowed_weapon_paths, day_night_enabled, mines_enabled, allowed_mine_paths, rockets_enabled, recon_capture_enabled)
+	_assign_ruleset.rpc_id(peer_id, allowed_weapon_paths, day_night_enabled, mines_enabled, allowed_mine_paths, rockets_enabled, recon_capture_enabled, allowed_specials)
 	# Backfill the roster so the newly joined peer sees everyone already
 	# assigned before picking their own - no auto-assignment anymore, the new
 	# peer isn't in peer_teams at all until request_team() below succeeds, so
@@ -439,13 +503,14 @@ func _reject_team_request(reason: String) -> void:
 
 
 @rpc("authority", "call_local", "reliable")
-func _assign_ruleset(weapon_paths: Array, day_night: bool, mines: bool, mine_paths: Array, rockets: bool, recon_capture: bool) -> void:
+func _assign_ruleset(weapon_paths: Array, day_night: bool, mines: bool, mine_paths: Array, rockets: bool, recon_capture: bool, specials: Array) -> void:
 	allowed_weapon_paths.assign(weapon_paths)
 	day_night_enabled = day_night
 	mines_enabled = mines
 	allowed_mine_paths.assign(mine_paths)
 	rockets_enabled = rockets
 	recon_capture_enabled = recon_capture
+	allowed_specials.assign(specials)
 
 
 func _team_count(team: String) -> int:

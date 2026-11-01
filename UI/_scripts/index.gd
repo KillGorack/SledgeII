@@ -63,6 +63,7 @@ const JOIN_GAME_TAB_INDEX := 1
 # discussion for why they won't live in this same folder.
 const MINE_CATALOG_DIR := "res://Weapons/settings_mines/"
 const WEAPON_CATALOG_DIRS: Array[String] = ["res://Weapons/settings/"]
+const CRAFT_SCENE_PATH := "res://Crafts/Scenes/craft.tscn"
 
 
 
@@ -366,25 +367,50 @@ func _on_game_selected():
 # in an exported build, silently. ResourceLoader.list_directory() reports
 # each file's original pre-export extension regardless of how it's actually
 # stored, so this filter works identically in both.
+#
+# Listed in the craft's own weapon order (weapon_node.weapon_settings in
+# craft.tscn, the order weapons cycle in a match); anything on disk the craft
+# doesn't carry goes after, in folder order.
 func _build_weapon_checklist() -> void:
 	for child in weapon_checklist.get_children():
 		child.queue_free()
+	var weapon_paths := _craft_weapon_order()
 	for dir_path in WEAPON_CATALOG_DIRS:
 		for file_name in ResourceLoader.list_directory(dir_path):
 			if file_name.ends_with("/") or not file_name.ends_with(".tres"):
 				continue
 			var weapon_path := dir_path.path_join(file_name)
-			var settings: WeaponSettings = load(weapon_path)
-			if settings:
-				var check := CheckBox.new()
-				check.text = settings.weapon_name
-				check.button_pressed = settings.default_available
-				check.set_meta("weapon_path", weapon_path)
-				weapon_checklist.add_child(check)
+			if not weapon_paths.has(weapon_path):
+				weapon_paths.append(weapon_path)
+	for weapon_path in weapon_paths:
+		var settings: WeaponSettings = load(weapon_path)
+		if settings:
+			var check := CheckBox.new()
+			check.text = settings.weapon_name
+			check.button_pressed = settings.default_available
+			check.set_meta("weapon_path", weapon_path)
+			weapon_checklist.add_child(check)
+
+
+# Read off craft.tscn's saved state rather than instantiating a whole craft in the menu.
+func _craft_weapon_order() -> Array[String]:
+	var paths: Array[String] = []
+	var state := (load(CRAFT_SCENE_PATH) as PackedScene).get_state()
+	for node in state.get_node_count():
+		if state.get_node_name(node) != "weapon_node":
+			continue
+		for prop in state.get_node_property_count(node):
+			if state.get_node_property_name(node, prop) == "weapon_settings":
+				for settings in state.get_node_property_value(node, prop):
+					if settings and not paths.has(settings.resource_path):
+						paths.append(settings.resource_path)
+	return paths
 
 
 # Same idea as the weapon list, for the specials (mines). There is no master switch:
-# mines exist in a match exactly when at least one of them is ticked.
+# mines exist in a match exactly when at least one of them is ticked. The
+# built-in specials (SpecialCatalog) follow the mines in the same list, tagged
+# "special_id" instead of "mine_path", and start unticked.
 func _build_mine_checklist() -> void:
 	for child in mine_checklist.get_children():
 		child.queue_free()
@@ -400,14 +426,28 @@ func _build_mine_checklist() -> void:
 			check.button_pressed = settings.default_available
 			check.set_meta("mine_path", mine_path)
 			mine_checklist.add_child(check)
+	for id in SpecialCatalog.ids():
+		var check := CheckBox.new()
+		check.text = SpecialCatalog.display_name(id)
+		check.tooltip_text = SpecialCatalog.description(id)
+		check.set_meta("special_id", id)
+		mine_checklist.add_child(check)
 
 
 func _get_checked_mine_paths() -> Array[String]:
 	var paths: Array[String] = []
 	for child in mine_checklist.get_children():
-		if child is CheckBox and child.button_pressed:
+		if child is CheckBox and child.button_pressed and child.has_meta("mine_path"):
 			paths.append(child.get_meta("mine_path"))
 	return paths
+
+
+func _get_checked_specials() -> Array[StringName]:
+	var ids: Array[StringName] = []
+	for child in mine_checklist.get_children():
+		if child is CheckBox and child.button_pressed and child.has_meta("special_id"):
+			ids.append(child.get_meta("special_id"))
+	return ids
 
 
 func _get_checked_weapon_paths() -> Array[String]:
@@ -443,7 +483,8 @@ func _on_host_pressed():
 		not _get_checked_mine_paths().is_empty(),
 		_get_checked_mine_paths(),
 		rockets_check.button_pressed,
-		recon_capture_check.button_pressed
+		recon_capture_check.button_pressed,
+		_get_checked_specials()
 	)
 
 
@@ -462,6 +503,8 @@ func _save_host_settings() -> void:
 	cfg.set_value("host", "weapons_checked", _get_checked_weapon_paths())
 	cfg.set_value("host", "mines_listed", _listed_paths(mine_checklist, "mine_path"))
 	cfg.set_value("host", "mines_checked", _get_checked_mine_paths())
+	cfg.set_value("host", "specials_listed", _listed_paths(mine_checklist, "special_id"))
+	cfg.set_value("host", "specials_checked", _get_checked_specials())
 	var err := cfg.save(HOST_SETTINGS_PATH)
 	if err != OK:
 		push_warning("Couldn't save host settings (%s)" % error_string(err))
@@ -483,19 +526,21 @@ func _load_host_settings() -> void:
 	day_night_check.button_pressed = cfg.get_value("host", "day_night", day_night_check.button_pressed)
 	_restore_checklist(weapon_checklist, "weapon_path", cfg.get_value("host", "weapons_listed", []), cfg.get_value("host", "weapons_checked", []))
 	_restore_checklist(mine_checklist, "mine_path", cfg.get_value("host", "mines_listed", []), cfg.get_value("host", "mines_checked", []))
+	_restore_checklist(mine_checklist, "special_id", cfg.get_value("host", "specials_listed", []), cfg.get_value("host", "specials_checked", []))
 
 
-func _listed_paths(checklist: VBoxContainer, meta: String) -> Array[String]:
-	var paths: Array[String] = []
+# Only the checkboxes carrying `meta` - the specials list mixes mines and built-ins.
+func _listed_paths(checklist: VBoxContainer, meta: String) -> Array:
+	var paths: Array = []
 	for child in checklist.get_children():
-		if child is CheckBox:
+		if child is CheckBox and child.has_meta(meta):
 			paths.append(child.get_meta(meta))
 	return paths
 
 
 func _restore_checklist(checklist: VBoxContainer, meta: String, listed: Array, checked: Array) -> void:
 	for child in checklist.get_children():
-		if child is CheckBox and listed.has(child.get_meta(meta)):
+		if child is CheckBox and child.has_meta(meta) and listed.has(child.get_meta(meta)):
 			child.button_pressed = checked.has(child.get_meta(meta))
 
 
@@ -718,7 +763,12 @@ func _on_request_completed(_result, response_code, _headers, body):
 					set_ui_feedback("Login NOT successful, please try again!", "NOK")
 					resetForm()
 			elif function_complete == "getSecretLevelList":
-				populate_levels_tree(response_data)
+				# A refused session comes back as a bare message string, not {status, data}
+				# - e.g. this account logged in again elsewhere, which replaces its key.
+				if response_data is Dictionary and response_data.get("status", "") == "success":
+					populate_levels_tree(response_data)
+				else:
+					set_ui_feedback("Your session expired (logged in somewhere else?) - log in again to load maps.", "NOK")
 		else:
 			set_ui_feedback("A server error occured", "NOK")
 			resetForm()

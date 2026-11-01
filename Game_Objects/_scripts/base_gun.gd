@@ -7,6 +7,9 @@ const HOVER_HEIGHT_ABOVE_RECON := 4.0
 const CAPTURE_DURATION := 10.0
 const TRAVEL_SPEED := 12.0
 const VERTICAL_SPEED := 1.0
+# Climb/descent for a Controller call or send-home - quicker than a capture's,
+# a called gun is support someone is waiting on.
+const DEPLOY_VERTICAL_SPEED := 3.0
 
 const MAX_HP := 100.0
 const HITBOX_RADIUS := 1.0
@@ -44,6 +47,15 @@ var recon: ReconStation = null
 # clears it once the whole round trip (there, hold, back) finishes - a busy
 # gun isn't offered for a second, different capture in the meantime.
 var is_busy: bool = false
+
+# Controller special (Networking/gun_controller.gd), same values on every peer:
+# who called this gun out (0 = it belongs at base), the grid cell it holds,
+# the order calls were made in (the oldest is taken first when the base is
+# empty) and where it hovers.
+var deployed_owner: int = 0
+var deploy_cell: Vector2i = Vector2i.ZERO
+var deploy_order: int = 0
+var deploy_target: Vector3 = Vector3.ZERO
 
 var _rest_position: Vector3
 var _hp: float = MAX_HP
@@ -270,6 +282,7 @@ func _sync_dead() -> void:
 
 func _apply_dead() -> void:
 	is_dead = true
+	_clear_deploy()
 	_cancel_flight()
 	_refresh_state()
 
@@ -329,18 +342,21 @@ func set_effect_active(active: bool) -> void:
 # locally decided) - flies out to hover over `recon`, holds there with the
 # effect on for CAPTURE_DURATION, calls on_capture_ready (this is where the
 # caller should actually apply the color change - while the gun's still
-# there, not after it's already flown home), then reverses the whole path
-# back to rest.
+# there, not after it's already flown home), then flies back to rest.
+# Starts from wherever the gun is: a capture can take a gun a player called
+# out (match.gd::_find_available_gun), which then comes home afterwards.
 func begin_capture(target_recon: Node3D, on_capture_ready: Callable, on_aborted: Callable = Callable()) -> void:
 	is_busy = true
+	_clear_deploy()
+	var serial := _new_flight()
 	_on_capture_aborted = on_aborted
-	var serial := _flight_serial
-	var cruise_y := _rest_position.y + ASCEND_HEIGHT
+	var cruise_y := maxf(_rest_position.y, global_position.y) + ASCEND_HEIGHT
+	var above_start := Vector3(global_position.x, cruise_y, global_position.z)
 	var above_base := Vector3(_rest_position.x, cruise_y, _rest_position.z)
 	var above_recon := Vector3(target_recon.global_position.x, cruise_y, target_recon.global_position.z)
 	var hover_position := Vector3(target_recon.global_position.x, target_recon.global_position.y + HOVER_HEIGHT_ABOVE_RECON, target_recon.global_position.z)
 
-	await _move_to(above_base, VERTICAL_SPEED)
+	await _move_to(above_start, VERTICAL_SPEED)
 	if serial != _flight_serial:
 		return
 	await _move_to(above_recon, TRAVEL_SPEED)
@@ -368,6 +384,56 @@ func begin_capture(target_recon: Node3D, on_capture_ready: Callable, on_aborted:
 	if serial != _flight_serial:
 		return
 	is_busy = false
+
+
+# Controller call (gun_controller.gd), on every peer. fly = false puts it
+# straight there (a late joiner catching up).
+func deploy(owner_peer: int, cell: Vector2i, order: int, target: Vector3, fly: bool) -> void:
+	deployed_owner = owner_peer
+	deploy_cell = cell
+	deploy_order = order
+	deploy_target = target
+	if fly:
+		_fly_to(target)
+	else:
+		_new_flight()
+		global_position = target
+		reset_physics_interpolation()
+
+
+# Controller send-home, on every peer. Free for calls and captures again the
+# moment it turns around.
+func send_home() -> void:
+	_clear_deploy()
+	_fly_to(_rest_position)
+
+
+func _clear_deploy() -> void:
+	deployed_owner = 0
+	deploy_order = 0
+
+
+# Up, across, down, from wherever the gun is now - a call or send-home can
+# catch a gun mid-flight.
+func _fly_to(target: Vector3) -> void:
+	var serial := _new_flight()
+	var cruise_y := maxf(global_position.y, target.y) + ASCEND_HEIGHT
+	await _move_to(Vector3(global_position.x, cruise_y, global_position.z), DEPLOY_VERTICAL_SPEED)
+	if serial != _flight_serial:
+		return
+	await _move_to(Vector3(target.x, cruise_y, target.z), TRAVEL_SPEED)
+	if serial != _flight_serial:
+		return
+	await _move_to(target, DEPLOY_VERTICAL_SPEED)
+
+
+# Stops whatever flight is running (its awaits see the serial change and quit)
+# without _cancel_flight's capture-abort - only for starting a new one.
+func _new_flight() -> int:
+	_flight_serial += 1
+	if _tween:
+		_tween.kill()
+	return _flight_serial
 
 
 func _move_to(target: Vector3, speed: float) -> void:

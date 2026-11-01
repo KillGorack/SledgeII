@@ -46,18 +46,61 @@ var _shot_seq: int = 0
 const MUZZLE_TOLERANCE := 4.0
 
 # The mines this craft can lay (Weapons/settings_mines/*.tres), filtered to the
-# host's choices at spawn like weapon_settings. change_specials cycles
-# current_mine_index. See Networking/mine_manager.gd.
+# host's choices at spawn like weapon_settings. See Networking/mine_manager.gd.
 @export var mine_settings: Array[MineSettings] = []
-var current_mine_index: int = 0
+# Position in specials() - the mines, then the host's built-in specials
+# (SpecialCatalog). change_specials cycles it.
+var current_special_index: int = 0
+# Which of mine_settings is selected, -1 when the selection isn't a mine.
+var current_mine_index: int:
+	get:
+		return mine_settings.find(current_mine())
 
 @onready var barrel: Node3D = get_node("../Turret/Barrel")
 @onready var power_node: Node3D = get_node("../power_node")
 @onready var chat: Control = get_node("../Hud_InGame/Chat")
 
 
+# Everything Shift+Tab cycles through: each a MineSettings or a SpecialCatalog id.
+func specials() -> Array:
+	var list: Array = []
+	if NetworkManager.mines_enabled:
+		list.append_array(mine_settings)
+	for id in SpecialCatalog.ids():
+		if NetworkManager.allowed_specials.has(id):
+			list.append(id)
+	return list
+
+
+# Wrapped, not bounds-checked: the list can't change mid-match, but this keeps
+# a stale index pointing at something real anyway.
+func current_special() -> Variant:
+	var list := specials()
+	return list[current_special_index % list.size()] if not list.is_empty() else null
+
+
 func current_mine() -> MineSettings:
-	return mine_settings[current_mine_index] if current_mine_index >= 0 and current_mine_index < mine_settings.size() else null
+	var special = current_special()
+	return special if special is MineSettings else null
+
+
+func _use_special(primary: bool) -> void:
+	var match_node = get_tree().get_first_node_in_group("match")
+	if match_node == null:
+		return
+	var special = current_special()
+	if special is MineSettings:
+		if not match_node.mines:
+			return
+		if primary:
+			match_node.mines.request_lay_mine.rpc_id(1, mine_settings.find(special))
+		else:
+			match_node.mines.request_blow_mines.rpc_id(1)
+	elif special is StringName and special == SpecialCatalog.CONTROLLER and match_node.gun_control:
+		if primary:
+			match_node.gun_control.request_call.rpc_id(1)
+		else:
+			match_node.gun_control.request_recall.rpc_id(1)
 
 
 func _ready() -> void:
@@ -79,17 +122,18 @@ func _physics_process(_delta: float) -> void:
 	# The community level builder uses Space/Tab for placing and cycling.
 	if NetworkManager.creative_building:
 		return
-	# Mines are laid and blown by the server (mine_manager.gd); this is just
-	# the request.
-	if Input.is_action_just_pressed("change_specials", true) and not mine_settings.is_empty():
-		current_mine_index = (current_mine_index + 1) % mine_settings.size()
-	if Input.is_action_just_pressed("lay_mine") or Input.is_action_just_pressed("blow_mines"):
-		var match_node = get_tree().get_first_node_in_group("match")
-		if match_node and match_node.mines:
-			if Input.is_action_just_pressed("lay_mine"):
-				match_node.mines.request_lay_mine.rpc_id(1, current_mine_index)
-			else:
-				match_node.mines.request_blow_mines.rpc_id(1)
+	# Specials are acted on by the server (mine_manager.gd, gun_controller.gd);
+	# this is just the request. M is the selected special's action and Shift+M
+	# its second one (blow mines / send guns home) - exact_match, like Tab below,
+	# or Shift+M would also count as plain M.
+	if Input.is_action_just_pressed("change_specials", true):
+		var count := specials().size()
+		if count > 0:
+			current_special_index = (current_special_index + 1) % count
+	var primary := Input.is_action_just_pressed("lay_mine", true)
+	var secondary := Input.is_action_just_pressed("blow_mines", true)
+	if primary or secondary:
+		_use_special(primary)
 	# weapon_change is Tab and change_specials is Shift+Tab. Godot ignores held
 	# modifiers by default, so Tab alone would also fire on Shift+Tab; exact_match
 	# makes each action fire only for its own exact key combination.

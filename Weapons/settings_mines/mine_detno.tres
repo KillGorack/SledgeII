@@ -8,7 +8,7 @@
 
 [resource]
 script = ExtResource("4_kypqt")
-mine_name = "Detno"
+mine_name = "Detno Mine"
 mine_icon = ExtResource("3_4ahpm")
 mine_color = Color(1, 0, 0, 1)
 mine_lore = "Your run of the mill general use mine. Set it and forget it."

@@ -1,8 +1,9 @@
-[gd_resource type="Resource" script_class="CraftDef" format=3]
+[gd_resource type="Resource" script_class="CraftDef" format=3 uid="uid://lclk31n3pxld"]
 
-[ext_resource type="Script" path="res://Crafts/_scripts/craft_def.gd" id="1_def"]
-[ext_resource type="PackedScene" path="res://Crafts/Models/Aegis/Aegis.glb" id="2_model"]
-[ext_resource type="Resource" path="res://Crafts/Settings/aegis_stats.tres" id="3_stats"]
+[ext_resource type="Script" uid="uid://36yf6f5pq2ss" path="res://Crafts/_scripts/craft_def.gd" id="1_def"]
+[ext_resource type="PackedScene" uid="uid://c0n8sf47cc2ol" path="res://Crafts/Models/Aegis/Aegis.glb" id="2_model"]
+[ext_resource type="Resource" uid="uid://uq7h7gd0ea86" path="res://Crafts/Settings/aegis_stats.tres" id="3_stats"]
+[ext_resource type="ArrayMesh" uid="uid://b15krk75hxfrm" path="res://Crafts/Models/Aegis/aegis_collider.obj" id="9_collider"]
 
 [resource]
 script = ExtResource("1_def")
@@ -10,4 +11,5 @@ id = &"aegis"
 display_name = "Aegis"
 description = "Balanced, with extra armor."
 model = ExtResource("2_model")
+collider = ExtResource("9_collider")
 stats = ExtResource("3_stats")

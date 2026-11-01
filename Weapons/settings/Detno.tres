@@ -11,7 +11,7 @@
 
 [resource]
 script = ExtResource("1_lj0dn")
-weapon_name = "Detno"
+weapon_name = "Detno Missile"
 weapon_icon = ExtResource("8_jpno1")
 reload_on = 1
 hit_points = 150.0

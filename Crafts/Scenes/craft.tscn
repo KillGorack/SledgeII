@@ -8,11 +8,14 @@
 [ext_resource type="Script" uid="uid://dfcysnykxpal7" path="res://Weapons/_scripts/weapon_node.gd" id="7_weapon"]
 [ext_resource type="Script" uid="uid://bsrg8o0bdngbb" path="res://Crafts/_scripts/hud_controller.gd" id="8_hud"]
 [ext_resource type="Script" uid="uid://defwrtblkx02f" path="res://Weapons/_scripts/weapon_settings.gd" id="10_4qjx5"]
+[ext_resource type="Resource" uid="uid://cj6flevgdw3u6" path="res://Weapons/settings/MKII_CEB.tres" id="11_twnxb"]
 [ext_resource type="Script" uid="uid://du7bg1pw2tnpr" path="res://Crafts/_scripts/reticle.gd" id="11_wiinl"]
+[ext_resource type="Resource" uid="uid://bsww8jv3xka45" path="res://Weapons/settings/MKIII_CEB.tres" id="12_8eb0h"]
 [ext_resource type="Resource" uid="uid://cra5ynqajpxse" path="res://Weapons/settings/basic_cannon.tres" id="12_cannon"]
 [ext_resource type="Resource" uid="uid://qqc2vwxrscfy" path="res://Weapons/settings/Repulsor.tres" id="13_repulsor"]
 [ext_resource type="Resource" uid="uid://b5trap215xo20" path="res://Weapons/settings/Detno.tres" id="14_detno"]
 [ext_resource type="Resource" uid="uid://d2bcvfd5dw7pj" path="res://Weapons/settings/MKIV_CEB.tres" id="15_mkiv"]
+[ext_resource type="Resource" uid="uid://bti10spf86dbe" path="res://Weapons/settings/MKI_CEB.tres" id="15_xayyq"]
 [ext_resource type="Resource" uid="uid://bryidariyxws7" path="res://Weapons/settings/plasma.tres" id="16_8hncv"]
 [ext_resource type="Script" uid="uid://ccjvxuanm2neh" path="res://Crafts/_scripts/speedometer.gd" id="16_speedo"]
 [ext_resource type="Texture2D" uid="uid://davch07lrofb0" path="res://Crafts/Images/hud_bezel_resize.png" id="17_jva1l"]
@@ -70,6 +73,7 @@ physics_material_override = ExtResource("5_physmat")
 center_of_mass_mode = 1
 center_of_mass = Vector3(0, -0.3, -0.44)
 can_sleep = false
+continuous_cd = true
 
 [node name="movement_node" type="Node3D" parent="." unique_id=1513453241]
 script = ExtResource("1_nm6mo")
@@ -153,7 +157,7 @@ public_visibility = false
 
 [node name="weapon_node" type="Node3D" parent="." unique_id=1782664371]
 script = ExtResource("7_weapon")
-weapon_settings = Array[ExtResource("10_4qjx5")]([ExtResource("12_cannon"), ExtResource("14_detno"), ExtResource("15_mkiv"), ExtResource("13_repulsor"), ExtResource("16_8hncv")])
+weapon_settings = Array[ExtResource("10_4qjx5")]([ExtResource("15_xayyq"), ExtResource("11_twnxb"), ExtResource("12_8eb0h"), ExtResource("15_mkiv"), ExtResource("12_cannon"), ExtResource("14_detno"), ExtResource("13_repulsor"), ExtResource("16_8hncv")])
 mine_settings = Array[ExtResource("mine_settings_script")]([ExtResource("mine_settings_res"), ExtResource("mine_force_res")])
 
 [node name="Hud_InGame" type="Control" parent="." unique_id=1814334772]

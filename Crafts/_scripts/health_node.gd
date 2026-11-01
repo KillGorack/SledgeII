@@ -40,6 +40,8 @@ var _last_attacker: int = 0
 var _last_attacker_msec: int = 0
 # Server-only. What dealt the blow that destroyed this craft.
 var _death_cause: int = DeathCause.WEAPON
+# Server-only. Who hit this craft while it was in the air - see air_juggle.gd.
+var _air := AirJuggle.new()
 
 # Death-window bookkeeping. A destroyed craft keeps its node alive (see
 # destroy_self below), so its collider has to be explicitly taken out of the
@@ -82,6 +84,19 @@ func _ready() -> void:
 	_weapon_freeze_timer.one_shot = true
 	_weapon_freeze_timer.timeout.connect(_on_weapon_freeze_timeout)
 	add_child(_weapon_freeze_timer)
+
+
+# Server-only: is it in the air right now (juggle counting, air_juggle.gd).
+func _physics_process(_delta: float) -> void:
+	if _is_destroyed or not body.visible or not NetworkManager.is_live_server():
+		return
+	_air.update(body)
+
+
+# Kill payout multiplier for this attacker: x1, or one times per hit they
+# landed while this craft was in the air. Read by match.gd during craft_defeated.
+func juggle_multiplier(attacker_id: int) -> int:
+	return _air.multiplier(attacker_id)
 
 
 func _process(delta: float) -> void:
@@ -174,6 +189,7 @@ func note_attacker(attacker_id: int) -> void:
 		return
 	_last_attacker = attacker_id
 	_last_attacker_msec = Time.get_ticks_msec()
+	_air.note_hit(attacker_id)
 
 
 func _credited_attacker() -> int:
@@ -298,6 +314,7 @@ func destroy_self(death_time: float = 0.0) -> void:
 	if multiplayer.is_server():
 		craft_defeated.emit(body.get_multiplayer_authority(), _credited_attacker(), _death_cause)
 		_last_attacker = 0
+		_air.reset()
 
 
 # How long a peer that only watches this craft should hold the explosion, so
@@ -323,6 +340,7 @@ func respawn_at(spawn_position: Vector3, spawn_basis: Basis) -> void:
 	armor = _armor_max
 	life = _life_max
 	_is_destroyed = false
+	_air.reset()
 	var new_transform := Transform3D(spawn_basis, spawn_position)
 	if body is RigidBody3D:
 		# Unfreeze BEFORE moving. freeze puts the body into the physics server

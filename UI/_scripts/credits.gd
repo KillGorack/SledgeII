@@ -24,6 +24,7 @@ static func text() -> String:
 		"The full license texts are under [b]Licenses[/b].",
 		"",
 		"[b]Art, sound and music[/b]",
+		"Base ambience: \"4 Atmospheric / Ghostly Loops\" from OpenGameArt.org (CC0), opengameart.org/content/4-atmospheric-ghostly-loops",
 		"Thank you to everyone who made and shared the textures, sounds and models this game uses.",
 		"",
 		"[b]Thanks[/b]",
