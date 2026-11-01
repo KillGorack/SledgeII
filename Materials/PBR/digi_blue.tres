@@ -1,8 +1,8 @@
 [gd_resource type="StandardMaterial3D" format=3 uid="uid://c3bhhcy54i02b"]
 
-[ext_resource type="Texture2D" uid="uid://dxcgxmoebla4g" path="res://Materials/Textures/Digicamo/DigiCamo_diffuseOriginal.bmp" id="1_fx243"]
+[ext_resource type="Texture2D" uid="uid://caagv5vlofxgm" path="res://Materials/Textures/Digicamo/DigiCamo_diffuseOriginal.png" id="1_fx243"]
 [ext_resource type="Texture2D" uid="uid://b3eqjcsy74sux" path="res://Materials/Textures/Digicamo/REVERSE_EMMITION.png" id="2_fr3k6"]
-[ext_resource type="Texture2D" uid="uid://bvni0rpqi2j03" path="res://Materials/Textures/Digicamo/DigiCamo_normal.bmp" id="3_be5qa"]
+[ext_resource type="Texture2D" uid="uid://c5eg4aosceju" path="res://Materials/Textures/Digicamo/DigiCamo_normal.png" id="3_be5qa"]
 
 [resource]
 albedo_color = Color(0, 0.36862746, 1, 1)

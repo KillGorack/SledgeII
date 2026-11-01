@@ -11,7 +11,7 @@ class_name Tornado
 # Set `bounds` (the XZ area it may roam, already shrunk by the margin) before adding it to the tree.
 
 const FLIPBOOK := preload("res://Materials/Textures/Particles/T_smoke_flipbook.png")
-# A 35 second wind, cut from the old game's 5 minute recording and joined end to start so it loops unbroken.
+# A short wind recording (Roloxi, CC BY 4.0 - see the Credits screen), looped by _ready().
 const WIND := preload("res://Game_Objects/Sounds/tornado_wind.ogg")
 
 const SPEED := 2.0               # metres per second across the level

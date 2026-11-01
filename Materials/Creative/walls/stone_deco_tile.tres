@@ -1,0 +1,15 @@
+[gd_resource type="StandardMaterial3D" load_steps=5 format=3]
+
+[ext_resource type="Texture2D" path="res://Materials/Creative/Textures/stone_deco_tile/diffuse.png" id="1_d"]
+[ext_resource type="Texture2D" path="res://Materials/Creative/Textures/stone_deco_tile/normal.png" id="2_n"]
+[ext_resource type="Texture2D" path="res://Materials/Creative/Textures/stone_deco_tile/ao.png" id="3_ao"]
+[ext_resource type="Texture2D" path="res://Materials/Creative/Textures/stone_deco_tile/roughness.png" id="4_r"]
+
+[resource]
+albedo_texture = ExtResource("1_d")
+normal_enabled = true
+normal_scale = -1.0
+normal_texture = ExtResource("2_n")
+ao_enabled = true
+ao_texture = ExtResource("3_ao")
+roughness_texture = ExtResource("4_r")

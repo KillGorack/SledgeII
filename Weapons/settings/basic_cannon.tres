@@ -5,8 +5,8 @@
 [ext_resource type="PackedScene" uid="uid://ccxhqgq7uepr2" path="res://Weapons/Scenes/projectiles/trail_smoke.tscn" id="2_vcfcg"]
 [ext_resource type="PackedScene" uid="uid://b4qwbkxy8u1u6" path="res://Weapons/Scenes/projectiles/shell.tscn" id="2_y8gcj"]
 [ext_resource type="Script" uid="uid://defwrtblkx02f" path="res://Weapons/_scripts/weapon_settings.gd" id="3_y8gcj"]
-[ext_resource type="AudioStream" uid="uid://dy0ecskx3n1b" path="res://Weapons/Sounds/Mortar2.wav" id="4_djqd1"]
-[ext_resource type="AudioStream" uid="uid://driqxc5owy7sw" path="res://Weapons/Sounds/hit.wav" id="4_otocn"]
+[ext_resource type="AudioStream" uid="uid://v4fihwej61g1" path="res://Weapons/Sounds/Impact.mp3" id="4_otocn"]
+[ext_resource type="AudioStream" uid="uid://dsjcj32jipj6g" path="res://Weapons/Sounds/shot.mp3" id="5_otocn"]
 [ext_resource type="Texture2D" uid="uid://dcjjebx4kprxx" path="res://Weapons/icons/cannon.png" id="8_otocn"]
 
 [resource]
@@ -23,7 +23,7 @@ projectile_color = Color(0.60932976, 0.60933024, 0.60932994, 1)
 explosion_prefab = ExtResource("2_i4pwi")
 bullet_hole_prefab = ExtResource("1_y8gcj")
 exhaust_prefab = ExtResource("2_vcfcg")
-launch_sound = ExtResource("4_djqd1")
+launch_sound = ExtResource("5_otocn")
 hit_sound = ExtResource("4_otocn")
 projectile_count_capacity = 15
 projectile_count_actual = 15

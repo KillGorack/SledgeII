@@ -10,6 +10,7 @@ point_count = 3
 [resource]
 script = ExtResource("1_stats")
 engine_sound = ExtResource("1_0ri4b")
+engine_pitch = 0.5
 recenter_speed = 64.0
 turn_speed = 2.0
 turn_acceleration = 6.0

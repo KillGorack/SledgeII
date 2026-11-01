@@ -12,7 +12,7 @@ dest_files=["res://.godot/imported/tornado_wind.ogg-51e55e1794eab010dba57071e50c
 
 [params]
 
-loop=false
+loop=true
 loop_offset=0
 bpm=0
 beat_count=0

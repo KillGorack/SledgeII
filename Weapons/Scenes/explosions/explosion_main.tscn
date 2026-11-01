@@ -1,14 +1,14 @@
 [gd_scene format=3 uid="uid://7dlbhxdr6kg8"]
 
 [ext_resource type="Texture2D" uid="uid://dwj3xf6p78rul" path="res://Materials/Textures/Particles/Explosion.png" id="1_xe46o"]
-[ext_resource type="Texture2D" uid="uid://vlv7bavbs1kd" path="res://Materials/Textures/Particles/exp_height.bmp" id="2_4h2r5"]
-[ext_resource type="Texture2D" uid="uid://n4qqsmkep3qy" path="res://Materials/Textures/Particles/exp_normal.bmp" id="3_10rek"]
+[ext_resource type="Texture2D" path="res://Materials/Textures/Particles/exp_height.png" id="2_4h2r5"]
+[ext_resource type="Texture2D" path="res://Materials/Textures/Particles/exp_normal.png" id="3_10rek"]
 [ext_resource type="Script" uid="uid://c6e2d0hsfw6gk" path="res://_globals/_gc.gd" id="4_4h2r5"]
 [ext_resource type="Script" uid="uid://1fifc8n2jfdv" path="res://Weapons/_scripts/flash.gd" id="5_10rek"]
 [ext_resource type="Shader" uid="uid://n1kaoh7j33ja" path="res://Materials/Shaders/clash.tres" id="6_7o1g6"]
 [ext_resource type="Texture2D" uid="uid://cglf5hd5udewc" path="res://Materials/Textures/Particles/T_circle42.PNG" id="7_04cjh"]
 [ext_resource type="Shader" uid="uid://c05kf2yj5tshy" path="res://Materials/Shaders/clash_spark.tres" id="8_65rut"]
-[ext_resource type="AudioStream" uid="uid://ddn0qisytl3nm" path="res://Weapons/Sounds/Explosion.wav" id="9_04cjh"]
+[ext_resource type="AudioStream" path="res://Weapons/Sounds/Explosion.mp3" id="9_04cjh"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_yj4eb"]
 transparency = 1

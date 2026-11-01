@@ -1,0 +1,18 @@
+[gd_resource type="StandardMaterial3D" load_steps=6 format=3]
+
+[ext_resource type="Texture2D" path="res://Materials/Creative/Textures/steel_plate/diffuse.png" id="1_d"]
+[ext_resource type="Texture2D" path="res://Materials/Creative/Textures/steel_plate/normal.png" id="2_n"]
+[ext_resource type="Texture2D" path="res://Materials/Creative/Textures/steel_plate/ao.png" id="3_ao"]
+[ext_resource type="Texture2D" path="res://Materials/Creative/Textures/steel_plate/roughness.png" id="4_r"]
+[ext_resource type="Texture2D" path="res://Materials/Creative/Textures/steel_plate/metallic.png" id="5_m"]
+
+[resource]
+albedo_texture = ExtResource("1_d")
+normal_enabled = true
+normal_scale = -1.0
+normal_texture = ExtResource("2_n")
+ao_enabled = true
+ao_texture = ExtResource("3_ao")
+roughness_texture = ExtResource("4_r")
+metallic = 1.0
+metallic_texture = ExtResource("5_m")

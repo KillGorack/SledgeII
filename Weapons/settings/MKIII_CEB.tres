@@ -3,7 +3,7 @@
 [ext_resource type="PackedScene" uid="uid://c8wgfwmq20j15" path="res://Weapons/Scenes/hitmarks/scorch.tscn" id="1_kcefw"]
 [ext_resource type="PackedScene" uid="uid://cbbcjhhhvec5c" path="res://Weapons/Scenes/projectiles/trail_ribbon.tscn" id="2_vci0u"]
 [ext_resource type="PackedScene" uid="uid://dqu4r8p4yt5jp" path="res://Weapons/Scenes/explosions/sparks.tscn" id="3_a0822"]
-[ext_resource type="AudioStream" uid="uid://k16ialmjcr" path="res://Weapons/Sounds/laser3.mp3" id="4_kcefw"]
+[ext_resource type="AudioStream" uid="uid://d4h12ovaftvei" path="res://Weapons/Sounds/MKIII.mp3" id="4_kcefw"]
 [ext_resource type="PackedScene" uid="uid://b2vljciuo54jp" path="res://Weapons/Scenes/projectiles/laser.tscn" id="5_cp154"]
 [ext_resource type="Script" uid="uid://defwrtblkx02f" path="res://Weapons/_scripts/weapon_settings.gd" id="6_h0exv"]
 [ext_resource type="Texture2D" uid="uid://6217q1jvkjwy" path="res://Weapons/icons/MKIII.png" id="7_kcefw"]
