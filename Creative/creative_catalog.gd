@@ -124,6 +124,22 @@ const LEGACY_OBJECTS := {
 	&"turret_friendly": [&"turret", &"green"],
 }
 
+# The boulder tool's shapes ("Low Poly Rocks" by para, CC0 - credited in credits.gd), in the order the editor cycles them.
+# "normal" is the pack's normal map for that mesh, shrunk to 1024 px (the originals were 4096 px, 50+ MB each).
+const BOULDERS := [
+	{"name": "Rock C1", "mesh": "res://Models/Decor/Rocks/rock_c_01.obj", "normal": "res://Models/Decor/Rocks/rock_c_01_normal.png"},
+	{"name": "Rock D1", "mesh": "res://Models/Decor/Rocks/rock_d_01.obj", "normal": "res://Models/Decor/Rocks/rock_d_01_normal.png"},
+	{"name": "Rock D2", "mesh": "res://Models/Decor/Rocks/rock_d_02.obj", "normal": "res://Models/Decor/Rocks/rock_d_02_normal.png"},
+	{"name": "Rock D3", "mesh": "res://Models/Decor/Rocks/rock_d_03.obj", "normal": "res://Models/Decor/Rocks/rock_d_03_normal.png"},
+	{"name": "Rock D5", "mesh": "res://Models/Decor/Rocks/rock_d_05.obj", "normal": "res://Models/Decor/Rocks/rock_d_05_normal.png"},
+	{"name": "Rock D6", "mesh": "res://Models/Decor/Rocks/rock_d_06.obj", "normal": "res://Models/Decor/Rocks/rock_d_06_normal.png"},
+]
+const MIN_BOULDER_SCALE := 0.5
+const MAX_BOULDER_SCALE := 4.0
+# How much of a rock's height is buried in the surface it was placed on.
+const DEFAULT_BOULDER_SINK := 0.5
+const MAX_BOULDER_SINK := 0.9
+
 const OBJECTS := {
 	&"base_pad": {"name": "Base pad", "icon": preload("res://Creative/icons/base_pad_gray.png"), "kind": "pad", "teams": [&"red", &"green", &"blue", &"gray"], "team_default": "red", "group": "base_pad_", "offset": Vector3.ZERO},
 	&"recon": {"name": "Recon station", "teams": [&"neutral", &"red", &"green", &"blue", &"gray"], "team_default": "neutral", "snap": "cell", "offset": Vector3.ZERO, "icon": preload("res://Creative/icons/recon_station_creative.png"), "kind": "recon"},
@@ -132,6 +148,7 @@ const OBJECTS := {
 	&"wall_art": {"hidden": true, "name": "Wall art", "icon": preload("res://Creative/icons/wall_art.png"), "kind": "placeholder", "color": Color(0.7, 0.5, 0.9), "anchor": "center", "offset": Vector3.ZERO},
 	&"turret": {"name": "Turret", "icon": preload("res://Creative/icons/sentry_enemy.png"), "kind": "turret", "teams": [&"red", &"green", &"blue", &"gray"], "team_default": "red", "anchor": "center", "snap": "cell", "offset": Vector3(0.0, 0.5, 0.0)},
 	&"fire_pot": {"name": "Fire pot", "icon": preload("res://Creative/icons/fire_pot.png"), "kind": "decor", "color": Color(1.0, 0.5, 0.1), "scene": preload("res://Creative/Decor/fire_pot.tscn")},
+	&"boulder": {"name": "Boulder", "kind": "boulder", "color": Color(0.5, 0.48, 0.45), "offset": Vector3.ZERO, "variants": BOULDERS},
 	&"tornado": {"name": "Tornado", "icon": preload("res://Creative/icons/tornado.png"), "kind": "tornado", "color": Color(0.6, 0.6, 0.7), "offset": Vector3.ZERO},
 	&"tree_oak": {"name": "Tree", "icon": preload("res://Creative/icons/oak.png"), "kind": "decor", "color": Color(0.2, 0.55, 0.2), "scene": preload("res://Creative/Decor/tree_oak.tscn")},
 	&"tree_poplar": {"name": "Evergreen tree", "icon": preload("res://Creative/icons/poplar.png"), "kind": "decor", "color": Color(0.5, 0.7, 0.2), "scene": preload("res://Creative/Decor/tree_poplar.tscn")},
@@ -159,6 +176,23 @@ static func object_team(id: StringName, team: Variant) -> StringName:
 
 static func has_teams(id: StringName) -> bool:
 	return OBJECTS[id].has("teams")
+
+
+static func has_variants(id: StringName) -> bool:
+	return OBJECTS[id].has("variants")
+
+
+# A boulder entry's shape index and size, kept in range whatever the file says.
+static func boulder_variant(value: Variant) -> int:
+	return clampi(int(value) if (value is float or value is int) else 0, 0, BOULDERS.size() - 1)
+
+
+static func boulder_sink(value: Variant) -> float:
+	return clampf(float(value) if (value is float or value is int) else DEFAULT_BOULDER_SINK, 0.0, MAX_BOULDER_SINK)
+
+
+static func boulder_scale(value: Variant) -> float:
+	return clampf(float(value) if (value is float or value is int) else 1.0, MIN_BOULDER_SCALE, MAX_BOULDER_SCALE)
 
 
 static func has_object(id: StringName) -> bool:

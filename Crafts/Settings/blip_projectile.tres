@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="RadarTargetDef" format=3 uid="uid://devapspir3vbm"]
+
+[ext_resource type="Script" uid="uid://dc7nvy010cc26" path="res://Crafts/_scripts/radar_target_def.gd" id="1_dx4bw"]
+
+[resource]
+script = ExtResource("1_dx4bw")
+group_name = "Projectile"
+color = Color(0.9999998, 0.9941912, 0.9931868, 1)
+use_team_color = true
+size = Vector2(1, 1)

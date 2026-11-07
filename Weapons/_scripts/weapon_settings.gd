@@ -80,6 +80,12 @@ enum ReloadOn { NEUTRAL, CAPTURED }
 @export var affected_by_gravity: bool = false
 
 @export var launch_offset: float = -0.5
+# Seconds between a projectile being destroyed (hit/range/lifetime) and its
+# node actually being freed - lets trails/sounds finish. NOT a lifetime.
 @export var projectile_destruction_delay: float = 0.0
+# Seconds of flight after which the projectile destroys itself, whatever it
+# has or hasn't hit. 0 = no limit (range alone ends it). Essential for
+# thrown objects (object_handler.gd), which rest instead of flying out of range.
+@export var projectile_lifetime: float = 0.0
 @export var friendly_fire: bool = false
 @export var turncoat: String = ""

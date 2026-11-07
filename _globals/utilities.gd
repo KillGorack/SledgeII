@@ -147,11 +147,19 @@ func collect_bodies(space_state: PhysicsDirectSpaceState3D, origin: Vector3, n: 
 				mask |= 1 << (layer + 8 - 1)
 	if mask == 0:
 		mask = 0x7fffffff
+	else:
+		# Thrown objects (physics layer 15, see object_handler.gd) are no
+		# team's target, but blasts should still be able to shove them.
+		mask |= 1 << 14
 	query.collision_mask = mask
 
 	var result := space_state.intersect_shape(query, n)
 	var filtered_result = []
 	for item in result:
+		# Thrown objects always pass: no team group, but blasts shove them.
+		if item.collider.is_in_group("playthings"):
+			filtered_result.append(item)
+			continue
 		for group in target_groups:
 			if item.collider.is_in_group(group):
 				filtered_result.append(item)

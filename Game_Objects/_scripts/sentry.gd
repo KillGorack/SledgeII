@@ -100,8 +100,11 @@ func _refresh_state() -> void:
 		_hit_body.collision_layer = 1 << (int(layer_data["layer"]) + HIT_LAYER_OFFSET - 1)
 		if not _hit_body.is_in_group(team):
 			_hit_body.add_to_group(team)
+		# The radar's blip_turret row finds these by group.
+		add_to_group("Turret")
 	else:
 		_hit_body.collision_layer = 0
+		remove_from_group("Turret")
 		if team != "" and _hit_body.is_in_group(team):
 			_hit_body.remove_from_group(team)
 
@@ -192,7 +195,10 @@ func _try_fire(point: Vector3) -> void:
 
 # Server only (collision_handler.gd resolves hits there, through base_gun_health.gd).
 func take_damage(damage: float, _attacker_id: int = 0) -> void:
-	if not multiplayer.is_server() or is_dead:
+	if not multiplayer.is_server() or is_dead or team == "":
+		return
+	# Same as base_gun.gd: with nobody on this turret's team, shots are absorbed and do nothing.
+	if not NetworkManager.peer_teams.values().has(team):
 		return
 	_hp -= damage
 	if _hp > 0.0:

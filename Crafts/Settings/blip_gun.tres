@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="RadarTargetDef" format=3 uid="uid://ctsx0i5ebuji3"]
+
+[ext_resource type="Script" uid="uid://dc7nvy010cc26" path="res://Crafts/_scripts/radar_target_def.gd" id="1_gab0q"]
+
+[resource]
+script = ExtResource("1_gab0q")
+group_name = "Recon"
+color = Color(0.9999998, 0.9941912, 0.9931868, 1)

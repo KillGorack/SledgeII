@@ -181,6 +181,16 @@ static func _clean_object(entry: Variant) -> Dictionary:
 	}
 	if CreativeCatalog.has_teams(id):
 		clean["t"] = String(CreativeCatalog.object_team(id, team))
+	if CreativeCatalog.has_variants(id):
+		var scale: Variant = entry.get("sc")
+		if (scale is float or scale is int) and (is_nan(scale) or is_inf(scale)):
+			scale = null
+		clean["v"] = CreativeCatalog.boulder_variant(entry.get("v"))
+		clean["sc"] = snappedf(CreativeCatalog.boulder_scale(scale), 0.05)
+		var sink: Variant = entry.get("sk")
+		if (sink is float or sink is int) and (is_nan(sink) or is_inf(sink)):
+			sink = null
+		clean["sk"] = snappedf(CreativeCatalog.boulder_sink(sink), 0.05)
 	return clean
 
 

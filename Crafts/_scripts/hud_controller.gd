@@ -1,6 +1,7 @@
 extends Control
 
 const PLAYER_LIST := preload("res://Crafts/_scripts/player_list.gd")
+const KEY_HELP := preload("res://Crafts/_scripts/key_help.gd")
 # Full-screen card shown while your own craft is destroyed (the respawn delay).
 const DEMISE_SCREEN := preload("res://UI/backgrounds/demise_screen.png")
 # Fades in, so the start of your own explosion still shows; gone on respawn.
@@ -56,6 +57,10 @@ func _ready() -> void:
 	_match_node = get_tree().get_first_node_in_group("match")
 	arena_label.text = NetworkManager.current_map_title
 	add_child(PLAYER_LIST.new())
+	# Only in a match: the builder's test mode has its own F1 card.
+	if _match_node:
+		add_child(KEY_HELP.new())
+		_add_help_hint()
 	# Juice is only spent on recon captures, so with capture off the bar (and
 	# the Bezel frame that holds nothing else) has nothing to say. The ruleset
 	# reaches joiners on connect, well before their craft and HUD exist.
@@ -72,6 +77,20 @@ func _ready() -> void:
 	if mine_counter:
 		mine_counter.set_process(false)
 		mine_counter.visible = false
+
+
+# A faint reminder in the top-right corner that F1 opens the key reference.
+func _add_help_hint() -> void:
+	var hint := Label.new()
+	hint.text = "F1  Controls"
+	hint.modulate = Color(1.0, 1.0, 1.0, 0.55)
+	hint.add_theme_font_size_override("font_size", 12)
+	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hint.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	hint.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	hint.offset_right = -10.0
+	hint.offset_top = 6.0
+	add_child(hint)
 
 
 # Its own CanvasLayer, above the HUD and chat, so the whole view is the card.

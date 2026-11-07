@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="RadarTargetDef" format=3 uid="uid://c5rwld4fk2qvr"]
+[gd_resource type="Resource" script_class="RadarTargetDef" format=3 uid="uid://dt2vjt1ugnwss"]
 
 [ext_resource type="Script" uid="uid://dc7nvy010cc26" path="res://Crafts/_scripts/radar_target_def.gd" id="1_hacya"]
 

@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="WeaponSettings" format=3 uid="uid://wwdw5mdsil3o"]
+
+[ext_resource type="PackedScene" uid="uid://rc3u55q56ylx" path="res://Weapons/Scenes/projectiles/d_20.tscn" id="1_8qqe4"]
+[ext_resource type="Script" uid="uid://defwrtblkx02f" path="res://Weapons/_scripts/weapon_settings.gd" id="1_glspx"]
+[ext_resource type="Texture2D" uid="uid://x87wep10td1q" path="res://Weapons/icons/D20.png" id="3_or1lj"]
+
+[resource]
+script = ExtResource("1_glspx")
+weapon_name = "D20 Die"
+weapon_icon = ExtResource("3_or1lj")
+cool_down = 0.01
+projectile_prefab = ExtResource("1_8qqe4")
+projectile_range = 1000.0
+projectile_speed = 10.0
+affected_by_gravity = true
+launch_offset = 3.0
+projectile_lifetime = 150.0
+friendly_fire = true
+metadata/_custom_type_script = "uid://defwrtblkx02f"

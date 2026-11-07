@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://75sa32sebpqn" path="res://Weapons/_scripts/collision_handler.gd" id="1_bsdoy"]
 [ext_resource type="Texture2D" uid="uid://d24a1wpkenydh" path="res://Materials/Textures/Particles/Sun.png" id="1_k3wgm"]
 [ext_resource type="Script" uid="uid://l07kt7adidgn" path="res://Materials/Shaders/colorable_light.gd" id="2_4o3dw"]
-[ext_resource type="Script" path="res://Materials/Shaders/colorable_sprite.gd" id="3_plsma"]
+[ext_resource type="Script" uid="uid://l1xtv0d2mow4" path="res://Materials/Shaders/colorable_sprite.gd" id="3_plsma"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_4o3dw"]
 radius = 0.1

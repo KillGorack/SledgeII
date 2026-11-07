@@ -62,6 +62,10 @@ var _stored_collision_mask: int = 0
 
 
 func _ready() -> void:
+	# The smoke's own transform stays upright in the world (see _update_smoke): its "up" would otherwise turn with
+	# the craft and send the smoke into the ground when the craft is upside down.
+	if _smoke:
+		_smoke.top_level = true
 	if stats == null:
 		return
 	# stats is a shared template resource (same values for every Lightning) -
@@ -138,9 +142,11 @@ func _process(delta: float) -> void:
 		apply_damage(shields + armor + life, 0, DeathCause.VOID)
 
 
+# The emitter follows the craft's mount point but never its rotation, so the smoke always rises, upside down or not.
 func _update_smoke() -> void:
 	if _smoke == null or _life_max <= 0.0:
 		return
+	_smoke.global_position = (_smoke.get_parent() as Node3D).get_global_transform_interpolated().origin
 	_smoke.emitting = not _is_destroyed and life < _life_max * SMOKE_LIFE_RATIO
 
 

@@ -18,6 +18,9 @@ extends Node3D
 
 @export var stats: CraftStats
 
+# A base gun's feed (and drain, when it's an enemy's) as a fraction of a recon pad's.
+const GUN_POWER_SCALE := 0.5
+
 var current_power: float = 0.0
 
 @onready var body: Node3D = get_parent()
@@ -42,13 +45,28 @@ func _process(delta: float) -> void:
 		# should mean.
 		if recon.captured_color == ReconStation.StationColor.NONE:
 			continue
-		var distance = body.global_position.distance_to(recon.global_position)
-		if distance <= stats.max_effect_distance:
-			var t: float = distance / stats.max_effect_distance
-			var closeness: float = stats.power_falloff_curve.sample_baked(t) if stats.power_falloff_curve else 1.0 - t
-			var rate = stats.power_gain_rate * closeness * delta
-			total_gain += rate if recon.captured_color == my_color else -rate
+		total_gain += _source_rate(recon.global_position, recon.captured_color == my_color, 1.0, delta)
+	# Base guns transmit too, weaker than a pad, and stack with it and each
+	# other. Turrets are in their own "Turret" group and don't feed; a recon
+	# station's own gun is skipped because the station already counts above.
+	for gun in get_tree().get_nodes_in_group("BaseGun"):
+		if not (gun is BaseGun) or gun.recon != null or gun.is_dead or gun.team == "":
+			continue
+		total_gain += _source_rate(gun.global_position, ReconStation.color_for_team(gun.team) == my_color, GUN_POWER_SCALE, delta)
 	current_power = clamp(current_power + total_gain, 0.0, stats.power_capacity)
+
+
+# Signed power change this frame from one source: positive from a friendly one,
+# negative from an enemy, tapering with distance. `scale` weakens it relative to
+# a recon pad.
+func _source_rate(source_position: Vector3, friendly: bool, scale: float, delta: float) -> float:
+	var distance = body.global_position.distance_to(source_position)
+	if distance > stats.max_effect_distance:
+		return 0.0
+	var t: float = distance / stats.max_effect_distance
+	var closeness: float = stats.power_falloff_curve.sample_baked(t) if stats.power_falloff_curve else 1.0 - t
+	var rate: float = stats.power_gain_rate * closeness * scale * delta
+	return rate if friendly else -rate
 
 
 func get_power_ratio() -> float:

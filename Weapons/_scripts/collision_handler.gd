@@ -42,6 +42,8 @@ var targeted_group: bool = false
 var result = []
 var distance_traveled: float = 0.0
 var max_distance: float
+# Seconds since this copy spawned - drives weapon_settings.projectile_lifetime.
+var _age: float = 0.0
 # Only matters for weapon_settings.affected_by_gravity - the launch velocity
 # gets set exactly once, on this projectile's first physics tick, then left
 # alone so gravity_scale can curve it from there. See _physics_process().
@@ -57,6 +59,8 @@ var shooter_peer: int = 0
 # The shooter held "reverso" when firing: projectile_force pulls instead of
 # pushes. Only the server's copy resolves hits, so only it needs this.
 var reverse_force: bool = false
+# Physics layer 15 - thrown objects (object_handler.gd) live on it.
+const OBJECT_LAYER_BIT := 1 << 14
 const GUIDED_CORRECTION_INTERVAL := 0.05
 const CORRECTION_SNAP_DISTANCE := 5.0
 const CORRECTION_BLEND_RATE := 15.0
@@ -81,9 +85,14 @@ func _ready() -> void:
 	if is_multiplayer_authority():
 		contact_monitor = true
 		max_contacts_reported = 5
+	# Every projectile, teamed or not, on every peer - alongside (not instead of) the per-team group below.
+	add_to_group("Projectile")
 	if team != "":
 		allegiance_group = "projectile_" + team
 		Utilities.set_allegiance(self, allegiance_group)
+	# Every projectile can strike a thrown object (see handle_collision).
+	if is_multiplayer_authority():
+		collision_mask |= OBJECT_LAYER_BIT
 	if not is_multiplayer_authority():
 		# Cosmetic copy - see the header comment. Frozen so the physics engine
 		# never moves it (_cosmetic_step does), and collision-free so it can't
@@ -210,6 +219,10 @@ func _physics_process(delta: float) -> void:
 		return
 
 	max_distance = weapon_settings.projectile_range
+	_age += delta
+	if weapon_settings.projectile_lifetime > 0.0 and _age >= weapon_settings.projectile_lifetime:
+		destroy_self()
+		return
 
 	var distance_this_frame = linear_velocity.length() * delta
 	distance_traveled += distance_this_frame
@@ -275,6 +288,11 @@ func _authoritative_velocity() -> Vector3:
 # Trail3D/smoke trails sample that interpolated transform.
 func _cosmetic_step(delta: float) -> void:
 	if _cosmetic_ended:
+		return
+	_age += delta
+	# Fallback for a lost end event, same idea as the range check below.
+	if weapon_settings.projectile_lifetime > 0.0 and _age >= weapon_settings.projectile_lifetime + 1.0:
+		_park()
 		return
 	if weapon_settings.affected_by_gravity:
 		_cosmetic_velocity += _gravity() * delta
@@ -401,7 +419,11 @@ func handle_collision() -> void:
 
 	if (weapon_settings.explosive_force > 0 and weapon_settings.explosive_force_distance > 0) or weapon_settings.unfreeze or weapon_settings.bounce_count > 0:
 		var dist = weapon_settings.explosive_force_distance if weapon_settings.explosive_force_distance > 0 else weapon_settings.target_system_scan_radius
-		var scope_targets = Utilities.GROUP_LAYER_SCOPE[allegiance_group]["target_groups"] if Utilities.GROUP_LAYER_SCOPE.has(allegiance_group) else []
+		var scope_targets: Array = Utilities.GROUP_LAYER_SCOPE[allegiance_group]["target_groups"].duplicate() if Utilities.GROUP_LAYER_SCOPE.has(allegiance_group) else []
+		# friendly_fire means the blast hurts/shoves the shooter's own team
+		# too (including the shooter) - the scope only ever lists enemies.
+		if weapon_settings.friendly_fire and team != "" and team not in scope_targets:
+			scope_targets.append(team)
 
 		result = Utilities.collect_bodies(
 			get_world_3d().direct_space_state,
@@ -439,6 +461,14 @@ func handle_collision() -> void:
 
 		if weapon_settings.projectile_pierce_count > 0:
 			destroy = handle_pierce()
+
+	# Shooting a thrown object (object_handler.gd): no team to damage, but it
+	# should still get shoved. Uses the weapon's projectile_force, or a
+	# fraction of its damage if it has none.
+	if is_instance_valid(collided_object) and collided_object is Node and collided_object.is_in_group("playthings"):
+		var shove := weapon_settings.projectile_force if weapon_settings.projectile_force > 0.0 else weapon_settings.hit_points * 0.5
+		if shove > 0.0 and not targeted_group:
+			apply_hit_force(-shove if reverse_force else shove)
 
 	if weapon_settings.bounce_count > 0:
 		destroy = handle_bounce(result)
@@ -604,9 +634,11 @@ func handle_pierce() -> bool:
 
 
 func handle_bounce(bodies) -> bool:
-	if bodies.size() > 0 and ricochet_count <= weapon_settings.bounce_count:
+	# Thrown objects aren't bounce targets.
+	var candidates: Array = bodies.filter(func(b): return not (b.collider is Node and b.collider.is_in_group("playthings")))
+	if candidates.size() > 0 and ricochet_count <= weapon_settings.bounce_count:
 		ricochet_count += 1
-		var body = bodies[0].collider
+		var body = candidates[0].collider
 		var direction = (body.global_transform.origin - global_transform.origin).normalized()
 		linear_velocity = direction * weapon_settings.projectile_speed
 		_reset_one_offs()
