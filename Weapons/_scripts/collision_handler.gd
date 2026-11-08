@@ -190,6 +190,8 @@ func _spawn_exhaust() -> void:
 	# reaches it - tint it the same way (opt-in per child, via
 	# apply_projectile_color()).
 	Utilities.apply_projectile_color_recursive(_exhaust, weapon_settings.projectile_color)
+	if weapon_settings.exhaust_color != Color.WHITE:
+		_exhaust.tint_particles(weapon_settings.exhaust_color)
 	_exhaust.follow(self)
 
 

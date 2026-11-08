@@ -35,6 +35,7 @@ var _is_regenerating: bool = false
 # Weapon freeze (freeze_timer / unfreeze weapons). Runs on the craft's owner -
 # see apply_weapon_freeze below.
 var _weapon_freeze_timer: Timer
+var _frozen: bool = false
 # Server-only. Who last hit or shoved this craft, and when - see note_attacker.
 var _last_attacker: int = 0
 var _last_attacker_msec: int = 0
@@ -301,6 +302,11 @@ func destroy_self(death_time: float = 0.0) -> void:
 	if _is_destroyed:
 		return
 	_is_destroyed = true
+	# A frozen wreck is just a wreck: clear the frost and the freeze timer.
+	if _frozen:
+		_frozen = false
+		_weapon_freeze_timer.stop()
+		_set_frost(false)
 	# Weapons picked up from loot don't survive the wreck.
 	var weapon_node = body.get_node_or_null("weapon_node")
 	if weapon_node and weapon_node.has_method("revoke_granted"):
@@ -449,29 +455,87 @@ func apply_impulse(impulse: Vector3) -> void:
 		movement_node.apply_knockback_grace()
 
 
-# Weapon freeze, routed to the owner for the same reason as apply_impulse:
-# setFreezeState only stops the movement_node that actually simulates the
-# craft, and on the server that is only ever the host's own tank. duration > 0
-# freezes (extending, never shortening, a freeze already running); 0 unfreezes.
-# The timer lives here on the owner too, so overlapping freezes can't have an
-# earlier one's timeout thaw a later one early.
+# Weapon freeze: a hit with freeze_timer > 0 locks the target solid in place for
+# that many seconds - rigid body frozen (stuck in mid-air if that's where it was),
+# no firing, but the driver can still look around. Runs on EVERY peer (the server
+# sends it to all): each one needs to know the craft is frozen - the server to
+# refuse its shots, everyone to draw the frost - while only the owner's copy is a
+# live physics body that actually gets frozen. duration 0 thaws. A hit while
+# already frozen does not extend it.
+#
+# movement_node.setFreezeState (stop_forces) is deliberately NOT used: it returns
+# early from the whole movement physics step, which would lock the turret too.
 @rpc("authority", "call_local", "reliable")
 func apply_weapon_freeze(duration: float) -> void:
-	if _is_destroyed or _weapon_freeze_timer == null or not body.is_multiplayer_authority():
+	if _is_destroyed or _weapon_freeze_timer == null:
 		return
 	if duration <= 0.0:
-		_weapon_freeze_timer.stop()
-		_set_movement_frozen(false)
+		_thaw()
 		return
-	if _weapon_freeze_timer.is_stopped() or _weapon_freeze_timer.time_left < duration:
-		_weapon_freeze_timer.start(duration)
-	_set_movement_frozen(true)
+	if _frozen:
+		return
+	_frozen = true
+	_weapon_freeze_timer.start(duration)
+	_set_frost(true)
+	_set_body_frozen.call_deferred(true)
+
+
+func is_frozen() -> bool:
+	return _frozen
+
+
+func _thaw() -> void:
+	if not _frozen:
+		return
+	_frozen = false
+	_weapon_freeze_timer.stop()
+	_set_frost(false)
+	if not _is_destroyed:
+		_set_body_frozen.call_deferred(false)
+
+
+# Only the owner's copy is a live dynamic body (every other peer keeps it frozen
+# kinematic - see movement.gd::_ready), so only that one is touched. Deferred:
+# the hit that causes this arrives from inside the projectile's physics callback,
+# and the physics server refuses state changes made during its own callbacks.
+func _set_body_frozen(frozen: bool) -> void:
+	if not (body is RigidBody3D) or not body.is_multiplayer_authority():
+		return
+	if frozen:
+		body.linear_velocity = Vector3.ZERO
+		body.angular_velocity = Vector3.ZERO
+	body.freeze = frozen
+
+
+# Frost look: a translucent icy overlay on every mesh of the craft, restored to
+# whatever each mesh had before (nothing, usually) when it thaws.
+static var _frost_material: StandardMaterial3D = null
+var _saved_overlays: Dictionary = {} # MeshInstance3D -> its previous material_overlay
+
+
+func _set_frost(on: bool) -> void:
+	if on:
+		if _frost_material == null:
+			_frost_material = StandardMaterial3D.new()
+			_frost_material.albedo_color = Color(0.72, 0.88, 1.0, 0.55)
+			_frost_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			_frost_material.emission_enabled = true
+			_frost_material.emission = Color(0.4, 0.7, 1.0)
+			_frost_material.emission_energy_multiplier = 0.9
+			_frost_material.roughness = 0.15
+		for mesh in body.find_children("*", "MeshInstance3D", true, false):
+			if not _saved_overlays.has(mesh):
+				_saved_overlays[mesh] = mesh.material_overlay
+			mesh.material_overlay = _frost_material
+	else:
+		for mesh in _saved_overlays:
+			if is_instance_valid(mesh):
+				mesh.material_overlay = _saved_overlays[mesh]
+		_saved_overlays.clear()
 
 
 func _on_weapon_freeze_timeout() -> void:
-	# A craft that died mid-freeze stays parked until respawn_at thaws it.
-	if not _is_destroyed:
-		_set_movement_frozen(false)
+	_thaw()
 
 
 func _set_collision_enabled(enabled: bool) -> void:

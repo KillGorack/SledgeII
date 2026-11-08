@@ -58,6 +58,14 @@ func _process(delta):
 	mesh.clear_surfaces()
 	if _points.size() < 2:
 		return
+	# The points are world positions sampled from the INTERPOLATED transform, and
+	# the renderer draws this mesh with the interpolated transform too - so the
+	# world->local step has to use that same one. to_local() uses the raw
+	# (last physics tick) transform instead, which displaces the whole trail by
+	# however far the node has moved since that tick: up to speed/tick-rate
+	# (a 25 m/s laser at 120 Hz: ~0.2 m), changing every frame as render and
+	# physics ticks drift against each other - the intermittent wobble.
+	var to_mesh := get_global_transform_interpolated().affine_inverse()
 	mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLE_STRIP)
 	for i in range(_points.size()):
 		var t = float (i) / (_points.size() - 1.0)
@@ -67,9 +75,9 @@ func _process(delta):
 		var t0 = float(i) / float(_points.size())
 		var t1 = t
 		mesh.surface_set_uv(Vector2(t0, 0))
-		mesh.surface_add_vertex(to_local(_points[i] + currWidth))
+		mesh.surface_add_vertex(to_mesh * (_points[i] + currWidth))
 		mesh.surface_set_uv(Vector2(t1, 1))
-		mesh.surface_add_vertex(to_local(_points[i] - currWidth))
+		mesh.surface_add_vertex(to_mesh * (_points[i] - currWidth))
 	mesh.surface_end()
 	
 	

@@ -33,11 +33,15 @@ var net_id: int = -1
 # each other.
 const OBJECT_LAYER_BIT := 1 << 14
 const STREAM_INTERVAL := 0.05
-# Cosmetic copies hold still if no update arrives for this long.
-const STALE_AFTER := 0.25
-const SNAP_DISTANCE := 5.0
-const BLEND_RATE := 15.0
-const TURN_RATE := 20.0
+# Cosmetic copies draw the server's snapshots this far in the past, interpolating
+# between two real ones - so they never guess, never sink through the floor, and
+# a bounce shows exactly where it happened. The delay builds up over the first
+# INTERP_RAMP seconds after launch (the start is predicted ballistic flight), so
+# a throw doesn't hitch.
+const INTERP_DELAY := 0.12
+const INTERP_RAMP := 0.5
+const SEED_SECONDS := 0.6
+const SEED_STEP := 0.025
 # Change in speed (m/s) an impact must cause to count as a "hit" - below this
 # it's just resting / rolling contact and does no damage.
 const MIN_HIT_SPEED := 3.0
@@ -50,13 +54,13 @@ var _stream_elapsed := 0.0
 var _was_sleeping := false
 var _match_node: Node = null
 var _hit_times := {} # body instance id -> _age of last damaging hit
-var _cosmetic_velocity := Vector3.ZERO
-var _position_error := Vector3.ZERO
+var _cosmetic_velocity := Vector3.ZERO # launch velocity, used to seed the buffer
 var _cosmetic_ended := false
-var _since_correction := 0.0
-# True after the server's final resting pose: hold exactly there, no gravity.
-var _resting := false
-var _target_basis := Basis.IDENTITY
+# Snapshot buffer: [{t, p, q, v, syn}] in this copy's own clock (_clock). "syn"
+# ones are predicted launch flight, replaced as real snapshots arrive.
+var _snaps: Array = []
+var _clock := 0.0
+var _seeded := false
 
 
 func _ready() -> void:
@@ -78,7 +82,6 @@ func _ready() -> void:
 		contact_monitor = false
 		collision_layer = 0
 		collision_mask = 0
-		_target_basis = global_basis
 		if weapon_settings:
 			_cosmetic_velocity = -global_transform.basis.z.normalized() * weapon_settings.projectile_speed
 
@@ -99,12 +102,11 @@ func _gravity() -> Vector3:
 # match.gd calls this right after spawning. The server's body just keeps
 # simulating (it was launched in _ready), so only the cosmetic copy needs to
 # catch up with the time the spawn event spent in transit.
-func fast_forward(seconds: float) -> void:
-	if seconds <= 0.0 or weapon_settings == null or is_multiplayer_authority():
-		return
-	global_position += _cosmetic_velocity * seconds + 0.5 * _gravity() * seconds * seconds
-	_cosmetic_velocity += _gravity() * seconds
-	reset_physics_interpolation()
+func fast_forward(_seconds: float) -> void:
+	# Nothing to do. The server's body just keeps simulating, and cosmetic copies
+	# draw the server's snapshots in the past (see _show_pose_at), so catching up
+	# to "now" would only put them ahead of the data they're about to play back.
+	pass
 
 
 func _physics_process(delta: float) -> void:
@@ -147,41 +149,69 @@ func _cosmetic_step(delta: float) -> void:
 	if weapon_settings.projectile_lifetime > 0.0 and _age >= weapon_settings.projectile_lifetime + 1.0:
 		end_cosmetic()
 		return
-	# The server goes quiet once a die sleeps. Keep extrapolating then and the
-	# copy (which has no collision) would sink through the floor, and snap
-	# back into view the moment the die is touched again - the blinking.
-	_since_correction += delta
-	if _resting or _since_correction > STALE_AFTER:
-		_cosmetic_velocity = Vector3.ZERO
-	else:
-		_cosmetic_velocity += _gravity() * delta
-	var motion := _cosmetic_velocity * delta
-	if not _position_error.is_zero_approx():
-		var blend := _position_error * minf(1.0, BLEND_RATE * delta)
-		motion += blend
-		_position_error -= blend
-	global_position += motion
-	var t := 1.0 - exp(-TURN_RATE * delta)
-	global_basis = Basis(global_basis.get_rotation_quaternion().slerp(_target_basis.get_rotation_quaternion(), t))
+	_clock += delta
+	if not _seeded:
+		_seed_snapshots()
+	var delay := INTERP_DELAY * clampf(_age / INTERP_RAMP, 0.0, 1.0)
+	_show_pose_at(_clock - delay)
 
 
-# match.gd: server_transform/velocity from the stream. snap = discrete jump.
-func apply_correction(server_transform: Transform3D, velocity: Vector3, latency: float, snap: bool) -> void:
+# Predicted launch flight, so there is something to play back until the
+# server's own snapshots start arriving (the first one is ~50 ms away).
+func _seed_snapshots() -> void:
+	_seeded = true
+	var p0 := global_position
+	var q := global_basis.get_rotation_quaternion()
+	var g := _gravity()
+	var steps := int(SEED_SECONDS / SEED_STEP)
+	for i in steps + 1:
+		var dt := i * SEED_STEP
+		_snaps.append({"t": _clock + dt, "p": p0 + _cosmetic_velocity * dt + 0.5 * g * dt * dt, "q": q, "syn": true})
+	reset_physics_interpolation()
+
+
+# Straight-line interpolation between the two snapshots around `time` (not a
+# curve: a curve can overshoot and dip a die below the floor at a bounce).
+func _show_pose_at(time: float) -> void:
+	var n := _snaps.size()
+	if n == 0:
+		return
+	# Drop what's long past, keeping one snapshot before `time` to interpolate from.
+	while n > 2 and _snaps[1]["t"] < time:
+		_snaps.pop_front()
+		n -= 1
+	var a: Dictionary = _snaps[0]
+	if time <= a["t"] or n == 1:
+		global_position = a["p"]
+		global_basis = Basis(a["q"])
+		return
+	var b: Dictionary = _snaps[1]
+	if time >= b["t"]:
+		# Out of data (late or lost update): hold the newest pose, don't guess.
+		global_position = b["p"]
+		global_basis = Basis(b["q"])
+		return
+	var s: float = (time - a["t"]) / (b["t"] - a["t"])
+	global_position = (a["p"] as Vector3).lerp(b["p"], s)
+	global_basis = Basis((a["q"] as Quaternion).slerp(b["q"], s))
+
+
+# match.gd: a server snapshot (~20/s while awake; one reliable final pose when it
+# goes to sleep), labelled with when it ARRIVED and holding the server's raw
+# position - never projected forward, which would push a landing die below the
+# floor it is actually resting on.
+func apply_correction(server_transform: Transform3D, _velocity: Vector3, _latency: float, _snap: bool) -> void:
 	if _cosmetic_ended:
 		return
-	_since_correction = 0.0
-	# The sleep message is the only reliable one sent with zero velocity.
-	_resting = snap and velocity.is_zero_approx()
-	var target := server_transform.origin + velocity * latency
-	_cosmetic_velocity = velocity
-	_target_basis = server_transform.basis
-	if snap or global_position.distance_to(target) > SNAP_DISTANCE:
-		global_position = target
-		global_basis = server_transform.basis
-		_position_error = Vector3.ZERO
-		reset_physics_interpolation()
-	else:
-		_position_error = target - global_position
+	# Real data replaces any predicted flight from this moment on.
+	while not _snaps.is_empty() and _snaps.back()["syn"] and _snaps.back()["t"] >= _clock:
+		_snaps.pop_back()
+	_snaps.append({
+		"t": _clock,
+		"p": server_transform.origin,
+		"q": server_transform.basis.get_rotation_quaternion(),
+		"syn": false,
+	})
 
 
 func end_cosmetic() -> void:

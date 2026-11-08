@@ -12,7 +12,8 @@ const WARN_SECONDS := 4.0
 var weapon_node: Node
 
 var _slots: Array = [] # {box, icon, label}
-var _active: Array = [] # [{boost, end_msec}] in slot order
+var _active: Array = [] # end_msec per slot, in slot order
+var _shown: Array = [] # the BoostSettings in each slot
 
 
 func _ready() -> void:
@@ -61,11 +62,13 @@ func _refresh() -> void:
 	var status: Array = weapon_node.boost_status()
 	var now := Time.get_ticks_msec()
 	_active.clear()
+	_shown.clear()
 	for i in SLOTS:
 		var slot: Dictionary = _slots[i]
 		if i < status.size():
 			var boost: BoostSettings = status[i]["boost"]
 			_active.append(now + int(status[i]["left"] * 1000.0))
+			_shown.append(boost)
 			slot["icon"].texture = boost.icon
 			slot["icon"].self_modulate = Color.WHITE
 			slot["box"].visible = true
@@ -75,9 +78,14 @@ func _refresh() -> void:
 
 func _process(_delta: float) -> void:
 	var now := Time.get_ticks_msec()
+	# Dim a boost that doesn't apply to the weapon you're holding.
+	var index: int = weapon_node.current_weapon_index
+	var held: WeaponSettings = weapon_node.weapon_settings[index] if index >= 0 and index < weapon_node.weapon_settings.size() else null
 	for i in _active.size():
 		var left := maxf(0.0, (_active[i] - now) / 1000.0)
 		var slot: Dictionary = _slots[i]
 		slot["label"].text = "%d" % ceili(left)
+		var applies: bool = held == null or _shown[i].affects_kind(held.weapon_kind)
+		slot["icon"].self_modulate = Color.WHITE if applies else Color(0.35, 0.35, 0.35, 0.8)
 		# Blink in the last few seconds.
 		slot["icon"].modulate.a = 1.0 if left > WARN_SECONDS or int(left * 4.0) % 2 == 0 else 0.35

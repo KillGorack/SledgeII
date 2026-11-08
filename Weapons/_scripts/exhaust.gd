@@ -18,6 +18,32 @@ var _target: Node3D
 var _finished: bool = false
 
 
+func _ready() -> void:
+	# This node is moved every render frame to the target's ALREADY-interpolated
+	# transform (below), so the engine must not interpolate it a second time: that
+	# lags it behind the projectile by a fraction of a physics tick that changes
+	# with the render/physics phase - the trail then wobbles intermittently.
+	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
+	# Spinners inside it still rotate in _physics_process and want their own
+	# smoothing between ticks (75 rad/s is over half a radian per tick).
+	for node in find_children("*", "Node3D", true, false):
+		if "spin_speed" in node:
+			node.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_ON
+
+
+# Multiplies the colour of every particle system under this exhaust (smoke has
+# a fixed grey ramp and nothing else tints it). Each system gets its own copy
+# of its material, so the shared scene file is never touched. See
+# WeaponSettings.exhaust_color.
+func tint_particles(color: Color) -> void:
+	for node in find_children("*", "GPUParticles3D", true, false):
+		var material := (node as GPUParticles3D).process_material as ParticleProcessMaterial
+		if material:
+			material = material.duplicate()
+			material.color = color
+			(node as GPUParticles3D).process_material = material
+
+
 func follow(target: Node3D) -> void:
 	_target = target
 	global_transform = target.get_global_transform_interpolated()

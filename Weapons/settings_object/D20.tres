@@ -10,6 +10,7 @@ weapon_name = "D20 Die"
 weapon_icon = ExtResource("3_or1lj")
 cool_down = 0.01
 projectile_prefab = ExtResource("1_8qqe4")
+weapon_kind = 2
 projectile_range = 1000.0
 projectile_speed = 10.0
 affected_by_gravity = true

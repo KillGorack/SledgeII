@@ -1,9 +1,9 @@
-[gd_resource type="Resource" script_class="LootSettings" format=3]
+[gd_resource type="Resource" script_class="LootSettings" format=3 uid="uid://bebqjq5j8lixu"]
 
-[ext_resource type="Script" path="res://Game_Objects/Powerups/_scripts/loot_settings.gd" id="1_loot"]
-[ext_resource type="PackedScene" path="res://Game_Objects/Powerups/Scenes/D20_Plaything.tscn" id="2_visual"]
-[ext_resource type="AudioStream" path="res://Game_Objects/Powerups/sounds/bottle.wav" id="3_sound"]
-[ext_resource type="Resource" path="res://Weapons/settings_object/D20.tres" id="4_weapon"]
+[ext_resource type="Script" uid="uid://m0ygem6thprc" path="res://Game_Objects/Powerups/_scripts/loot_settings.gd" id="1_loot"]
+[ext_resource type="PackedScene" uid="uid://dl8q2g821qbdf" path="res://Game_Objects/Powerups/Scenes/D20_Plaything.tscn" id="2_visual"]
+[ext_resource type="AudioStream" uid="uid://cds8k4oewmn8" path="res://Game_Objects/Powerups/sounds/bottle.wav" id="3_sound"]
+[ext_resource type="Resource" uid="uid://wwdw5mdsil3o" path="res://Weapons/settings_object/D20.tres" id="4_weapon"]
 
 [resource]
 script = ExtResource("1_loot")
@@ -11,7 +11,6 @@ loot_name = "D20"
 loot_type = 3
 weapon = ExtResource("4_weapon")
 drop_weight = 0.3
-lifetime = 25.0
-color = Color(1, 1, 0, 1)
 visual_scene = ExtResource("2_visual")
+color = Color(1, 1, 0, 1)
 pickup_sound = ExtResource("3_sound")

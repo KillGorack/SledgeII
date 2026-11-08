@@ -1188,7 +1188,7 @@ const LOOT_RING_RADIUS := 2.0
 const DEBUG_FORCE_LOOT := ""
 # TEMPORARY test switch: every kill drops the WHOLE table, in a ring around the
 # wreck. Set to false for normal weighted drops. Wins over DEBUG_FORCE_LOOT.
-const DEBUG_DROP_ALL := false
+const DEBUG_DROP_ALL := true
 
 
 # Weighted pick from LOOT_TABLE. Rare drops just have a small drop_weight.

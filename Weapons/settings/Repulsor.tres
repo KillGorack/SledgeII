@@ -14,6 +14,7 @@ script = ExtResource("1_k3735")
 weapon_name = "Repulsor Missile"
 weapon_icon = ExtResource("8_g3ac4")
 projectile_prefab = ExtResource("6_g3ac4")
+weapon_kind = 1
 projectile_color = Color(0, 0.5372549, 1, 1)
 explosion_prefab = ExtResource("1_icuoo")
 bullet_hole_prefab = ExtResource("1_egv2f")

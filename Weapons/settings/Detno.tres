@@ -18,6 +18,7 @@ hit_points = 150.0
 crit_multiplier = 0.0
 cool_down = 1.0
 projectile_prefab = ExtResource("6_jpno1")
+weapon_kind = 1
 projectile_color = Color(1, 0, 0, 1)
 explosion_prefab = ExtResource("1_qca65")
 bullet_hole_prefab = ExtResource("1_7qxki")

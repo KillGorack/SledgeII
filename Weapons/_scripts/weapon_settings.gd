@@ -22,6 +22,15 @@ enum ReloadOn { NEUTRAL, CAPTURED }
 @export var power_consumption: float = 0.0
 
 @export var projectile_prefab: PackedScene
+# What sort of weapon this is. Boosts (boost_settings.gd) only apply to the
+# kinds they list: lasers and plasma are LASER, rockets and shells are MISSILE,
+# thrown objects like the D20 are OBJECT.
+enum WeaponKind { LASER, MISSILE, OBJECT }
+@export var weapon_kind: WeaponKind = WeaponKind.LASER
+# Multiplies the colour of this weapon's exhaust smoke (particles). White does
+# nothing; a boost raises it above 1 to make the smoke glow white. Unrelated
+# to projectile_color, which never touched the smoke.
+@export var exhaust_color: Color = Color.WHITE
 # Tint for this weapon's projectile - see collision_handler.gd::_apply_projectile_color.
 # Projectile scenes (rocket/laser/shell) now carry one shared grayscale-ready
 # material/trail/light setup each, instead of a separate color-baked scene per

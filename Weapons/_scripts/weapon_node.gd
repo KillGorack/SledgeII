@@ -147,7 +147,8 @@ func _physics_process(_delta: float) -> void:
 	if Input.is_action_just_pressed("weapon_change", true):
 		switch_weapon()
 	var now = Time.get_ticks_msec() / 1000.0
-	if Input.is_action_pressed("fire_weapon") and now >= _client_next_fire_time:
+	# A frozen craft can look around but not shoot (health_node.gd::apply_weapon_freeze).
+	if Input.is_action_pressed("fire_weapon") and now >= _client_next_fire_time and not _is_frozen():
 		var base_settings := weapon_settings[current_weapon_index]
 		var settings := effective(base_settings)
 		# Predicted locally off power_node's replicated current_power - same
@@ -174,10 +175,12 @@ func _physics_process(_delta: float) -> void:
 		# where we actually see it, instead of a round trip later from where
 		# the server thought we were. The host skips this - its own shots are
 		# already the real, server-side ones with zero latency.
-		if not multiplayer.is_server():
+		# Thrown objects (dice) aren't predicted: their copies play the server's
+		# snapshots back in the past, so a prediction would run ahead of them.
+		if not multiplayer.is_server() and base_settings.weapon_kind != WeaponSettings.WeaponKind.OBJECT:
 			var match_node = get_tree().get_first_node_in_group("match")
 			if match_node:
-				match_node.predict_shot(_shot_seq, base_settings.resource_path, team, muzzle, boost_ops())
+				match_node.predict_shot(_shot_seq, base_settings.resource_path, team, muzzle, boost_ops_for(base_settings))
 		# Recoil belongs to whoever simulates this craft - that's us. The
 		# server used to apply it to its own copy, which for any client-owned
 		# craft is just a follower of the owner's transform, so client recoil
@@ -272,6 +275,9 @@ func _try_fire(weapon_index: int, shot_seq: int, client_muzzle: Transform3D, sen
 	var base_settings := weapon_settings[weapon_index]
 	if base_settings == null or base_settings.projectile_prefab == null:
 		return false
+	# Frozen solid: the server is the one that enforces it.
+	if _is_frozen():
+		return false
 	# What this craft's boosts make of the weapon - cooldown, power, ammo and
 	# the shot itself all read this, never the shared .tres directly.
 	var settings := effective(base_settings)
@@ -333,7 +339,7 @@ func _try_fire(weapon_index: int, shot_seq: int, client_muzzle: Transform3D, sen
 	var fast_forward := 0.0
 	if sender != 1:
 		fast_forward = minf(match_node.peer_one_way_latency(sender), match_node.PROJECTILE_MAX_FAST_FORWARD)
-	match_node.spawn_projectile(path, team, muzzle, false, sender, shot_seq, fast_forward, reverse_force, boost_ops())
+	match_node.spawn_projectile(path, team, muzzle, false, sender, shot_seq, fast_forward, reverse_force, boost_ops_for(base_settings))
 	return true
 
 
@@ -417,22 +423,33 @@ signal boosts_changed
 
 var _boosts: Array[BoostSettings] = []
 var _boost_end_msec: Dictionary = {} # boost resource_path -> local end time
-var _boost_ops: Dictionary = {}
+var _ops_cache: Dictionary = {} # base WeaponSettings -> merged ops for ITS kind
 var _effective_cache: Dictionary = {} # base WeaponSettings -> boosted duplicate
 
 
 # The weapon as this craft currently fires it: base, plus active boosts.
 func effective(base: WeaponSettings) -> WeaponSettings:
-	if _boosts.is_empty() or base == null:
+	var ops := boost_ops_for(base)
+	if ops.is_empty():
 		return base
 	if not _effective_cache.has(base):
-		_effective_cache[base] = BoostSettings.apply_ops(base, _boost_ops)
+		_effective_cache[base] = BoostSettings.apply_ops(base, ops)
 	return _effective_cache[base]
 
 
+# What the active boosts do to THIS weapon (only boosts that affect its kind).
 # Sent with every shot so other peers build the same boosted weapon.
-func boost_ops() -> Dictionary:
-	return _boost_ops if not _boosts.is_empty() else {}
+func boost_ops_for(base: WeaponSettings) -> Dictionary:
+	if _boosts.is_empty() or base == null:
+		return {}
+	if not _ops_cache.has(base):
+		_ops_cache[base] = BoostSettings.resolve(_boosts, base.weapon_kind)
+	return _ops_cache[base]
+
+
+func _is_frozen() -> bool:
+	var health = get_node_or_null("../health_node")
+	return health != null and health.is_frozen()
 
 
 # For the HUD: [{boost: BoostSettings, left: seconds}]
@@ -500,7 +517,7 @@ func _apply_boosts(paths: PackedStringArray, left: PackedFloat32Array) -> void:
 			continue
 		_boosts.append(boost)
 		_boost_end_msec[paths[i]] = now + int(left[i] * 1000.0)
-	_boost_ops = BoostSettings.resolve(_boosts)
+	_ops_cache.clear()
 	_effective_cache.clear()
 	boosts_changed.emit()
 
@@ -511,6 +528,6 @@ func _clear_boosts() -> void:
 		return
 	_boosts.clear()
 	_boost_end_msec.clear()
-	_boost_ops = {}
+	_ops_cache.clear()
 	_effective_cache.clear()
 	boosts_changed.emit()

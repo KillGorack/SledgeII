@@ -21,16 +21,21 @@ class_name BoostSettings
 @export var tint_projectiles: bool = true
 @export_color_no_alpha var projectile_color: Color = Color.WHITE
 # WeaponSettings property name -> value, replacing the weapon's own.
+# Which kinds of weapon this boost applies to (see WeaponSettings.WeaponKind).
+# Others fire exactly as before. Default: lasers and missiles, not objects.
+@export_flags("Laser", "Missile", "Object") var affects: int = 3
 @export var set_values: Dictionary = {}
 # WeaponSettings property name -> factor, multiplying the weapon's own.
 @export var multiply_values: Dictionary = {}
 
 
 # Merge any number of boosts into one ops dictionary: {"set": {...}, "mul": {...}}.
-static func resolve(boosts: Array) -> Dictionary:
+# Only boosts that affect `kind` (a WeaponSettings.WeaponKind) are included;
+# {} if nothing applies.
+static func resolve(boosts: Array, kind: int = -1) -> Dictionary:
 	var ops := {"set": {}, "mul": {}}
 	for boost in boosts:
-		if boost == null:
+		if boost == null or (kind >= 0 and not boost.affects_kind(kind)):
 			continue
 		for key in boost.set_values:
 			ops["set"][key] = boost.set_values[key]
@@ -38,7 +43,13 @@ static func resolve(boosts: Array) -> Dictionary:
 			ops["mul"][key] = boost.multiply_values[key]
 		if boost.tint_projectiles:
 			ops["set"]["projectile_color"] = boost.projectile_color
+	if ops["set"].is_empty() and ops["mul"].is_empty():
+		return {}
 	return ops
+
+
+func affects_kind(kind: int) -> bool:
+	return (affects & (1 << kind)) != 0
 
 
 # `base` with the ops applied, as a duplicate (the .tres itself is never
