@@ -8,7 +8,7 @@
 script = ExtResource("1_glspx")
 weapon_name = "D20 Die"
 weapon_icon = ExtResource("3_or1lj")
-cool_down = 0.01
+cool_down = 5.0
 projectile_prefab = ExtResource("1_8qqe4")
 weapon_kind = 2
 projectile_range = 1000.0

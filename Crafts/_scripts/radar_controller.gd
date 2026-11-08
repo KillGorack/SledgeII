@@ -1,5 +1,7 @@
 extends Control
 
+const BOOST_RING := preload("res://Crafts/_scripts/radar_boost_ring.gd")
+
 
 @export var target_defs: Array[RadarTargetDef] = []
 @export var self_size: Vector2 = Vector2(5, 5)
@@ -125,3 +127,20 @@ func _update_blip(target: Node3D, color: Color, target_def: RadarTargetDef, orig
 		blip.color = color
 	blip.size = target_def.size
 	blip.position = flat * (size / (2.0 * effective_range)) + size / 2.0 - target_def.size / 2.0
+	_update_boost_ring(blip, target)
+
+
+# A ring on the blip of any craft running weapon boosts (not your own, which
+# has no blip) - duck-typed, so only things with a weapon_node that knows about
+# boosts ever get one.
+func _update_boost_ring(blip: Control, target: Node) -> void:
+	var weapon_node = target.get_node_or_null("weapon_node")
+	var boosted: bool = weapon_node != null and weapon_node.has_method("has_boosts") and weapon_node.has_boosts()
+	var ring := blip.get_node_or_null("BoostRing")
+	if boosted and ring == null:
+		ring = BOOST_RING.new()
+		ring.name = "BoostRing"
+		ring.mouse_filter = MOUSE_FILTER_IGNORE
+		blip.add_child(ring)
+	elif not boosted and ring != null:
+		ring.queue_free()

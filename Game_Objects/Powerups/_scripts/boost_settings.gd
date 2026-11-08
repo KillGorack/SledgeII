@@ -16,7 +16,7 @@ class_name BoostSettings
 # HUD icon. Placeholder: frame 1 of the pickup's animation (an AtlasTexture).
 @export var icon: Texture2D
 # Flat time in seconds. Picking the same boost up again refreshes it.
-@export var duration: float = 20.0
+@export var duration: float = 60.0
 # Paint this boost's shots in projectile_color so everyone can read the threat.
 @export var tint_projectiles: bool = true
 @export_color_no_alpha var projectile_color: Color = Color.WHITE

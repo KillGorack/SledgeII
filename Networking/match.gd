@@ -795,6 +795,10 @@ func _notify_ready(username: String = "") -> void:
 	for gun in get_tree().get_nodes_in_group("BaseGunAll"):
 		if gun.is_dead:
 			gun._sync_dead.rpc_id(requester_id)
+	# ...and every barrel that is broken.
+	for barrel in get_tree().get_nodes_in_group("Barrels"):
+		if barrel.is_dead:
+			barrel._sync_dead.rpc_id(requester_id)
 	# ...and every gun a player called out, so it's where everyone else sees it.
 	gun_control.sync_to(requester_id)
 
@@ -1188,7 +1192,7 @@ const LOOT_RING_RADIUS := 2.0
 const DEBUG_FORCE_LOOT := ""
 # TEMPORARY test switch: every kill drops the WHOLE table, in a ring around the
 # wreck. Set to false for normal weighted drops. Wins over DEBUG_FORCE_LOOT.
-const DEBUG_DROP_ALL := true
+const DEBUG_DROP_ALL := false
 
 
 # Weighted pick from LOOT_TABLE. Rare drops just have a small drop_weight.
@@ -1218,14 +1222,14 @@ func _roll_loot_count() -> int:
 
 
 # Server only.
-func _drop_loot_at(position: Vector3) -> void:
+func _drop_loot_at(position: Vector3, dropper_peer: int = 0) -> void:
 	if not multiplayer.is_server() or NetworkManager.creative_building:
 		return
 	if DEBUG_DROP_ALL:
 		var total := LOOT_TABLE.size()
 		for i in total:
 			var angle := TAU * i / total
-			_spawn_loot(LOOT_TABLE[i], position + Vector3(cos(angle), 0.0, sin(angle)) * 2.5)
+			_spawn_loot(LOOT_TABLE[i], position + Vector3(cos(angle), 0.0, sin(angle)) * 2.5, dropper_peer, position)
 		return
 	var count := _roll_loot_count()
 	if count == 0:
@@ -1238,31 +1242,36 @@ func _drop_loot_at(position: Vector3) -> void:
 		if count > 1:
 			var angle := start_angle + TAU * i / count
 			spot += Vector3(cos(angle), 0.0, sin(angle)) * LOOT_RING_RADIUS
-		_spawn_loot(_roll_loot(), spot)
+		_spawn_loot(_roll_loot(), spot, dropper_peer, position if count > 1 else Vector3.INF)
 
 
 # Server only: place one drop on the floor under `position` and announce it.
-func _spawn_loot(settings: LootSettings, position: Vector3) -> void:
+# dropper_peer: whose death left this - they can never pick it up (see loot_pickup.gd).
+# anchor: the wreck, when `position` is one of several spots fanned out around it.
+func _spawn_loot(settings: LootSettings, position: Vector3, dropper_peer: int = 0, anchor: Vector3 = Vector3.INF) -> void:
 	if settings == null or settings.resource_path.is_empty():
 		return
-	# Settle onto the floor under the wreck instead of hanging in the air.
-	var query := PhysicsRayQueryParameters3D.create(position + Vector3.UP * 2.0, position + Vector3.DOWN * 30.0, 1 << (Utilities.GROUP_LAYER_SCOPE["world"]["layer"] - 1))
-	var hit := get_viewport().world_3d.direct_space_state.intersect_ray(query)
-	if not hit.is_empty():
-		position = hit.position # pickups sit ON the floor; the visual is 0.31 up
+	# Settle onto the floor under the wreck instead of hanging in the air (and never onto a
+	# ceiling above it - see LootPickup.floor_point).
+	var world_mask: int = 1 << (Utilities.GROUP_LAYER_SCOPE["world"]["layer"] - 1)
+	var floor_at := LootPickup.floor_point(get_viewport().world_3d.direct_space_state, world_mask, position, anchor)
+	if floor_at != Vector3.INF:
+		position = floor_at # pickups sit ON the floor; the visual is 0.31 up
+	elif position.y < HealthNode.FALL_DEATH_Y:
+		return # died in the void: nothing to land on, nobody could reach it
 	# Over the cap, the oldest goes.
 	while _loot.size() >= MAX_LOOT:
 		collect_loot(_loot.keys()[0], 0)
 	var id := _next_loot_id
 	_next_loot_id += 1
-	_make_loot(id, settings, position)
+	_make_loot(id, settings, position, dropper_peer)
 	for peer_id in _ready_peers:
 		if peer_id != 1:
 			_spawn_loot_event.rpc_id(peer_id, id, settings.resource_path, position)
 	get_tree().create_timer(settings.lifetime).timeout.connect(func(): collect_loot(id, 0))
 
 
-func _make_loot(id: int, settings: LootSettings, position: Vector3) -> void:
+func _make_loot(id: int, settings: LootSettings, position: Vector3, dropper_peer: int = 0) -> void:
 	if _loot_container == null:
 		_loot_container = Node3D.new()
 		_loot_container.name = "Loot"
@@ -1270,6 +1279,7 @@ func _make_loot(id: int, settings: LootSettings, position: Vector3) -> void:
 	var pickup: LootPickup = LOOT_SCENE.instantiate()
 	pickup.loot_id = id
 	pickup.settings = settings
+	pickup.dropped_by = dropper_peer
 	pickup.position = position
 	_loot[id] = pickup
 	_loot_container.add_child(pickup)
@@ -1733,6 +1743,14 @@ func _say_to(peer_id: int, line: String) -> void:
 		_broadcast_chat_message.rpc_id(peer_id, line)
 
 
+# Server only: a base gun or sentry that has just been shot down leaves loot, the
+# same roll a destroyed craft gets (nobody is barred from picking it up). Their
+# respawn delay (NetworkManager.base_gun_respawn_seconds) is what keeps this
+# from being farmed.
+func drop_loot_for_structure(position: Vector3) -> void:
+	_drop_loot_at(position)
+
+
 # Server-only, called by base_gun.gd when a gun is shot down.
 func on_gun_destroyed(attacker_id: int) -> void:
 	if attacker_id != 0:
@@ -1806,7 +1824,7 @@ func _on_craft_defeated(peer_id: int, attacker_id: int, cause: int) -> void:
 		var juggle := " [color=orange]Juggled x%d![/color]" % multiplier if multiplier > 1 else ""
 		_announce("[color=yellow]Bounty collected by[/color] %s[color=yellow]: %d credits[/color]%s" % [_colored_name(attacker_id, _peer_names.get(attacker_id, "")), collected, juggle])
 	if is_instance_valid(victim):
-		_drop_loot_at(victim.global_position)
+		_drop_loot_at(victim.global_position, peer_id)
 	await get_tree().create_timer(RESPAWN_DELAY).timeout
 	if not NetworkManager.peer_teams.has(peer_id):
 		return # player left during the respawn delay

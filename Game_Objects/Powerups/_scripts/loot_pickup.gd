@@ -6,13 +6,18 @@ class_name LootPickup
 # detects pickups and applies the effect, then tells everyone it's gone.
 
 const BLINK_SECONDS := 4.0
-# Half the width of the 256 px medallion sprite at the 0.25 scale in its scene.
-const COIN_RADIUS := 0.31
+# Half the width of a 256 px medallion frame as drawn at scale 1 (Sprite3D's
+# default pixel_size is 0.01 m per pixel). The scenes keep their sprites at scale
+# 1; LootSettings.visual_scale is the one place that sizes the coin.
+const COIN_RADIUS := 1.28
 # Crafts live on layers 3-6.
 const CRAFT_MASK := (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5)
 const SPIN_SPEED := 1.5
 
 var loot_id: int = -1
+# The peer whose death left this behind (server's copy only). It never picks it
+# up: otherwise destroying yourself would be a way to keep the loot.
+var dropped_by: int = 0
 var settings: LootSettings
 var _age := 0.0
 var _taken := false
@@ -28,18 +33,26 @@ func _ready() -> void:
 	if settings:
 		# Sits ON the floor at any scale: its centre is one coin-radius up.
 		_visual.scale = Vector3.ONE * settings.visual_scale
-		_visual.position.y = COIN_RADIUS * settings.visual_scale
+		_visual.position.y = _center_height()
 	if settings and settings.visual_scene:
 		_orb.visible = false
 		_icon.visible = false
 		var look := settings.visual_scene.instantiate()
 		_visual.add_child(look)
 		look.position = Vector3(0, 0.0, 0)
-		# The scene's own Area3D is the trigger (it scales with the visual, and
-		# is tuned next to the art). Without one, the pickup's own sphere is used.
+		# The scene's own Area3D is the trigger, tuned next to the art. Without
+		# one, the pickup's own sphere is used. It is lifted OUT of the scaled
+		# visual: collision shapes don't follow node scale, so under it the shape
+		# would keep its size while sitting at a scaled position. Moved to the
+		# pickup root, its radius is in real meters and it stays at the coin's centre.
 		var areas := look.find_children("*", "Area3D", true, false)
 		if not areas.is_empty():
 			_scene_trigger = areas[0]
+			_scene_trigger.get_parent().remove_child(_scene_trigger)
+			add_child(_scene_trigger)
+			_scene_trigger.transform = Transform3D(Basis.IDENTITY, Vector3(0.0, _center_height(), 0.0))
+			for shape_node in _scene_trigger.find_children("*", "CollisionShape3D", true, false):
+				shape_node.basis = Basis.IDENTITY # a scale on the shape node is ignored by physics anyway
 	elif settings:
 		var mat := StandardMaterial3D.new()
 		mat.albedo_color = settings.color
@@ -68,6 +81,40 @@ func _ready() -> void:
 		trigger.monitoring = false
 
 
+# How far above a drop spot the floor search starts, how far down it looks, and how far
+# short of a wall a pulled-back spot stops.
+const PROBE_UP := 0.4
+const SEARCH_DEPTH := 80.0
+const WALL_MARGIN := 0.3
+
+
+# Where a drop at `position` should rest: on the floor directly BELOW it. The search starts
+# just above the spot, never from high up - from 2 m above, a ceiling lower than that
+# (a tunnel, an overhang, a bridge deck) was mistaken for the floor and the loot ended up
+# on top of it, out of reach. `anchor` is the wreck itself when `position` is a spot fanned
+# out to the side of it: if a wall is in between, the spot is pulled back to the wall instead
+# of landing inside it or behind it. Returns Vector3.INF when there is no floor below at all.
+static func floor_point(space: PhysicsDirectSpaceState3D, world_mask: int, position: Vector3, anchor: Vector3 = Vector3.INF) -> Vector3:
+	var spot := position
+	if anchor != Vector3.INF:
+		var from := anchor + Vector3.UP * PROBE_UP
+		var to := Vector3(spot.x, from.y, spot.z)
+		var side := space.intersect_ray(PhysicsRayQueryParameters3D.create(from, to, world_mask))
+		if not side.is_empty():
+			var back := (from - to).normalized()
+			spot = Vector3(side.position.x, anchor.y, side.position.z) + back * WALL_MARGIN
+	var down := space.intersect_ray(PhysicsRayQueryParameters3D.create(spot + Vector3.UP * PROBE_UP, spot + Vector3.DOWN * SEARCH_DEPTH, world_mask))
+	if down.is_empty():
+		return Vector3.INF
+	return down.position
+
+
+# Height of the coin's centre above the floor point: one coin-radius, so the
+# coin appears to rest on the ground at any visual_scale.
+func _center_height() -> float:
+	return COIN_RADIUS * (settings.visual_scale if settings else 1.0)
+
+
 func _process(delta: float) -> void:
 	_age += delta
 	_visual.rotation.y += SPIN_SPEED * delta
@@ -82,6 +129,8 @@ func _process(delta: float) -> void:
 # Server only.
 func _on_body_entered(body: Node) -> void:
 	if _taken or settings == null:
+		return
+	if dropped_by != 0 and body.get_multiplayer_authority() == dropped_by:
 		return
 	var health_node := body.get_node_or_null("health_node")
 	if health_node == null:

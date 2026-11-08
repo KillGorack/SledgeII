@@ -387,10 +387,16 @@ static func make_object(entry: Dictionary, recon_locations: Node3D, editing: boo
 			_place(node, entry)
 			if editing:
 				_add_pick_proxy(node, entry, Color(1.0, 0.8, 0.2), CreativeCatalog.object_lift(id))
-		"boulder":
-			node = make_boulder(entry)
+		"barrel":
+			# A breakable barrel (Game_Objects/_scripts/barrel.gd): built the same while editing and playing, and only
+			# takes hits when the match is not in build mode.
+			node = BreakableBarrel.new()
 			_place(node, entry)
-			node.scale = Vector3.ONE * CreativeCatalog.boulder_scale(entry.get("sc"))
+			# A distinct name on every peer: its destroyed/restored calls travel by node path.
+			node.name = "Barrel_%d_%d_%d" % [roundi(node.position.x), roundi(node.position.y), roundi(node.position.z)]
+			if editing:
+				_add_decor_pick_proxy(node, entry)
+			return node
 		"decor":
 			node = def.scene.instantiate()
 			_place(node, entry)
@@ -578,58 +584,6 @@ static func _add_pick_proxy(marker: Node3D, entry: Dictionary, color: Color, lif
 	proxy.set_meta("entry", entry)
 	proxy.set_meta("root", marker)
 	marker.add_child(proxy)
-
-
-# variant index -> its material: the pack's normal map for relief over one flat rock colour (the pack has no colour
-# texture of its own).
-static var _boulder_materials: Dictionary = {}
-
-
-static func _boulder_material_for(variant: int) -> Material:
-	if not _boulder_materials.has(variant):
-		var material := StandardMaterial3D.new()
-		material.albedo_color = Color(0.5, 0.48, 0.45)
-		material.roughness = 1.0
-		material.normal_enabled = true
-		material.normal_texture = load(CreativeCatalog.BOULDERS[variant].normal)
-		_boulder_materials[variant] = material
-	return _boulder_materials[variant]
-
-
-static func boulder_mesh(variant: int) -> Mesh:
-	return load(CreativeCatalog.BOULDERS[CreativeCatalog.boulder_variant(variant)].mesh)
-
-
-# How far a boulder's mesh is moved (the rocks are modelled around their middle) so its lowest point sits `sink` of
-# its height below the ground it was placed on. Per unit of scale.
-static func boulder_drop(mesh: Mesh, sink: float) -> float:
-	var box := mesh.get_aabb()
-	return -box.position.y - sink * box.size.y
-
-
-# A solid rock: world layer like a wall, so crafts and shots hit it. The caller scales the body; the mesh and its
-# collider scale with it.
-static func make_boulder(entry: Dictionary) -> StaticBody3D:
-	var mesh := boulder_mesh(CreativeCatalog.boulder_variant(entry.get("v")))
-	var body := StaticBody3D.new()
-	body.collision_layer = WORLD_LAYER
-	body.collision_mask = 0
-	body.physics_material_override = WALL_PHYSICS
-	var offset := Transform3D(Basis.IDENTITY, Vector3(0.0, boulder_drop(mesh, CreativeCatalog.boulder_sink(entry.get("sk"))), 0.0))
-	var visual := MeshInstance3D.new()
-	visual.mesh = mesh
-	visual.name = "Rock"
-	visual.material_override = _boulder_material_for(CreativeCatalog.boulder_variant(entry.get("v")))
-	visual.transform = offset
-	body.add_child(visual)
-	var shape := CollisionShape3D.new()
-	shape.shape = mesh.create_convex_shape()
-	shape.transform = offset
-	body.add_child(shape)
-	# Found by the editor's Remove, the way a surface is.
-	body.set_meta("entry", entry)
-	body.set_meta("root", body)
-	return body
 
 
 static func _place(node: Node3D, entry: Dictionary) -> void:

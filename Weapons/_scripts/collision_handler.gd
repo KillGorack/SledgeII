@@ -397,6 +397,9 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 					targeted_group = true
 					break
 
+			# Anything breakable (a Creative barrel) can be hurt by every team's shots.
+			if collider.is_in_group("Breakable"):
+				targeted_group = true
 			collided_object = collider
 			collided_layer = collider.collision_layer
 			collision_point = state.get_contact_local_position(i)

@@ -238,15 +238,20 @@ func request_fall_damage(impact_speed: float) -> void:
 	apply_damage(stats.fall_damage_coefficient * excess * excess, 0, DeathCause.FALL)
 
 
-# Server-only. Restores `amount`, armor first then life (shields regen on their
-# own), like station healing below. Returns whether anything was restored, so
+# Server-only. Restores `amount` in this order: shields, then armor, then life. (Shields
+# also regenerate on their own; station healing below doesn't touch them.) Returns whether anything was restored, so
 # a pickup can be left alone by a craft that's already full.
 func heal(amount: float) -> bool:
 	if not multiplayer.is_server() or _is_destroyed or amount <= 0.0:
 		return false
 	var remaining := amount
 	var healed := false
-	if armor < _armor_max:
+	if shields < _shields_max:
+		var to_shields := minf(remaining, _shields_max - shields)
+		shields += to_shields
+		remaining -= to_shields
+		healed = true
+	if remaining > 0.0 and armor < _armor_max:
 		var to_armor := minf(remaining, _armor_max - armor)
 		armor += to_armor
 		remaining -= to_armor
@@ -306,7 +311,7 @@ func destroy_self(death_time: float = 0.0) -> void:
 	if _frozen:
 		_frozen = false
 		_weapon_freeze_timer.stop()
-		_set_frost(false)
+		_set_frost(false, true)
 	# Weapons picked up from loot don't survive the wreck.
 	var weapon_node = body.get_node_or_null("weapon_node")
 	if weapon_node and weapon_node.has_method("revoke_granted"):
@@ -507,31 +512,74 @@ func _set_body_frozen(frozen: bool) -> void:
 	body.freeze = frozen
 
 
-# Frost look: a translucent icy overlay on every mesh of the craft, restored to
-# whatever each mesh had before (nothing, usually) when it thaws.
-static var _frost_material: StandardMaterial3D = null
+# Frost look: a faint icy overlay on every mesh of the craft that fades in when it
+# freezes and out when it thaws, restored to whatever each mesh had before
+# (nothing, usually). Tuning, all 0-1 except the fades (seconds):
+const FROST_ALPHA := 0.22 # how opaque the ice layer is
+const FROST_EMISSION := 0.3 # how much it glows
+const FROST_RIM := 0.7 # extra icy glow on the edges, where the craft outline reads
+const FROST_FADE_IN := 0.4
+const FROST_FADE_OUT := 0.7
+
+# This craft's own material (not shared), so fading one doesn't touch another.
+var _frost_material: StandardMaterial3D = null
+var _frost_tween: Tween = null
+var _frost_amount := 0.0 # 0 = none, 1 = fully frosted
 var _saved_overlays: Dictionary = {} # MeshInstance3D -> its previous material_overlay
 
 
-func _set_frost(on: bool) -> void:
+func _frost_mat() -> StandardMaterial3D:
+	if _frost_material == null:
+		_frost_material = StandardMaterial3D.new()
+		_frost_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_frost_material.albedo_color = Color(0.78, 0.9, 1.0, 0.0)
+		_frost_material.emission_enabled = true
+		_frost_material.emission = Color(0.55, 0.78, 1.0)
+		_frost_material.emission_energy_multiplier = 0.0
+		_frost_material.rim_enabled = true
+		_frost_material.rim = FROST_RIM
+		_frost_material.rim_tint = 0.4
+		_frost_material.roughness = 0.4
+	return _frost_material
+
+
+func _set_frost_amount(amount: float) -> void:
+	_frost_amount = amount
+	var material := _frost_mat()
+	var colour := material.albedo_color
+	colour.a = FROST_ALPHA * amount
+	material.albedo_color = colour
+	material.emission_energy_multiplier = FROST_EMISSION * amount
+
+
+# `instant` skips the fade (the craft is being destroyed).
+func _set_frost(on: bool, instant: bool = false) -> void:
+	if _frost_tween:
+		_frost_tween.kill()
+		_frost_tween = null
 	if on:
-		if _frost_material == null:
-			_frost_material = StandardMaterial3D.new()
-			_frost_material.albedo_color = Color(0.72, 0.88, 1.0, 0.55)
-			_frost_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-			_frost_material.emission_enabled = true
-			_frost_material.emission = Color(0.4, 0.7, 1.0)
-			_frost_material.emission_energy_multiplier = 0.9
-			_frost_material.roughness = 0.15
 		for mesh in body.find_children("*", "MeshInstance3D", true, false):
 			if not _saved_overlays.has(mesh):
 				_saved_overlays[mesh] = mesh.material_overlay
-			mesh.material_overlay = _frost_material
+			mesh.material_overlay = _frost_mat()
+		_frost_tween = create_tween()
+		_frost_tween.tween_method(_set_frost_amount, _frost_amount, 1.0, FROST_FADE_IN)
+	elif instant or _frost_amount <= 0.0:
+		_set_frost_amount(0.0)
+		_restore_overlays()
 	else:
-		for mesh in _saved_overlays:
-			if is_instance_valid(mesh):
-				mesh.material_overlay = _saved_overlays[mesh]
-		_saved_overlays.clear()
+		_frost_tween = create_tween()
+		_frost_tween.tween_method(_set_frost_amount, _frost_amount, 0.0, FROST_FADE_OUT)
+		_frost_tween.tween_callback(_restore_overlays)
+
+
+func _restore_overlays() -> void:
+	if _frozen: # froze again while it was fading out
+		return
+	for mesh in _saved_overlays:
+		if is_instance_valid(mesh):
+			mesh.material_overlay = _saved_overlays[mesh]
+	_saved_overlays.clear()
 
 
 func _on_weapon_freeze_timeout() -> void:

@@ -204,6 +204,9 @@ func take_damage(damage: float, _attacker_id: int = 0) -> void:
 	if _hp > 0.0:
 		return
 	_destroyed.rpc()
+	var match_node := get_tree().get_first_node_in_group("match")
+	if match_node:
+		match_node.drop_loot_for_structure(global_position)
 	await get_tree().create_timer(NetworkManager.base_gun_respawn_seconds).timeout
 	if is_instance_valid(self) and is_dead:
 		_restored.rpc()

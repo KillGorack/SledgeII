@@ -1,70 +1,70 @@
 [gd_scene format=3 uid="uid://rjyc1vw6dsdh"]
 
-[ext_resource type="Texture2D" uid="uid://chi5hhmqtcnoo" path="res://Game_Objects/Powerups/Spritesheets/potion_round_bottom_Front_256.png" id="1_i61ar"]
+[ext_resource type="Texture2D" uid="uid://bqrxlwpbvv6l8" path="res://Game_Objects/Powerups/Spritesheets/POWERUPS.png" id="1_i61ar"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_yxo0r"]
 atlas = ExtResource("1_i61ar")
-region = Rect2(0, 1024, 256, 256)
+region = Rect2(0, 1792, 256, 256)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_m4yd2"]
 atlas = ExtResource("1_i61ar")
-region = Rect2(256, 1024, 256, 256)
+region = Rect2(256, 1792, 256, 256)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_up0la"]
 atlas = ExtResource("1_i61ar")
-region = Rect2(512, 1024, 256, 256)
+region = Rect2(512, 1792, 256, 256)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_fqr6r"]
 atlas = ExtResource("1_i61ar")
-region = Rect2(768, 1024, 256, 256)
+region = Rect2(768, 1792, 256, 256)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_1g4l7"]
 atlas = ExtResource("1_i61ar")
-region = Rect2(1024, 1024, 256, 256)
+region = Rect2(1024, 1792, 256, 256)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_3hs8q"]
 atlas = ExtResource("1_i61ar")
-region = Rect2(1280, 1024, 256, 256)
+region = Rect2(1280, 1792, 256, 256)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_rravv"]
 atlas = ExtResource("1_i61ar")
-region = Rect2(1536, 1024, 256, 256)
+region = Rect2(1536, 1792, 256, 256)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_ljajc"]
 atlas = ExtResource("1_i61ar")
-region = Rect2(1792, 1024, 256, 256)
+region = Rect2(1792, 1792, 256, 256)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_e2k7f"]
 atlas = ExtResource("1_i61ar")
-region = Rect2(2048, 1024, 256, 256)
+region = Rect2(2048, 1792, 256, 256)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_jqcgl"]
 atlas = ExtResource("1_i61ar")
-region = Rect2(2304, 1024, 256, 256)
+region = Rect2(2304, 1792, 256, 256)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_xqkyy"]
 atlas = ExtResource("1_i61ar")
-region = Rect2(2560, 1024, 256, 256)
+region = Rect2(2560, 1792, 256, 256)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_a46o2"]
 atlas = ExtResource("1_i61ar")
-region = Rect2(2816, 1024, 256, 256)
+region = Rect2(2816, 1792, 256, 256)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_cwurs"]
 atlas = ExtResource("1_i61ar")
-region = Rect2(3072, 1024, 256, 256)
+region = Rect2(3072, 1792, 256, 256)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_04dh5"]
 atlas = ExtResource("1_i61ar")
-region = Rect2(3328, 1024, 256, 256)
+region = Rect2(3328, 1792, 256, 256)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_05dgr"]
 atlas = ExtResource("1_i61ar")
-region = Rect2(3584, 1024, 256, 256)
+region = Rect2(3584, 1792, 256, 256)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_1pohn"]
 atlas = ExtResource("1_i61ar")
-region = Rect2(3840, 1024, 256, 256)
+region = Rect2(3840, 1792, 256, 256)
 
 [sub_resource type="SpriteFrames" id="SpriteFrames_rkwpw"]
 animations = [{
@@ -123,12 +123,11 @@ animations = [{
 }]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_4o70d"]
-radius = 0.31
+radius = 0.25
 
 [node name="Energy" type="Node3D" unique_id=1523590355]
 
 [node name="Sprite3D" type="AnimatedSprite3D" parent="." unique_id=1700788770]
-transform = Transform3D(0.25, 0, 0, 0, 0.25, 0, 0, 0, 0.25, 0, 0, 0)
 billboard = 1
 sprite_frames = SubResource("SpriteFrames_rkwpw")
 autoplay = "default"

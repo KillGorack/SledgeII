@@ -256,6 +256,7 @@ func take_damage(damage: float, attacker_id: int = 0) -> void:
 	var match_node := get_tree().get_first_node_in_group("match")
 	if match_node:
 		match_node.on_gun_destroyed(attacker_id)
+		match_node.drop_loot_for_structure(global_position)
 	var delay := NetworkManager.base_gun_respawn_seconds
 	await get_tree().create_timer(delay).timeout
 	if is_instance_valid(self) and is_dead:

@@ -28,7 +28,6 @@ static func text() -> String:
 		"Sound effects (CC0, edited) from Freesound.org: mrspivey, Julien_Matthey, SieuAmThanh, tradeachest, Jarusca, C-V, Anomaex, GameAudio.",
 		"Tornado wind: \"Blowind Wind\" by Roloxi, freesound.org/people/roloxi/sounds/666847, licensed CC BY 4.0 (creativecommons.org/licenses/by/4.0). Edited to loop.",
 		"Engine hum: \"SpaceShip_Engine_Large_Loop_00\" by LittleRobotSoundFactory, freesound.org/people/LittleRobotSoundFactory/sounds/270539, licensed CC BY 4.0. Edited to loop.",
-		"Boulders: \"Low Poly Rocks\" by para, OpenGameArt.org (CC0), opengameart.org/content/low-poly-rocks",
 		"Impact sounds: natlapse, OpenGameArt.org (CC0), opengameart.org/content/ingame-samples-audio",
 		"Haste powerup icon: \"Curly wing\" by Lorc, game-icons.net/1x1/lorc/curly-wing.html, licensed CC BY 3.0 (creativecommons.org/licenses/by/3.0). Modified into a 3D medallion.",
 		"Thank you to everyone who made and shared the textures, sounds and models this game uses.",

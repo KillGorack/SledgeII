@@ -45,13 +45,6 @@ var _material_buttons: Array[Button] = []
 var _width_edit: LineEdit
 var _height_edit: LineEdit
 var _rotate_group: Control
-var _boulder := 0
-var _boulder_scale := 1.0
-var _boulder_sink := CreativeCatalog.DEFAULT_BOULDER_SINK
-var _boulder_group: Control
-var _boulder_label: Label
-var _scale_label: Label
-var _sink_label: Label
 var _size_group: Control
 var _mode_button: Button
 var _status: Label
@@ -280,32 +273,6 @@ func _rotate(axis: Vector3) -> void:
 	_rotation = Vector3(fposmod(_rotation.x, 360.0), fposmod(_rotation.y, 360.0), fposmod(_rotation.z, 360.0))
 
 
-func _cycle_boulder(step: int) -> void:
-	_boulder = posmod(_boulder + step, CreativeCatalog.BOULDERS.size())
-	_refresh_boulder_labels()
-
-
-func _scale_boulder(step: float) -> void:
-	_boulder_scale = clampf(_boulder_scale + step, CreativeCatalog.MIN_BOULDER_SCALE, CreativeCatalog.MAX_BOULDER_SCALE)
-	_refresh_boulder_labels()
-
-
-func _sink_boulder(step: float) -> void:
-	_boulder_sink = clampf(snappedf(_boulder_sink + step, 0.1), 0.0, CreativeCatalog.MAX_BOULDER_SINK)
-	_refresh_boulder_labels()
-
-
-# Free turning for a rock, on top of the 90 degree steps.
-func _spin(degrees: float) -> void:
-	_rotation.y = fposmod(_rotation.y + degrees, 360.0)
-
-
-func _refresh_boulder_labels() -> void:
-	_boulder_label.text = CreativeCatalog.BOULDERS[_boulder].name
-	_scale_label.text = "%.2fx" % _boulder_scale
-	_sink_label.text = "%d%%" % roundi(_boulder_sink * 100.0)
-
-
 func _resize(width_step: float, height_step: float) -> void:
 	_size.x = clampf(_size.x + width_step, CreativeLevel.MIN_SURFACE_SIZE, CreativeLevel.MAX_SURFACE_SIZE)
 	_size.y = clampf(_size.y + height_step, CreativeLevel.MIN_SURFACE_SIZE, CreativeLevel.MAX_SURFACE_SIZE)
@@ -350,10 +317,6 @@ func _placement() -> Dictionary:
 		entry["id"] = String(tool.id)
 		if CreativeCatalog.has_teams(tool.id):
 			entry["t"] = String(_team)
-		if CreativeCatalog.has_variants(tool.id):
-			entry["v"] = _boulder
-			entry["sc"] = _boulder_scale
-			entry["sk"] = _boulder_sink
 		return {"entry": entry, "position": position}
 	entry["m"] = String(_material_ids[_material])
 	if tool.kind == "surface":
@@ -519,11 +482,6 @@ func _update_ghost(building: bool) -> void:
 			_ghost.mesh = quad
 		quad.size = _size
 		_ghost.global_transform = origin * Transform3D(Basis.IDENTITY, Vector3(_size.x * 0.5, _size.y * 0.5, 0.0))
-	elif tool.kind == "object" and CreativeCatalog.has_variants(tool.id):
-		# The rock itself, at the size it will be placed, sunk the way the real one is.
-		var rock := CreativeLevelBuilder.boulder_mesh(_boulder)
-		_ghost.mesh = rock
-		_ghost.global_transform = origin * Transform3D(Basis.from_scale(Vector3.ONE * _boulder_scale), Vector3(0.0, CreativeLevelBuilder.boulder_drop(rock, _boulder_sink) * _boulder_scale, 0.0))
 	elif tool.kind == "object":
 		var cube := _ghost.mesh as BoxMesh
 		if not cube:
@@ -637,38 +595,6 @@ func _build_ui() -> void:
 	_rotate_group = rotate_row
 	bar.add_child(rotate_row)
 
-	var boulder_row := HBoxContainer.new()
-	boulder_row.add_theme_constant_override("separation", 6)
-	boulder_row.add_child(VSeparator.new())
-	boulder_row.add_child(_caption("Rock"))
-	boulder_row.add_child(_step_button("<", _cycle_boulder.bind(-1), "Previous rock"))
-	_boulder_label = _caption("")
-	_boulder_label.custom_minimum_size = Vector2(70, 0)
-	_boulder_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	boulder_row.add_child(_boulder_label)
-	boulder_row.add_child(_step_button(">", _cycle_boulder.bind(1), "Next rock"))
-	boulder_row.add_child(VSeparator.new())
-	boulder_row.add_child(_caption("Size"))
-	boulder_row.add_child(_step_button("-", _scale_boulder.bind(-0.25), "Smaller"))
-	_scale_label = _caption("")
-	_scale_label.custom_minimum_size = Vector2(46, 0)
-	_scale_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	boulder_row.add_child(_scale_label)
-	boulder_row.add_child(_step_button("+", _scale_boulder.bind(0.25), "Bigger"))
-	boulder_row.add_child(VSeparator.new())
-	boulder_row.add_child(_caption("Sink"))
-	boulder_row.add_child(_step_button("-", _sink_boulder.bind(-0.1), "Sit higher on the surface"))
-	_sink_label = _caption("")
-	_sink_label.custom_minimum_size = Vector2(46, 0)
-	_sink_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	boulder_row.add_child(_sink_label)
-	boulder_row.add_child(_step_button("+", _sink_boulder.bind(0.1), "Bury it deeper in the surface"))
-	boulder_row.add_child(VSeparator.new())
-	boulder_row.add_child(_caption("Spin"))
-	boulder_row.add_child(_step_button("-15", _spin.bind(-15.0), "Turn 15 degrees"))
-	boulder_row.add_child(_step_button("+15", _spin.bind(15.0), "Turn 15 degrees the other way"))
-	_boulder_group = boulder_row
-	bar.add_child(boulder_row)
 
 	var size_row := HBoxContainer.new()
 	size_row.add_theme_constant_override("separation", 6)
@@ -1096,8 +1022,6 @@ func _refresh_ui(building: bool) -> void:
 		_offer_teams(tool.id)
 	_rotate_group.visible = rotates
 	_size_group.visible = tool.kind == "surface"
-	_boulder_group.visible = tool.kind == "object" and CreativeCatalog.has_variants(tool.id)
-	_refresh_boulder_labels()
 	_team_group.visible = has_team
 	_ui.get_node("Toolbar").visible = building and rotates
 	_ui.get_node("Held").offset_bottom = -96.0 if rotates else -24.0

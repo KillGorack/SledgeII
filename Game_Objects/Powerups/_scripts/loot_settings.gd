@@ -9,7 +9,7 @@ enum LootType { HEALTH, POWER, JUICE, WEAPON, BOOST }
 
 @export var loot_name: String = "Loot"
 @export var loot_type: LootType = LootType.HEALTH
-# Meaning depends on the type: HEALTH restores armor then life, POWER adds to
+# Meaning depends on the type: HEALTH restores shields, then armor, then life; POWER adds to
 # the craft's power, JUICE adds to the craft's TEAM juice.
 @export var amount: float = 25.0
 # WEAPON: the weapon to equip (kept until the craft is destroyed).
@@ -26,13 +26,14 @@ enum LootType { HEALTH, POWER, JUICE, WEAPON, BOOST }
 # (any Area3D inside is ignored - the pickup scene has its own trigger).
 @export var visual_scene: PackedScene
 # Fallback trigger, used only when the visual scene has no Area3D of its own
-# (that one wins, and scales with visual_scale). A sphere on the floor point. The craft is
-# about 0.74 m wide and 1.62 m long, so ~0.8 means it has to roll up to the
-# coin; 1.5 triggered a full tank-length early.
-@export var pickup_radius: float = 0.8
-# Size of the pickup's look (1.0 = as drawn, a 0.64 m wide coin). The coin is
-# kept sitting on the floor at any size.
-@export var visual_scale: float = 0.75
+# (that one wins - its shape radius is in real meters, it does NOT follow
+# visual_scale). A sphere at the coin's centre. The craft is about 0.74 m wide
+# and 1.62 m long, so it has to roll right up to the coin.
+@export var pickup_radius: float = 0.25
+# Size of the pickup's look relative to the art as drawn at scale 1 (a 256 px
+# medallion is 2.56 m wide there), so 0.125 is a 0.32 m coin. The coin is kept
+# resting on the floor at any size.
+@export var visual_scale: float = 0.125
 # Fallback look when visual_scene is empty: a glowing orb in this color, plus an optional billboard
 # icon over it. Swap in real art by setting icon.
 @export_color_no_alpha var color: Color = Color(0.2, 1.0, 0.3)

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://kmkxh6kj5ecy"
-path="res://.godot/imported/rock_d_05_normal.png-f2047c932f55e54c6f20c7f02170a873.ctex"
+uid="uid://rmowffalnxlh"
+path="res://.godot/imported/barrel.png-d220bd823873e180196a011c58712a1e.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Models/Decor/Rocks/rock_d_05_normal.png"
-dest_files=["res://.godot/imported/rock_d_05_normal.png-f2047c932f55e54c6f20c7f02170a873.ctex"]
+source_file="res://Creative/icons/barrel.png"
+dest_files=["res://.godot/imported/barrel.png-d220bd823873e180196a011c58712a1e.ctex"]
 
 [params]
 

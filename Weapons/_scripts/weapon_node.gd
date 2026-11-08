@@ -111,6 +111,13 @@ func _ready() -> void:
 	# craft's own - see grant_weapon / revoke_granted below.
 	weapon_settings = weapon_settings.duplicate()
 	_base_weapon_count = weapon_settings.size()
+	# Everyone else sees this craft's boosts as orbiting coins; its owner doesn't
+	# (their HUD shows them, and the coins would block the view).
+	if not is_multiplayer_authority():
+		var orbit := BoostOrbit.new()
+		orbit.weapon_node = self
+		orbit.craft = get_parent() as Node3D
+		get_parent().add_child.call_deferred(orbit)
 	_ammo_remaining.resize(weapon_settings.size())
 	for i in range(weapon_settings.size()):
 		var settings := weapon_settings[i]
@@ -452,6 +459,11 @@ func _is_frozen() -> bool:
 	return health != null and health.is_frozen()
 
 
+# For the radar: does this craft have any boost running? (No allocation.)
+func has_boosts() -> bool:
+	return not _boosts.is_empty()
+
+
 # For the HUD: [{boost: BoostSettings, left: seconds}]
 func boost_status() -> Array:
 	var now := Time.get_ticks_msec()
@@ -461,14 +473,29 @@ func boost_status() -> Array:
 	return out
 
 
-# Server only. Same boost again just refreshes its timer, so a returns-true
-# pickup is always "used".
+# Server only. The same boost again ADDS its duration to what is left (see
+# boost_end_after_pickup), so a pickup is always "used".
+# Longest a boost can be stacked up to, so repeated pickups can't bank an hour of it.
+const MAX_BOOST_SECONDS := 300.0
+
+
+# When a boost ends after another pickup of it: the time it still has PLUS the new
+# duration (picking one up while it runs adds to it, it doesn't restart it), or just
+# the new duration if it wasn't running. Capped at MAX_BOOST_SECONDS from now.
+static func boost_end_after_pickup(now_msec: int, current_end_msec: int, duration: float) -> int:
+	var start := maxi(now_msec, current_end_msec)
+	return mini(start + int(duration * 1000.0), now_msec + int(MAX_BOOST_SECONDS * 1000.0))
+
+
 func server_grant_boost(boost: BoostSettings) -> bool:
 	if not multiplayer.is_server() or boost == null or boost.resource_path.is_empty():
 		return false
-	_boost_end_msec[boost.resource_path] = Time.get_ticks_msec() + int(boost.duration * 1000.0)
+	var now := Time.get_ticks_msec()
+	var end := boost_end_after_pickup(now, int(_boost_end_msec.get(boost.resource_path, 0)), boost.duration)
+	_boost_end_msec[boost.resource_path] = end
 	_boosts_changed_on_server()
-	get_tree().create_timer(boost.duration + 0.05).timeout.connect(_expire_boosts)
+	# An earlier pickup's timer may fire first - _expire_boosts only removes what has really run out.
+	get_tree().create_timer((end - now) / 1000.0 + 0.05).timeout.connect(_expire_boosts)
 	return true
 
 
