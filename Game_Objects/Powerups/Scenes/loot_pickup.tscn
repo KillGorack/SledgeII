@@ -1,0 +1,28 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://Game_Objects/Powerups/_scripts/loot_pickup.gd" id="1_pickup"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_pickup"]
+radius = 1.5
+
+[sub_resource type="SphereMesh" id="SphereMesh_orb"]
+radius = 0.35
+height = 0.7
+
+[node name="LootPickup" type="Area3D"]
+script = ExtResource("1_pickup")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("SphereShape3D_pickup")
+
+[node name="Visual" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.31, 0)
+
+[node name="Orb" type="MeshInstance3D" parent="Visual"]
+mesh = SubResource("SphereMesh_orb")
+
+[node name="Icon" type="Sprite3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, 0)
+pixel_size = 0.004
+billboard = 1
+visible = false

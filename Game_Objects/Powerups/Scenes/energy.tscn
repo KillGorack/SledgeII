@@ -1,0 +1,142 @@
+[gd_scene format=3 uid="uid://rjyc1vw6dsdh"]
+
+[ext_resource type="Texture2D" uid="uid://chi5hhmqtcnoo" path="res://Game_Objects/Powerups/Spritesheets/potion_round_bottom_Front_256.png" id="1_i61ar"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_yxo0r"]
+atlas = ExtResource("1_i61ar")
+region = Rect2(0, 1024, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_m4yd2"]
+atlas = ExtResource("1_i61ar")
+region = Rect2(256, 1024, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_up0la"]
+atlas = ExtResource("1_i61ar")
+region = Rect2(512, 1024, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_fqr6r"]
+atlas = ExtResource("1_i61ar")
+region = Rect2(768, 1024, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_1g4l7"]
+atlas = ExtResource("1_i61ar")
+region = Rect2(1024, 1024, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_3hs8q"]
+atlas = ExtResource("1_i61ar")
+region = Rect2(1280, 1024, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_rravv"]
+atlas = ExtResource("1_i61ar")
+region = Rect2(1536, 1024, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_ljajc"]
+atlas = ExtResource("1_i61ar")
+region = Rect2(1792, 1024, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_e2k7f"]
+atlas = ExtResource("1_i61ar")
+region = Rect2(2048, 1024, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_jqcgl"]
+atlas = ExtResource("1_i61ar")
+region = Rect2(2304, 1024, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_xqkyy"]
+atlas = ExtResource("1_i61ar")
+region = Rect2(2560, 1024, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_a46o2"]
+atlas = ExtResource("1_i61ar")
+region = Rect2(2816, 1024, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_cwurs"]
+atlas = ExtResource("1_i61ar")
+region = Rect2(3072, 1024, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_04dh5"]
+atlas = ExtResource("1_i61ar")
+region = Rect2(3328, 1024, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_05dgr"]
+atlas = ExtResource("1_i61ar")
+region = Rect2(3584, 1024, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_1pohn"]
+atlas = ExtResource("1_i61ar")
+region = Rect2(3840, 1024, 256, 256)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_rkwpw"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_yxo0r")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_m4yd2")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_up0la")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_fqr6r")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_1g4l7")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_3hs8q")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_rravv")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_ljajc")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_e2k7f")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_jqcgl")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_xqkyy")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_a46o2")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_cwurs")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_04dh5")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_05dgr")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_1pohn")
+}],
+"loop": 1,
+"name": &"default",
+"speed": 17.0
+}]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_4o70d"]
+radius = 0.31
+
+[node name="Energy" type="Node3D" unique_id=1523590355]
+
+[node name="Sprite3D" type="AnimatedSprite3D" parent="." unique_id=1700788770]
+transform = Transform3D(0.25, 0, 0, 0, 0.25, 0, 0, 0, 0.25, 0, 0, 0)
+billboard = 1
+sprite_frames = SubResource("SpriteFrames_rkwpw")
+autoplay = "default"
+
+[node name="Area3D" type="Area3D" parent="." unique_id=1306241812]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Area3D" unique_id=1741971468]
+shape = SubResource("SphereShape3D_4o70d")
+
+[node name="OmniLight3D" type="OmniLight3D" parent="." unique_id=47441625]
+light_color = Color(1, 1, 0, 1)

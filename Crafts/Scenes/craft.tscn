@@ -36,7 +36,6 @@
 [ext_resource type="Resource" uid="uid://bo28uys4u40w8" path="res://Crafts/Settings/Player.tres" id="32_xb8dm"]
 [ext_resource type="Resource" uid="uid://dt2vjt1ugnwss" path="res://Crafts/Settings/blip_recon.tres" id="38_8eb0h"]
 [ext_resource type="Resource" uid="uid://devapspir3vbm" path="res://Crafts/Settings/blip_projectile.tres" id="39_iyhmj"]
-[ext_resource type="Resource" uid="uid://wwdw5mdsil3o" path="res://Weapons/settings/D20.tres" id="d20_settings"]
 [ext_resource type="PackedScene" uid="uid://cyca6s4fhq6ra" path="res://Weapons/Scenes/explosions/damage_smoke.tscn" id="damage_smoke_scene"]
 [ext_resource type="Script" uid="uid://dmp6mofyfrsod" path="res://Crafts/_scripts/mine_counter.gd" id="mine_counter_script"]
 [ext_resource type="Resource" uid="uid://b8h0f655falxi" path="res://Weapons/settings_mines/mine_force.tres" id="mine_force_res"]
@@ -160,7 +159,7 @@ public_visibility = false
 
 [node name="weapon_node" type="Node3D" parent="." unique_id=1782664371]
 script = ExtResource("7_weapon")
-weapon_settings = Array[ExtResource("10_4qjx5")]([ExtResource("15_xayyq"), ExtResource("11_twnxb"), ExtResource("12_8eb0h"), ExtResource("15_mkiv"), ExtResource("12_cannon"), ExtResource("14_detno"), ExtResource("13_repulsor"), ExtResource("16_8hncv"), ExtResource("d20_settings")])
+weapon_settings = Array[ExtResource("10_4qjx5")]([ExtResource("15_xayyq"), ExtResource("11_twnxb"), ExtResource("12_8eb0h"), ExtResource("15_mkiv"), ExtResource("12_cannon"), ExtResource("14_detno"), ExtResource("13_repulsor"), ExtResource("16_8hncv")])
 mine_settings = Array[ExtResource("mine_settings_script")]([ExtResource("mine_settings_res"), ExtResource("mine_force_res")])
 
 [node name="Hud_InGame" type="Control" parent="." unique_id=1814334772]

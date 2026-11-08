@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="LootSettings" format=3 uid="uid://d1p7f4gtk8ck7"]
+
+[ext_resource type="Script" uid="uid://m0ygem6thprc" path="res://Game_Objects/Powerups/_scripts/loot_settings.gd" id="1_loot"]
+[ext_resource type="PackedScene" path="res://Game_Objects/Powerups/Scenes/boost_seeker.tscn" id="2_visual"]
+[ext_resource type="AudioStream" uid="uid://cds8k4oewmn8" path="res://Game_Objects/Powerups/sounds/bottle.wav" id="3_sound"]
+[ext_resource type="Resource" uid="uid://c0kjjitoc8n4j" path="res://Game_Objects/Powerups/boosts/seeker.tres" id="4_boost"]
+
+[resource]
+script = ExtResource("1_loot")
+loot_name = "Seeker"
+loot_type = 4
+boost = ExtResource("4_boost")
+drop_weight = 0.8
+visual_scene = ExtResource("2_visual")
+color = Color(1, 0.85, 0.2, 1)
+pickup_sound = ExtResource("3_sound")

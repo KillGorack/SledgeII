@@ -2,6 +2,7 @@ extends Control
 
 const PLAYER_LIST := preload("res://Crafts/_scripts/player_list.gd")
 const KEY_HELP := preload("res://Crafts/_scripts/key_help.gd")
+const BOOST_BAR := preload("res://Crafts/_scripts/boost_bar.gd")
 # Full-screen card shown while your own craft is destroyed (the respawn delay).
 const DEMISE_SCREEN := preload("res://UI/backgrounds/demise_screen.png")
 # Fades in, so the start of your own explosion still shows; gone on respawn.
@@ -57,6 +58,9 @@ func _ready() -> void:
 	_match_node = get_tree().get_first_node_in_group("match")
 	arena_label.text = NetworkManager.current_map_title
 	add_child(PLAYER_LIST.new())
+	var boost_bar = BOOST_BAR.new()
+	boost_bar.weapon_node = weapon_node
+	add_child(boost_bar)
 	# Only in a match: the builder's test mode has its own F1 card.
 	if _match_node:
 		add_child(KEY_HELP.new())

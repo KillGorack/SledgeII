@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="BoostSettings" format=3 uid="uid://elmnc44mbcxp"]
+
+[ext_resource type="Script" uid="uid://btdcni1f3pvbi" path="res://Game_Objects/Powerups/_scripts/boost_settings.gd" id="1_boost"]
+[ext_resource type="Texture2D" path="res://Game_Objects/Powerups/Spritesheets/POWERUPS.png" id="2_sheet"]
+
+[sub_resource type="AtlasTexture" id="Icon"]
+atlas = ExtResource("2_sheet")
+region = Rect2(0, 512, 256, 256)
+
+[resource]
+script = ExtResource("1_boost")
+boost_name = "Haste"
+icon = SubResource("Icon")
+duration = 60.0
+projectile_color = Color(0.2, 0.9, 0.7, 1)
+multiply_values = {
+"cool_down": 0.5
+}

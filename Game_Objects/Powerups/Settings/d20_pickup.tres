@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="LootSettings" format=3]
+
+[ext_resource type="Script" path="res://Game_Objects/Powerups/_scripts/loot_settings.gd" id="1_loot"]
+[ext_resource type="PackedScene" path="res://Game_Objects/Powerups/Scenes/D20_Plaything.tscn" id="2_visual"]
+[ext_resource type="AudioStream" path="res://Game_Objects/Powerups/sounds/bottle.wav" id="3_sound"]
+[ext_resource type="Resource" path="res://Weapons/settings_object/D20.tres" id="4_weapon"]
+
+[resource]
+script = ExtResource("1_loot")
+loot_name = "D20"
+loot_type = 3
+weapon = ExtResource("4_weapon")
+drop_weight = 0.3
+lifetime = 25.0
+color = Color(1, 1, 0, 1)
+visual_scene = ExtResource("2_visual")
+pickup_sound = ExtResource("3_sound")

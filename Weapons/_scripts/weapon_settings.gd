@@ -50,9 +50,7 @@ enum ReloadOn { NEUTRAL, CAPTURED }
 @export var projectile_count_capacity: int = 0 # 0 is infinite
 @export var projectile_count_actual: int = 0
 
-@export var projectile_pierce_count: int = 0
 @export var projectile_ricochet_count: int = 0
-@export var bounce_count: int = 0
 @export var freeze_timer: float = 0.0
 @export var unfreeze: bool = false
 @export var projectile_force: float = 0.0

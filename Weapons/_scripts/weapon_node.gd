@@ -37,6 +37,9 @@ var _ammo_remaining: Array = []
 # (or rejection) can be matched back to the shot this client already
 # predicted locally - see match.gd::predict_shot.
 var _shot_seq: int = 0
+# How many entries of weapon_settings came with the craft; anything past this
+# was picked up from loot and is lost on destruction.
+var _base_weapon_count: int = 0
 # How far a client's claimed muzzle may sit from where the server thinks
 # that barrel is before the server ignores the claim and uses its own. The
 # server's view of a remote craft trails by roughly half an RTT plus the
@@ -104,6 +107,10 @@ func _use_special(primary: bool) -> void:
 
 
 func _ready() -> void:
+	# Own copy of the list (loot can add to it), and remember how many are the
+	# craft's own - see grant_weapon / revoke_granted below.
+	weapon_settings = weapon_settings.duplicate()
+	_base_weapon_count = weapon_settings.size()
 	_ammo_remaining.resize(weapon_settings.size())
 	for i in range(weapon_settings.size()):
 		var settings := weapon_settings[i]
@@ -141,7 +148,8 @@ func _physics_process(_delta: float) -> void:
 		switch_weapon()
 	var now = Time.get_ticks_msec() / 1000.0
 	if Input.is_action_pressed("fire_weapon") and now >= _client_next_fire_time:
-		var settings := weapon_settings[current_weapon_index]
+		var base_settings := weapon_settings[current_weapon_index]
+		var settings := effective(base_settings)
 		# Predicted locally off power_node's replicated current_power - same
 		# "not trusted for correctness" caveat as the cooldown below, the
 		# server re-checks for real in request_fire(). Skipping the RPC
@@ -169,7 +177,7 @@ func _physics_process(_delta: float) -> void:
 		if not multiplayer.is_server():
 			var match_node = get_tree().get_first_node_in_group("match")
 			if match_node:
-				match_node.predict_shot(_shot_seq, settings.resource_path, team, muzzle)
+				match_node.predict_shot(_shot_seq, base_settings.resource_path, team, muzzle, boost_ops())
 		# Recoil belongs to whoever simulates this craft - that's us. The
 		# server used to apply it to its own copy, which for any client-owned
 		# craft is just a follower of the owner's transform, so client recoil
@@ -261,16 +269,19 @@ func request_fire(weapon_index: int, shot_seq: int, client_muzzle: Transform3D, 
 func _try_fire(weapon_index: int, shot_seq: int, client_muzzle: Transform3D, sender: int, reverse_force: bool = false) -> bool:
 	if weapon_index < 0 or weapon_index >= weapon_settings.size():
 		return false
-	var settings := weapon_settings[weapon_index]
-	if settings == null or settings.projectile_prefab == null:
+	var base_settings := weapon_settings[weapon_index]
+	if base_settings == null or base_settings.projectile_prefab == null:
 		return false
+	# What this craft's boosts make of the weapon - cooldown, power, ammo and
+	# the shot itself all read this, never the shared .tres directly.
+	var settings := effective(base_settings)
 	# The spawner still needs a plain res:// string, not the Resource itself -
 	# see match.gd::_create_volley for why (replication can't safely decode
 	# arbitrary Objects, so every peer loads its own copy from disk by path).
 	# resource_path is populated automatically for any .tres dragged into the
 	# weapon_settings slot below, so this is just reading it back off, not
 	# reintroducing the string typing this change was meant to get rid of.
-	var path := settings.resource_path
+	var path := base_settings.resource_path
 	if path.is_empty():
 		push_warning("weapon_node: weapon_settings[%d] has no resource_path (not a saved .tres?)" % weapon_index)
 		return false
@@ -322,7 +333,7 @@ func _try_fire(weapon_index: int, shot_seq: int, client_muzzle: Transform3D, sen
 	var fast_forward := 0.0
 	if sender != 1:
 		fast_forward = minf(match_node.peer_one_way_latency(sender), match_node.PROJECTILE_MAX_FAST_FORWARD)
-	match_node.spawn_projectile(path, team, muzzle, false, sender, shot_seq, fast_forward, reverse_force)
+	match_node.spawn_projectile(path, team, muzzle, false, sender, shot_seq, fast_forward, reverse_force, boost_ops())
 	return true
 
 
@@ -342,3 +353,164 @@ func _sync_ammo(ammo: Array) -> void:
 	if multiplayer.get_remote_sender_id() != 1:
 		return
 	_ammo_remaining = ammo
+
+
+# --- Weapons picked up from loot --------------------------------------------
+# weapon_settings, _ammo_remaining and current_weapon_index are all indexed
+# together, so a granted weapon is appended on EVERY peer (server for the
+# fire checks, owner for input/HUD) to keep the indices aligned. The .tres
+# itself is never touched. Lost when the craft is destroyed (a logout just
+# frees the craft).
+
+# Server only. Returns false if the craft already has this weapon, so the
+# pickup is left for someone else.
+func server_grant_weapon(settings: WeaponSettings) -> bool:
+	if not multiplayer.is_server() or settings == null or settings.resource_path.is_empty():
+		return false
+	for existing in weapon_settings:
+		if existing and existing.resource_path == settings.resource_path:
+			return false
+	_apply_grant_weapon(settings.resource_path)
+	# Only the server (fire checks) and the owner (input/HUD) use the list.
+	if get_multiplayer_authority() != 1:
+		_grant_weapon.rpc_id(get_multiplayer_authority(), settings.resource_path)
+	return true
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _grant_weapon(path: String) -> void:
+	if multiplayer.get_remote_sender_id() != 1:
+		return
+	_apply_grant_weapon(path)
+
+
+func _apply_grant_weapon(path: String) -> void:
+	var settings := load(path) as WeaponSettings
+	if settings == null:
+		return
+	for existing in weapon_settings:
+		if existing and existing.resource_path == path:
+			return
+	weapon_settings.append(settings)
+	_ammo_remaining.append(settings.projectile_count_actual)
+	# Not equipped automatically - the player cycles to it with the weapon key.
+
+
+# Every peer, from health_node.gd::destroy_self.
+func revoke_granted() -> void:
+	_clear_boosts()
+	if weapon_settings.size() <= _base_weapon_count:
+		return
+	weapon_settings.resize(_base_weapon_count)
+	_ammo_remaining.resize(_base_weapon_count)
+	current_weapon_index = 0
+
+
+# --- Timed weapon boosts (BoostSettings) ---------------------------------------
+# The craft's active boosts live HERE, never on the weapon .tres files. Every
+# peer that cares (server for the real shot, owner for prediction + HUD, others
+# for the look) holds the same list, sent by the server whenever it changes.
+# Expiry is the server's call; each peer also keeps a local end time purely to
+# draw the HUD countdown.
+
+signal boosts_changed
+
+var _boosts: Array[BoostSettings] = []
+var _boost_end_msec: Dictionary = {} # boost resource_path -> local end time
+var _boost_ops: Dictionary = {}
+var _effective_cache: Dictionary = {} # base WeaponSettings -> boosted duplicate
+
+
+# The weapon as this craft currently fires it: base, plus active boosts.
+func effective(base: WeaponSettings) -> WeaponSettings:
+	if _boosts.is_empty() or base == null:
+		return base
+	if not _effective_cache.has(base):
+		_effective_cache[base] = BoostSettings.apply_ops(base, _boost_ops)
+	return _effective_cache[base]
+
+
+# Sent with every shot so other peers build the same boosted weapon.
+func boost_ops() -> Dictionary:
+	return _boost_ops if not _boosts.is_empty() else {}
+
+
+# For the HUD: [{boost: BoostSettings, left: seconds}]
+func boost_status() -> Array:
+	var now := Time.get_ticks_msec()
+	var out: Array = []
+	for boost in _boosts:
+		out.append({"boost": boost, "left": maxf(0.0, (_boost_end_msec.get(boost.resource_path, now) - now) / 1000.0)})
+	return out
+
+
+# Server only. Same boost again just refreshes its timer, so a returns-true
+# pickup is always "used".
+func server_grant_boost(boost: BoostSettings) -> bool:
+	if not multiplayer.is_server() or boost == null or boost.resource_path.is_empty():
+		return false
+	_boost_end_msec[boost.resource_path] = Time.get_ticks_msec() + int(boost.duration * 1000.0)
+	_boosts_changed_on_server()
+	get_tree().create_timer(boost.duration + 0.05).timeout.connect(_expire_boosts)
+	return true
+
+
+func _expire_boosts() -> void:
+	var now := Time.get_ticks_msec()
+	var changed := false
+	for path in _boost_end_msec.keys():
+		if _boost_end_msec[path] <= now:
+			_boost_end_msec.erase(path)
+			changed = true
+	if changed:
+		_boosts_changed_on_server()
+
+
+# Rebuild from the end-time table, tell every ready peer.
+func _boosts_changed_on_server() -> void:
+	var paths := PackedStringArray()
+	var left := PackedFloat32Array()
+	var now := Time.get_ticks_msec()
+	for path in _boost_end_msec:
+		paths.append(path)
+		left.append(maxf(0.0, (_boost_end_msec[path] - now) / 1000.0))
+	_apply_boosts(paths, left)
+	var match_node = get_tree().get_first_node_in_group("match")
+	if match_node == null:
+		return
+	for peer_id in match_node._ready_peers:
+		if peer_id != 1:
+			_sync_boosts.rpc_id(peer_id, paths, left)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _sync_boosts(paths: PackedStringArray, left: PackedFloat32Array) -> void:
+	if multiplayer.get_remote_sender_id() != 1:
+		return
+	_apply_boosts(paths, left)
+
+
+func _apply_boosts(paths: PackedStringArray, left: PackedFloat32Array) -> void:
+	_boosts.clear()
+	_boost_end_msec.clear()
+	var now := Time.get_ticks_msec()
+	for i in paths.size():
+		var boost := load(paths[i]) as BoostSettings
+		if boost == null:
+			continue
+		_boosts.append(boost)
+		_boost_end_msec[paths[i]] = now + int(left[i] * 1000.0)
+	_boost_ops = BoostSettings.resolve(_boosts)
+	_effective_cache.clear()
+	boosts_changed.emit()
+
+
+# Destruction: every peer drops its boosts locally (see revoke_granted).
+func _clear_boosts() -> void:
+	if _boosts.is_empty() and _boost_end_msec.is_empty():
+		return
+	_boosts.clear()
+	_boost_end_msec.clear()
+	_boost_ops = {}
+	_effective_cache.clear()
+	boosts_changed.emit()

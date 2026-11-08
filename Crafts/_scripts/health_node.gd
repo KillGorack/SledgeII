@@ -237,6 +237,25 @@ func request_fall_damage(impact_speed: float) -> void:
 	apply_damage(stats.fall_damage_coefficient * excess * excess, 0, DeathCause.FALL)
 
 
+# Server-only. Restores `amount`, armor first then life (shields regen on their
+# own), like station healing below. Returns whether anything was restored, so
+# a pickup can be left alone by a craft that's already full.
+func heal(amount: float) -> bool:
+	if not multiplayer.is_server() or _is_destroyed or amount <= 0.0:
+		return false
+	var remaining := amount
+	var healed := false
+	if armor < _armor_max:
+		var to_armor := minf(remaining, _armor_max - armor)
+		armor += to_armor
+		remaining -= to_armor
+		healed = true
+	if remaining > 0.0 and life < _life_max:
+		life = minf(_life_max, life + remaining)
+		healed = true
+	return healed
+
+
 # Armor-then-life heal while parked inside a recon station captured by this
 # craft's own team - shields already regen on their own via
 # _regeneration_timer above, so this never touches shields. Same fall-through
@@ -282,6 +301,10 @@ func destroy_self(death_time: float = 0.0) -> void:
 	if _is_destroyed:
 		return
 	_is_destroyed = true
+	# Weapons picked up from loot don't survive the wreck.
+	var weapon_node = body.get_node_or_null("weapon_node")
+	if weapon_node and weapon_node.has_method("revoke_granted"):
+		weapon_node.revoke_granted()
 
 	# Other peers draw this craft INTERP_DELAY in the past (movement.gd::
 	# _interpolate_remote), so on arrival of the death the wreck is still

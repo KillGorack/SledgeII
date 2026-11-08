@@ -278,6 +278,19 @@ func _broadcast_juice(force: bool = false) -> void:
 	NetworkManager._update_all_team_juice.rpc(values)
 
 
+# Server-only (loot pickups). Returns whether anything was added, so a team
+# already at capacity leaves the pickup for someone else.
+func add_team_juice(team: String, amount: float) -> bool:
+	if not multiplayer.is_server() or not NetworkManager.TEAM_NAMES.has(team) or amount <= 0.0:
+		return false
+	var current: float = _team_juice.get(team, 0.0)
+	if current >= JUICE_CAPACITY:
+		return false
+	_team_juice[team] = minf(JUICE_CAPACITY, current + amount)
+	_broadcast_juice()
+	return true
+
+
 func _juice_values() -> PackedFloat32Array:
 	var values := PackedFloat32Array()
 	for team in NetworkManager.TEAM_NAMES:
@@ -746,6 +759,11 @@ func _notify_ready(username: String = "") -> void:
 	_announce("%s has entered the arena." % _colored_name(requester_id, display_name))
 	_push_roster()
 	_sync_bounty(requester_id)
+	# Drops already on the floor, so a late joiner doesn't miss them.
+	for loot_id in _loot:
+		var existing: LootPickup = _loot[loot_id]
+		if is_instance_valid(existing):
+			_spawn_loot_event.rpc_id(requester_id, loot_id, existing.settings.resource_path, existing.global_position)
 	for other_peer_id in _spawned_peers.keys():
 		var craft = craft_container.get_node_or_null("Craft_%d" % other_peer_id)
 		if is_instance_valid(craft):
@@ -1125,7 +1143,7 @@ func _sync_recon_capture(recon_path: NodePath, team: String) -> void:
 #   spawn  - one reliable event per volley; every peer creates its own copy
 #            and flies it locally (collision_handler.gd::_cosmetic_step).
 #   correct- only for what clients can't predict: guided course (unreliable
-#            stream) and ricochets/pierces/bounces (reliable, one-off).
+#            stream) and ricochets (reliable, one-off).
 #   end    - one reliable event; explosion/bullet hole ride _play_impact_fx.
 # The server's own copy stays the only one that resolves hits.
 #
@@ -1133,6 +1151,163 @@ func _sync_recon_capture(recon_path: NodePath, team: String) -> void:
 # one-way latency (the shot left their barrel that long ago), and every
 # other peer by that plus its own one-way latency. The shooter themselves
 # never waits at all - see predict_shot.
+# --- Loot drops --------------------------------------------------------------
+# Server rolls and places a drop when a craft is destroyed, then sends ONE
+# reliable event (same channel as projectile spawn/end, so ordering holds).
+# Every peer spawns its own static copy; the server detects pickups and
+# announces them. Nothing about a drop is streamed.
+const LOOT_SCENE := preload("res://Game_Objects/Powerups/Scenes/loot_pickup.tscn")
+const LOOT_TABLE: Array[LootSettings] = [
+	preload("res://Game_Objects/Powerups/Settings/health_pack.tres"),
+	preload("res://Game_Objects/Powerups/Settings/energy_pack.tres"),
+	preload("res://Game_Objects/Powerups/Settings/juice_pack.tres"),
+	preload("res://Game_Objects/Powerups/Settings/d20_pickup.tres"),
+	preload("res://Game_Objects/Powerups/Settings/crit_ball_pickup.tres"),
+	preload("res://Game_Objects/Powerups/Settings/haste_pickup.tres"),
+	preload("res://Game_Objects/Powerups/Settings/ricochet_pickup.tres"),
+	preload("res://Game_Objects/Powerups/Settings/seeker_pickup.tres"),
+	preload("res://Game_Objects/Powerups/Settings/freeze_pickup.tres"),
+]
+const MAX_LOOT := 30
+var _next_loot_id := 1
+var _loot: Dictionary = {} # id -> LootPickup, on every peer
+var _loot_container: Node3D = null
+
+
+# How many drops a destroyed craft leaves. A kill drops NOTHING most of the
+# time: LOOT_DROP_CHANCE is the chance of at least one, then each further drop
+# needs LOOT_EXTRA_CHANCE again (so 2 is uncommon, 5 is a rarity), capped at
+# LOOT_MAX_DROPS. Every drop picks its own item by weight, so repeats can happen.
+const LOOT_DROP_CHANCE := 0.5
+const LOOT_EXTRA_CHANCE := 0.25
+const LOOT_MAX_DROPS := 5
+# Several drops fan out in a ring this far (meters) around the wreck.
+const LOOT_RING_RADIUS := 2.0
+# TEMPORARY test switch: a .tres path here makes EVERY drop that loot. Set back
+# to "" for normal weighted drops.
+const DEBUG_FORCE_LOOT := ""
+# TEMPORARY test switch: every kill drops the WHOLE table, in a ring around the
+# wreck. Set to false for normal weighted drops. Wins over DEBUG_FORCE_LOOT.
+const DEBUG_DROP_ALL := false
+
+
+# Weighted pick from LOOT_TABLE. Rare drops just have a small drop_weight.
+func _roll_loot() -> LootSettings:
+	if not DEBUG_FORCE_LOOT.is_empty():
+		return load(DEBUG_FORCE_LOOT) as LootSettings
+	var total := 0.0
+	for entry in LOOT_TABLE:
+		total += maxf(entry.drop_weight, 0.0)
+	if total <= 0.0:
+		return null
+	var roll := randf() * total
+	for entry in LOOT_TABLE:
+		roll -= maxf(entry.drop_weight, 0.0)
+		if roll < 0.0:
+			return entry
+	return LOOT_TABLE.back()
+
+
+func _roll_loot_count() -> int:
+	if randf() >= LOOT_DROP_CHANCE:
+		return 0
+	var count := 1
+	while count < LOOT_MAX_DROPS and randf() < LOOT_EXTRA_CHANCE:
+		count += 1
+	return count
+
+
+# Server only.
+func _drop_loot_at(position: Vector3) -> void:
+	if not multiplayer.is_server() or NetworkManager.creative_building:
+		return
+	if DEBUG_DROP_ALL:
+		var total := LOOT_TABLE.size()
+		for i in total:
+			var angle := TAU * i / total
+			_spawn_loot(LOOT_TABLE[i], position + Vector3(cos(angle), 0.0, sin(angle)) * 2.5)
+		return
+	var count := _roll_loot_count()
+	if count == 0:
+		return
+	# One drop sits right under the wreck; several fan out in an evenly spaced
+	# ring (random starting angle) so they never overlap.
+	var start_angle := randf() * TAU
+	for i in count:
+		var spot := position
+		if count > 1:
+			var angle := start_angle + TAU * i / count
+			spot += Vector3(cos(angle), 0.0, sin(angle)) * LOOT_RING_RADIUS
+		_spawn_loot(_roll_loot(), spot)
+
+
+# Server only: place one drop on the floor under `position` and announce it.
+func _spawn_loot(settings: LootSettings, position: Vector3) -> void:
+	if settings == null or settings.resource_path.is_empty():
+		return
+	# Settle onto the floor under the wreck instead of hanging in the air.
+	var query := PhysicsRayQueryParameters3D.create(position + Vector3.UP * 2.0, position + Vector3.DOWN * 30.0, 1 << (Utilities.GROUP_LAYER_SCOPE["world"]["layer"] - 1))
+	var hit := get_viewport().world_3d.direct_space_state.intersect_ray(query)
+	if not hit.is_empty():
+		position = hit.position # pickups sit ON the floor; the visual is 0.31 up
+	# Over the cap, the oldest goes.
+	while _loot.size() >= MAX_LOOT:
+		collect_loot(_loot.keys()[0], 0)
+	var id := _next_loot_id
+	_next_loot_id += 1
+	_make_loot(id, settings, position)
+	for peer_id in _ready_peers:
+		if peer_id != 1:
+			_spawn_loot_event.rpc_id(peer_id, id, settings.resource_path, position)
+	get_tree().create_timer(settings.lifetime).timeout.connect(func(): collect_loot(id, 0))
+
+
+func _make_loot(id: int, settings: LootSettings, position: Vector3) -> void:
+	if _loot_container == null:
+		_loot_container = Node3D.new()
+		_loot_container.name = "Loot"
+		add_child(_loot_container)
+	var pickup: LootPickup = LOOT_SCENE.instantiate()
+	pickup.loot_id = id
+	pickup.settings = settings
+	pickup.position = position
+	_loot[id] = pickup
+	_loot_container.add_child(pickup)
+
+
+@rpc("authority", "call_remote", "reliable", 2)
+func _spawn_loot_event(id: int, settings_path: String, position: Vector3) -> void:
+	var settings := load(settings_path) as LootSettings
+	if settings and not _loot.has(id):
+		_make_loot(id, settings, position)
+
+
+# Server only. taker_peer 0 = expired / evicted rather than picked up.
+func collect_loot(id: int, taker_peer: int) -> void:
+	if not _loot.has(id):
+		return
+	_remove_loot(id, taker_peer)
+	for peer_id in _ready_peers:
+		if peer_id != 1:
+			_remove_loot_event.rpc_id(peer_id, id, taker_peer)
+
+
+@rpc("authority", "call_remote", "reliable", 2)
+func _remove_loot_event(id: int, taker_peer: int) -> void:
+	_remove_loot(id, taker_peer)
+
+
+func _remove_loot(id: int, taker_peer: int) -> void:
+	var pickup: LootPickup = _loot.get(id)
+	_loot.erase(id)
+	if not is_instance_valid(pickup):
+		return
+	# Only the taker hears the pickup sound.
+	if taker_peer != 0 and taker_peer == multiplayer.get_unique_id() and pickup.settings.pickup_sound:
+		Utilities.play_sound(pickup.settings.pickup_sound, pickup.global_position, 3)
+	pickup.queue_free()
+
+
 const PROJECTILE_MAX_FAST_FORWARD := 0.15
 const _VOLLEY_START_ANGLES := [0, 0, -30, 45, 18, 0]
 
@@ -1147,24 +1322,24 @@ var _predicted_shots: Dictionary = {}
 
 # Server-only. shooter_peer 0 = not a player (base guns). The launch sound
 # plays either way, whenever the weapon's settings define one.
-func spawn_projectile(weapon_settings_path: String, team: String, muzzle_transform: Transform3D, use_team_color: bool = false, shooter_peer: int = 0, shot_seq: int = -1, fast_forward: float = 0.0, reverse_force: bool = false) -> void:
+func spawn_projectile(weapon_settings_path: String, team: String, muzzle_transform: Transform3D, use_team_color: bool = false, shooter_peer: int = 0, shot_seq: int = -1, fast_forward: float = 0.0, reverse_force: bool = false, overrides: Dictionary = {}) -> void:
 	if not multiplayer.is_server():
 		return
 	var settings: WeaponSettings = load(weapon_settings_path)
 	if settings == null or settings.projectile_prefab == null:
 		return
 	var first_id := _next_projectile_id
-	_next_projectile_id += maxi(settings.projectile_count, 1)
-	_create_volley(first_id, weapon_settings_path, team, muzzle_transform, use_team_color, fast_forward, true, shooter_peer, reverse_force)
+	_next_projectile_id += maxi(BoostSettings.apply_ops(settings, overrides).projectile_count, 1)
+	_create_volley(first_id, weapon_settings_path, team, muzzle_transform, use_team_color, fast_forward, true, shooter_peer, reverse_force, overrides)
 	var team_index := NetworkManager.TEAM_NAMES.find(team)
 	# Only to peers whose match scene actually exists - see _ready_peers.
 	for peer_id in _ready_peers:
 		if peer_id != 1:
-			_spawn_projectile_event.rpc_id(peer_id, first_id, weapon_settings_path, team_index, muzzle_transform, use_team_color, fast_forward, shooter_peer, shot_seq)
+			_spawn_projectile_event.rpc_id(peer_id, first_id, weapon_settings_path, team_index, muzzle_transform, use_team_color, fast_forward, shooter_peer, shot_seq, overrides)
 
 
 @rpc("authority", "call_remote", "reliable", 2)
-func _spawn_projectile_event(first_id: int, weapon_settings_path: String, team_index: int, muzzle_transform: Transform3D, use_team_color: bool, fast_forward: float, shooter_peer: int, shot_seq: int) -> void:
+func _spawn_projectile_event(first_id: int, weapon_settings_path: String, team_index: int, muzzle_transform: Transform3D, use_team_color: bool, fast_forward: float, shooter_peer: int, shot_seq: int, overrides: Dictionary = {}) -> void:
 	if shooter_peer == multiplayer.get_unique_id() and _predicted_shots.has(shot_seq):
 		# Our own shot - already flying since the moment we fired. Adopt the
 		# server's ids instead of spawning a duplicate.
@@ -1176,15 +1351,15 @@ func _spawn_projectile_event(first_id: int, weapon_settings_path: String, team_i
 				_projectiles[first_id + i] = predicted[i]
 		return
 	var team: String = NetworkManager.TEAM_NAMES[team_index] if team_index >= 0 and team_index < NetworkManager.TEAM_NAMES.size() else ""
-	_create_volley(first_id, weapon_settings_path, team, muzzle_transform, use_team_color, fast_forward + _one_way_latency(), true, shooter_peer)
+	_create_volley(first_id, weapon_settings_path, team, muzzle_transform, use_team_color, fast_forward + _one_way_latency(), true, shooter_peer, false, overrides)
 
 
 # Shooter-only (never the host - its shots are the real ones already). Spawns
 # the volley locally the instant the trigger is pulled; the server's spawn
 # event later adopts it (see _spawn_projectile_event) or reject_predicted_shot
 # removes it.
-func predict_shot(shot_seq: int, weapon_settings_path: String, team: String, muzzle_transform: Transform3D) -> void:
-	_predicted_shots[shot_seq] = _create_volley(-1, weapon_settings_path, team, muzzle_transform, false, 0.0, true)
+func predict_shot(shot_seq: int, weapon_settings_path: String, team: String, muzzle_transform: Transform3D, overrides: Dictionary = {}) -> void:
+	_predicted_shots[shot_seq] = _create_volley(-1, weapon_settings_path, team, muzzle_transform, false, 0.0, true, 0, false, overrides)
 
 
 func reject_predicted_shot(shot_seq: int) -> void:
@@ -1262,12 +1437,17 @@ func peer_one_way_latency(peer_id: int) -> float:
 # Builds one volley locally - identical on every peer, which is what lets
 # a single spawn event stand in for every projectile in it. net ids are
 # first_id, first_id+1, ... (first_id -1 = predicted, ids assigned later).
-func _create_volley(first_id: int, weapon_settings_path: String, team: String, muzzle_transform: Transform3D, use_team_color: bool, fast_forward: float, play_launch_sound: bool, shooter_peer: int = 0, reverse_force: bool = false) -> Array:
+func _create_volley(first_id: int, weapon_settings_path: String, team: String, muzzle_transform: Transform3D, use_team_color: bool, fast_forward: float, play_launch_sound: bool, shooter_peer: int = 0, reverse_force: bool = false, overrides: Dictionary = {}) -> Array:
 	# weapon_settings_path is a string, not the Resource itself - every peer
 	# has the same .tres locally, so each side just loads it by path.
 	var settings: WeaponSettings = load(weapon_settings_path)
 	if settings == null or settings.projectile_prefab == null:
 		return []
+	# Boosts: a duplicate with this craft's active boosts applied - see
+	# boost_settings.gd. Done before anything reads the settings, so the volley
+	# layout, tint and the projectile itself all see the boosted weapon.
+	if not overrides.is_empty():
+		settings = BoostSettings.apply_ops(settings, overrides)
 	if use_team_color:
 		# load() caches and shares this exact Resource across every shot of
 		# this weapon by every player, so mutating projectile_color directly
@@ -1625,6 +1805,8 @@ func _on_craft_defeated(peer_id: int, attacker_id: int, cause: int) -> void:
 	if collected > 0:
 		var juggle := " [color=orange]Juggled x%d![/color]" % multiplier if multiplier > 1 else ""
 		_announce("[color=yellow]Bounty collected by[/color] %s[color=yellow]: %d credits[/color]%s" % [_colored_name(attacker_id, _peer_names.get(attacker_id, "")), collected, juggle])
+	if is_instance_valid(victim):
+		_drop_loot_at(victim.global_position)
 	await get_tree().create_timer(RESPAWN_DELAY).timeout
 	if not NetworkManager.peer_teams.has(peer_id):
 		return # player left during the respawn delay

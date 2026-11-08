@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="LootSettings" format=3]
+
+[ext_resource type="Script" path="res://Game_Objects/Powerups/_scripts/loot_settings.gd" id="1_loot"]
+[ext_resource type="PackedScene" path="res://Game_Objects/Powerups/Scenes/juice.tscn" id="2_visual"]
+[ext_resource type="AudioStream" path="res://Game_Objects/Powerups/sounds/bottle.wav" id="3_sound"]
+
+[resource]
+script = ExtResource("1_loot")
+loot_name = "Juice Vial"
+loot_type = 2
+amount = 20.0
+drop_weight = 10.0
+lifetime = 25.0
+color = Color(0.2, 0.3, 1, 1)
+visual_scene = ExtResource("2_visual")
+pickup_sound = ExtResource("3_sound")

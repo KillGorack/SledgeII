@@ -24,7 +24,6 @@ class_name ThrownObject
 
 var weapon_settings: WeaponSettings
 var weapon_settings_path: String = ""
-var team: String = ""
 var shooter_peer: int = 0
 var reverse_force: bool = false
 var net_id: int = -1
@@ -34,6 +33,8 @@ var net_id: int = -1
 # each other.
 const OBJECT_LAYER_BIT := 1 << 14
 const STREAM_INTERVAL := 0.05
+# Cosmetic copies hold still if no update arrives for this long.
+const STALE_AFTER := 0.25
 const SNAP_DISTANCE := 5.0
 const BLEND_RATE := 15.0
 const TURN_RATE := 20.0
@@ -52,6 +53,9 @@ var _hit_times := {} # body instance id -> _age of last damaging hit
 var _cosmetic_velocity := Vector3.ZERO
 var _position_error := Vector3.ZERO
 var _cosmetic_ended := false
+var _since_correction := 0.0
+# True after the server's final resting pose: hold exactly there, no gravity.
+var _resting := false
 var _target_basis := Basis.IDENTITY
 
 
@@ -121,15 +125,17 @@ func _physics_process(delta: float) -> void:
 	if _stream_elapsed >= STREAM_INTERVAL:
 		_stream_elapsed = 0.0
 		var asleep := sleeping
-		if not asleep or not _was_sleeping:
-			_send_state()
+		if not asleep:
+			_send_state(false)
+		elif not _was_sleeping:
+			_send_state(true) # final resting pose: reliable, can't be lost
 		_was_sleeping = asleep
 
 
-func _send_state() -> void:
+func _send_state(final_pose: bool) -> void:
 	if net_id < 0 or _match_node == null or destroying:
 		return
-	_match_node.send_projectile_correction(net_id, global_transform, linear_velocity, false)
+	_match_node.send_projectile_correction(net_id, global_transform, Vector3.ZERO if final_pose else linear_velocity, final_pose)
 
 
 # --- cosmetic copies -------------------------------------------------------
@@ -141,7 +147,14 @@ func _cosmetic_step(delta: float) -> void:
 	if weapon_settings.projectile_lifetime > 0.0 and _age >= weapon_settings.projectile_lifetime + 1.0:
 		end_cosmetic()
 		return
-	_cosmetic_velocity += _gravity() * delta
+	# The server goes quiet once a die sleeps. Keep extrapolating then and the
+	# copy (which has no collision) would sink through the floor, and snap
+	# back into view the moment the die is touched again - the blinking.
+	_since_correction += delta
+	if _resting or _since_correction > STALE_AFTER:
+		_cosmetic_velocity = Vector3.ZERO
+	else:
+		_cosmetic_velocity += _gravity() * delta
 	var motion := _cosmetic_velocity * delta
 	if not _position_error.is_zero_approx():
 		var blend := _position_error * minf(1.0, BLEND_RATE * delta)
@@ -156,6 +169,9 @@ func _cosmetic_step(delta: float) -> void:
 func apply_correction(server_transform: Transform3D, velocity: Vector3, latency: float, snap: bool) -> void:
 	if _cosmetic_ended:
 		return
+	_since_correction = 0.0
+	# The sleep message is the only reliable one sent with zero velocity.
+	_resting = snap and velocity.is_zero_approx()
 	var target := server_transform.origin + velocity * latency
 	_cosmetic_velocity = velocity
 	_target_basis = server_transform.basis

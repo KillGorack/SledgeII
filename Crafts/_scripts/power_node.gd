@@ -73,6 +73,18 @@ func get_power_ratio() -> float:
 	return current_power / stats.power_capacity if stats and stats.power_capacity > 0.0 else 0.0
 
 
+# Server-only. Adds power (loot pickups); returns whether anything was added,
+# so a full craft leaves the pickup for someone else. current_power reaches the
+# owning client through the synchronizer, same as charging.
+func add_power(amount: float) -> bool:
+	if not NetworkManager.is_live_server() or stats == null or amount <= 0.0:
+		return false
+	if current_power >= stats.power_capacity:
+		return false
+	current_power = minf(stats.power_capacity, current_power + amount)
+	return true
+
+
 # Server-only, called from weapon_node.gd::request_fire(). Returns false (and
 # leaves current_power untouched) if there isn't enough to cover the cost, so
 # the caller can reject the shot outright rather than letting power go negative.

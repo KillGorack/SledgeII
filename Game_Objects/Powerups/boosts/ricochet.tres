@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="BoostSettings" format=3 uid="uid://b1w2oxxmdrrng"]
+
+[ext_resource type="Script" uid="uid://btdcni1f3pvbi" path="res://Game_Objects/Powerups/_scripts/boost_settings.gd" id="1_boost"]
+[ext_resource type="Texture2D" path="res://Game_Objects/Powerups/Spritesheets/POWERUPS.png" id="2_sheet"]
+
+[sub_resource type="AtlasTexture" id="Icon"]
+atlas = ExtResource("2_sheet")
+region = Rect2(0, 768, 256, 256)
+
+[resource]
+script = ExtResource("1_boost")
+boost_name = "Ricochet"
+icon = SubResource("Icon")
+duration = 60.0
+projectile_color = Color(0.85, 0.9, 1, 1)
+set_values = {
+"projectile_ricochet_count": 3
+}

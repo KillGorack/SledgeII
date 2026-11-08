@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="BoostSettings" format=3 uid="uid://de54bsiu3dfs0"]
+
+[ext_resource type="Script" uid="uid://btdcni1f3pvbi" path="res://Game_Objects/Powerups/_scripts/boost_settings.gd" id="1_boost"]
+[ext_resource type="Texture2D" path="res://Game_Objects/Powerups/Spritesheets/POWERUPS.png" id="2_sheet"]
+
+[sub_resource type="AtlasTexture" id="Icon"]
+atlas = ExtResource("2_sheet")
+region = Rect2(0, 256, 256, 256)
+
+[resource]
+script = ExtResource("1_boost")
+boost_name = "Freeze"
+icon = SubResource("Icon")
+duration = 60.0
+projectile_color = Color(0.45, 0.65, 1, 1)
+set_values = {
+"freeze_timer": 3.0
+}

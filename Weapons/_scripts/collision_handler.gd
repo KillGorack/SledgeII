@@ -36,7 +36,6 @@ var bullet_hole_one_off: bool = false
 var hit_scene_one_off: bool = false
 var _crit_pending: bool = false
 var collided_layer: int = -1
-var ignored_objects: Array = []
 var guided_target: Node = null
 var targeted_group: bool = false
 var result = []
@@ -265,7 +264,7 @@ func _physics_process(delta: float) -> void:
 			_send_correction(false)
 
 
-# Server-only. snap=true for discrete course changes (ricochet/pierce/bounce),
+# Server-only. snap=true for discrete course changes (ricochet),
 # sent reliably; false for the periodic guided stream, sent unreliably.
 func _send_correction(snap: bool) -> void:
 	if net_id < 0 or _match_node == null or _destroying:
@@ -303,11 +302,12 @@ func _cosmetic_step(delta: float) -> void:
 		motion += blend
 		_position_error -= blend
 	var end := start + motion
-	# A weapon that never bounces off the world can safely stop at the first
-	# wall it reaches here, rather than visibly flying on into it until the
-	# server's end event arrives a half-RTT later. Bouncing weapons keep
-	# going and wait for the server's correction instead.
-	if weapon_settings.projectile_ricochet_count == 0 and weapon_settings.bounce_count == 0:
+	# A weapon that never ricochets can safely stop at the first wall it
+	# reaches here, rather than visibly flying on into it until the server's
+	# end event arrives a half-RTT later. Ricocheting weapons keep going and
+	# wait for the server's correction instead. (Boosts that add ricochet reach
+	# this peer through the spawn event's overrides - see boost_settings.gd.)
+	if weapon_settings.projectile_ricochet_count == 0:
 		var query := PhysicsRayQueryParameters3D.create(start, end, _world_mask())
 		var hit := get_world_3d().direct_space_state.intersect_ray(query)
 		if not hit.is_empty():
@@ -417,7 +417,7 @@ func handle_collision() -> void:
 	var destroy = true
 	targeted_group = true if weapon_settings.friendly_fire else targeted_group
 
-	if (weapon_settings.explosive_force > 0 and weapon_settings.explosive_force_distance > 0) or weapon_settings.unfreeze or weapon_settings.bounce_count > 0:
+	if (weapon_settings.explosive_force > 0 and weapon_settings.explosive_force_distance > 0) or weapon_settings.unfreeze:
 		var dist = weapon_settings.explosive_force_distance if weapon_settings.explosive_force_distance > 0 else weapon_settings.target_system_scan_radius
 		var scope_targets: Array = Utilities.GROUP_LAYER_SCOPE[allegiance_group]["target_groups"].duplicate() if Utilities.GROUP_LAYER_SCOPE.has(allegiance_group) else []
 		# friendly_fire means the blast hurts/shoves the shooter's own team
@@ -459,9 +459,6 @@ func handle_collision() -> void:
 		if weapon_settings.projectile_force > 0:
 			apply_hit_force(-weapon_settings.projectile_force if reverse_force else weapon_settings.projectile_force)
 
-		if weapon_settings.projectile_pierce_count > 0:
-			destroy = handle_pierce()
-
 	# Shooting a thrown object (object_handler.gd): no team to damage, but it
 	# should still get shoved. Uses the weapon's projectile_force, or a
 	# fraction of its damage if it has none.
@@ -469,9 +466,6 @@ func handle_collision() -> void:
 		var shove := weapon_settings.projectile_force if weapon_settings.projectile_force > 0.0 else weapon_settings.hit_points * 0.5
 		if shove > 0.0 and not targeted_group:
 			apply_hit_force(-shove if reverse_force else shove)
-
-	if weapon_settings.bounce_count > 0:
-		destroy = handle_bounce(result)
 
 	if weapon_settings.projectile_ricochet_count > 0:
 		destroy = handle_ricochet()
@@ -594,7 +588,7 @@ func handle_ricochet() -> bool:
 		var reflect_direction = current_direction.bounce(collision_normal).normalized()
 		current_direction = reflect_direction
 		linear_velocity = reflect_direction * weapon_settings.projectile_speed
-		# 2x the collider's own radius (0.05), same margin handle_pierce() uses
+		# 2x the collider's own radius (0.05), same margin the old pierce used
 		# below - 1x was barely more than the radius itself, so a shallow or
 		# corner hit could still be touching next physics step and immediately
 		# ricochet again in the same spot.
@@ -607,40 +601,9 @@ func handle_ricochet() -> bool:
 		# angular_velocity the actual physics collision just imparted (real
 		# torque/friction from the contact), so without this the leftover spin
 		# keeps integrating right through the reorient and compounds with each
-		# subsequent bounce. handle_pierce() below already does this for the
-		# exact same reason.
+		# subsequent bounce.
 		angular_velocity = Vector3.ZERO
 		_clear_trails()
-		_reset_one_offs()
-		_send_correction(true)
-		return false
-	return true
-
-
-func handle_pierce() -> bool:
-	if collided_layer == 2: # world
-		return true
-	if ricochet_count <= weapon_settings.projectile_pierce_count and collided_object not in ignored_objects:
-		ricochet_count += 1
-		ignored_objects.append(collided_object)
-		global_transform.origin += current_direction.normalized() * 0.1
-		look_at(global_transform.origin + current_direction, Vector3.UP)
-		linear_velocity = current_direction.normalized() * weapon_settings.projectile_speed
-		angular_velocity = Vector3.ZERO
-		_reset_one_offs()
-		_send_correction(true)
-		return false
-	return true
-
-
-func handle_bounce(bodies) -> bool:
-	# Thrown objects aren't bounce targets.
-	var candidates: Array = bodies.filter(func(b): return not (b.collider is Node and b.collider.is_in_group("playthings")))
-	if candidates.size() > 0 and ricochet_count <= weapon_settings.bounce_count:
-		ricochet_count += 1
-		var body = candidates[0].collider
-		var direction = (body.global_transform.origin - global_transform.origin).normalized()
-		linear_velocity = direction * weapon_settings.projectile_speed
 		_reset_one_offs()
 		_send_correction(true)
 		return false
