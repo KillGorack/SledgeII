@@ -103,9 +103,20 @@ var selected_game_row = null
 # The Settings screen is built but left out of the menu for now; set this to true to bring its button back.
 const SHOW_SETTINGS := false
 
+# Menu music: "Break The Line" by Abbynoise (Uppbeat, credited in credits.gd). It lives on this scene, so it
+# stops by itself when a match loads and starts again when the player comes back to the menu.
+const MENU_MUSIC := preload("res://UI/music/break_the_line.mp3")
+# The player's music slider (bottom-left of the menu), 0 = off. Remembered between sessions.
+const MENU_MUSIC_DEFAULT := 0.3
+const MENU_MUSIC_TOP_DB := -6.0 # slider all the way up
+const MUSIC_FADE_SECONDS := 1.5
+const SETTINGS_PATH := "user://settings.cfg"
+var _music_player: AudioStreamPlayer
+
 
 func _ready() -> void:
 	btn_settings.visible = SHOW_SETTINGS
+	_start_menu_music()
 	_build_credits()
 	_add_version_label()
 	add_child(login_timer)
@@ -148,7 +159,7 @@ func _ready() -> void:
 	# host_game(), before host_started, before this scene gets replaced - see
 	# _on_host_started for where this actually gets shown.
 	NetworkManager.port_forward_failed.connect(func(reason): _pending_port_forward_warning = "Couldn't auto-forward your port: %s. Forward UDP %d manually for internet players." % [reason, NetworkManager.DEFAULT_PORT])
-	NetworkManager.join_failed.connect(func(reason): set_ui_feedback(reason, "NOK"))
+	NetworkManager.join_failed.connect(_on_join_failed)
 	NetworkManager.api_error.connect(func(reason): set_ui_feedback(reason, "NOK"))
 	NetworkManager.player_registered.connect(_on_player_registered)
 	NetworkManager.player_unregistered.connect(func(_peer_id): _build_team_roster())
@@ -171,6 +182,18 @@ func _ready() -> void:
 		login_group.visible = true
 		load_group.visible = false
 		set_ui_feedback("Please login to continue...", "INFO")
+
+	# A join that failed while a match scene was up (see NetworkManager._version_failed) sends us here.
+	if NetworkManager.menu_notice != "":
+		_show_menu_notice()
+
+
+# Held back a moment: opening the menu writes its own feedback line a second in.
+func _show_menu_notice() -> void:
+	await get_tree().create_timer(1.4).timeout
+	if NetworkManager.menu_notice != "":
+		set_ui_feedback(NetworkManager.menu_notice, "NOK")
+		NetworkManager.menu_notice = ""
 
 
 # --- Menu buttons: Play / Settings / Credits --------------------------------
@@ -227,6 +250,7 @@ func _enter_load_screen(feedback_message: String) -> void:
 func _build_credits() -> void:
 	var text_label := credits_group.get_node("Margin/Text") as RichTextLabel
 	text_label.text = Credits.text()
+	text_label.meta_clicked.connect(func(meta): OS.shell_open(str(meta)))
 	var button := Button.new()
 	button.text = "Licenses"
 	button.focus_mode = Control.FOCUS_NONE
@@ -248,6 +272,71 @@ func _build_credits() -> void:
 	dialog.add_child(box)
 	add_child(dialog)
 	button.pressed.connect(func() -> void: dialog.popup_centered())
+
+
+# Both ways into a match (hosting, and joining once a team is confirmed) end here. The music moves out of this
+# scene, which is about to be freed, and fades out over the load.
+func _enter_arena() -> void:
+	if _music_player and _music_player.playing:
+		var player := _music_player
+		_music_player = null
+		player.reparent(get_tree().root)
+		var tween := player.create_tween()
+		tween.tween_property(player, "volume_db", -60.0, MUSIC_FADE_SECONDS)
+		tween.tween_callback(player.queue_free)
+	get_tree().change_scene_to_file("res://Networking/match.tscn")
+
+
+# Slider position (0..1) to loudness: a straight volume scale, so the low end is gentle; 0 stops the track.
+func _apply_music_volume(value: float) -> void:
+	if _music_player == null:
+		return
+	if value <= 0.001:
+		_music_player.stop()
+		return
+	_music_player.volume_db = linear_to_db(value) + MENU_MUSIC_TOP_DB
+	if not _music_player.playing:
+		_music_player.play()
+
+
+func _start_menu_music() -> void:
+	var stream := MENU_MUSIC.duplicate() as AudioStreamMP3
+	stream.loop = true
+	_music_player = AudioStreamPlayer.new()
+	_music_player.name = "MenuMusic"
+	_music_player.stream = stream
+	add_child(_music_player)
+	var cfg := ConfigFile.new()
+	cfg.load(SETTINGS_PATH) # missing file is fine: defaults
+	var value := clampf(float(cfg.get_value("audio", "menu_music", MENU_MUSIC_DEFAULT)), 0.0, 1.0)
+	_apply_music_volume(value)
+	var layer := CanvasLayer.new()
+	layer.layer = 100
+	add_child(layer)
+	var row := HBoxContainer.new()
+	row.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	row.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	row.offset_left = 10.0
+	row.offset_bottom = -6.0
+	row.modulate = Color(1.0, 1.0, 1.0, 0.7)
+	layer.add_child(row)
+	var label := Label.new()
+	label.text = "Music"
+	row.add_child(label)
+	var slider := HSlider.new()
+	slider.min_value = 0.0
+	slider.max_value = 1.0
+	slider.step = 0.05
+	slider.value = value
+	slider.custom_minimum_size = Vector2(110.0, 0.0)
+	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	slider.value_changed.connect(func(v: float) -> void:
+		_apply_music_volume(v)
+		var out := ConfigFile.new()
+		out.load(SETTINGS_PATH) # keep any other saved settings
+		out.set_value("audio", "menu_music", v)
+		out.save(SETTINGS_PATH))
+	row.add_child(slider)
 
 
 # The build's version (Project Settings > Application > Config > Version), small in the bottom-right corner, so a
@@ -555,7 +644,7 @@ func _on_host_started(address: String) -> void:
 		set_ui_feedback("Hosting on %s (LAN only). %s" % [address, _pending_port_forward_warning], "NOK")
 	else:
 		set_ui_feedback("Hosting on %s, waiting for players..." % address, "OK")
-	get_tree().change_scene_to_file("res://Networking/match.tscn")
+	_enter_arena()
 
 
 func _on_join_pressed():
@@ -567,6 +656,18 @@ func _on_join_pressed():
 	var map_file_id = int(selected_game_row.get_meta("hst_map_file_id", 0))
 	set_ui_feedback("Connecting...", "INFO")
 	NetworkManager.join_game(address, port, map_file_id, selected_game_row.get_text(0))
+
+
+# A failed join. If it failed AFTER connecting (a version mismatch is only found out then), the team
+# select screen is up - put the player back on the screen they came from.
+func _on_join_failed(reason: String) -> void:
+	set_ui_feedback(reason, "NOK")
+	NetworkManager.menu_notice = ""
+	if team_select_group.visible:
+		team_select_group.visible = false
+		var logged_in: bool = UserData.user_id > 0
+		load_group.visible = logged_in
+		login_group.visible = not logged_in
 
 
 func _on_joined_match():
@@ -589,7 +690,7 @@ func _on_joined_match():
 func _on_player_registered(peer_id: int, _team: String) -> void:
 	_build_team_roster()
 	if team_select_group.visible and peer_id == NetworkManager.multiplayer.get_unique_id():
-		get_tree().change_scene_to_file("res://Networking/match.tscn")
+		_enter_arena()
 
 
 func _on_team_request_rejected(reason: String) -> void:

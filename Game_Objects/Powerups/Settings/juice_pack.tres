@@ -10,6 +10,7 @@ loot_name = "Juice Vial"
 loot_type = 2
 amount = 20.0
 drop_weight = 10.0
+requires = 2
 lifetime = 25.0
 color = Color(0.2, 0.3, 1, 1)
 visual_scene = ExtResource("2_visual")

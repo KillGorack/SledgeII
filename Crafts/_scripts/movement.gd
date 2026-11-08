@@ -449,6 +449,17 @@ func handle_turret_barrel_look():
 
 
 
+# Turret and barrel straight ahead at once - used on respawn (health_node.gd::respawn_at).
+func reset_aim() -> void:
+	yaw = 0.0
+	pitch = 0.0
+	recentering = false
+	if turret:
+		turret.rotation_degrees.y = 0.0
+	if barrel:
+		barrel.rotation_degrees.x = 0.0
+
+
 func recenter_turret_barrel():
 	var target_yaw = 0.0
 	target_pitch = 0.0

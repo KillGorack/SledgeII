@@ -1195,21 +1195,37 @@ const DEBUG_FORCE_LOOT := ""
 const DEBUG_DROP_ALL := false
 
 
-# Weighted pick from LOOT_TABLE. Rare drops just have a small drop_weight.
+# What this match is made of, for LootSettings.requires. Everyone shares one loadout, so any craft's
+# (already host-filtered) weapon list is the match's. Recomputed per roll: a handful of weapons, a few rolls
+# per kill. No craft to read from = no conditions, everything may drop.
+func _loot_facts() -> Dictionary:
+	for craft in get_tree().get_nodes_in_group("Craft"):
+		var weapon_node := craft.get_node_or_null("weapon_node")
+		if weapon_node:
+			return LootSettings.match_facts(weapon_node.weapon_settings, NetworkManager.recon_capture_enabled)
+	return {}
+
+
+# Weighted pick from LOOT_TABLE. Rare drops just have a small drop_weight. Entries the match has no use for
+# (LootSettings.requires) sit out the roll, so their weight goes to the rest in proportion.
 func _roll_loot() -> LootSettings:
 	if not DEBUG_FORCE_LOOT.is_empty():
 		return load(DEBUG_FORCE_LOOT) as LootSettings
+	var facts := _loot_facts()
+	var pool: Array[LootSettings] = []
 	var total := 0.0
 	for entry in LOOT_TABLE:
-		total += maxf(entry.drop_weight, 0.0)
+		if entry.is_available(facts):
+			pool.append(entry)
+			total += maxf(entry.drop_weight, 0.0)
 	if total <= 0.0:
 		return null
 	var roll := randf() * total
-	for entry in LOOT_TABLE:
+	for entry in pool:
 		roll -= maxf(entry.drop_weight, 0.0)
 		if roll < 0.0:
 			return entry
-	return LOOT_TABLE.back()
+	return pool.back()
 
 
 func _roll_loot_count() -> int:

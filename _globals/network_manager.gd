@@ -154,7 +154,23 @@ var _clock_ping_elapsed: float = 0.0
 var round_trip_time: float = 0.0
 
 
+# --- Version handshake ------------------------------------------------------
+# Host and joiners must run the same build: the network messages change between
+# versions (a mismatch used to just glitch or error with no explanation). Right after
+# connecting, a joiner says hello with its version; the host answers OK (and only
+# then sends the ruleset and roster) or tells it why not and disconnects it. A
+# peer that never says hello - a build from before this existed - is dropped too.
+# And a joiner whose host never answers (an old host) gives up with a message.
+var game_version: String = str(ProjectSettings.get_setting("application/config/version", "0"))
+var hello_timeout := 6.0
+var _verified: Dictionary = {} # host side: peer ids that passed the check
+var _host_confirmed := false # joiner side: the host said OK
+# Shown by the menu the next time it opens (the failure can land while a match scene is up).
+var menu_notice := ""
+
+
 func _ready() -> void:
+	multiplayer.connected_to_server.connect(_say_hello)
 	multiplayer.peer_connected.connect(_on_peer_connected)
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 	multiplayer.connected_to_server.connect(_reset_clock)
@@ -415,6 +431,7 @@ func stop_hosting() -> void:
 		multiplayer.multiplayer_peer.close()
 	multiplayer.multiplayer_peer = null
 	is_host = false
+	_verified.clear()
 	peer_teams.clear()
 	peer_crafts.clear()
 	peer_names.clear()
@@ -455,6 +472,15 @@ func list_open_games() -> void:
 func _on_peer_connected(peer_id: int) -> void:
 	if not is_host:
 		return
+	# Nothing is sent until the peer has said hello with the right version (see _hello). One that never
+	# does is an old build - drop it rather than leave it half-connected.
+	await get_tree().create_timer(hello_timeout).timeout
+	if is_host and not _verified.has(peer_id) and multiplayer.get_peers().has(peer_id):
+		multiplayer.multiplayer_peer.disconnect_peer(peer_id)
+
+
+# Host, once a peer has passed the version check: the one-match-wide ruleset and the roster so far.
+func _send_initial_state(peer_id: int) -> void:
 	# One match-wide ruleset, not per-peer, so this is a single targeted send
 	# rather than the backfill loop below - there's nothing to backfill, the
 	# host is the only one who ever sets it.
@@ -465,6 +491,55 @@ func _on_peer_connected(peer_id: int) -> void:
 	# match.gd never spawns a craft for them until they've actually chosen.
 	for existing_id in peer_teams.keys():
 		_assign_team.rpc_id(peer_id, existing_id, peer_teams[existing_id], peer_crafts.get(existing_id, CraftCatalog.DEFAULT_ID))
+
+
+# Joiner: greet the host the moment we're connected. A host that doesn't know this call (an older
+# build) never answers, which is what the timeout below is for.
+func _say_hello() -> void:
+	_host_confirmed = false
+	_hello.rpc_id(1, game_version)
+	await get_tree().create_timer(hello_timeout).timeout
+	if multiplayer.multiplayer_peer != null and not is_host and not _host_confirmed:
+		_version_failed("The host didn't answer - it is probably running an older version than yours (v%s). Ask them to update." % game_version)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _hello(version: String) -> void:
+	if not is_host:
+		return
+	var peer_id := multiplayer.get_remote_sender_id()
+	if version != game_version:
+		_hello_rejected.rpc_id(peer_id, game_version)
+		# A moment for the message to arrive first.
+		await get_tree().create_timer(0.5).timeout
+		if is_host and multiplayer.get_peers().has(peer_id):
+			multiplayer.multiplayer_peer.disconnect_peer(peer_id)
+		return
+	_verified[peer_id] = true
+	_hello_ok.rpc_id(peer_id)
+	_send_initial_state(peer_id)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _hello_ok() -> void:
+	_host_confirmed = true
+
+
+@rpc("authority", "call_remote", "reliable")
+func _hello_rejected(host_version: String) -> void:
+	_version_failed("Version mismatch: the host is on v%s and you are on v%s. Update the game so you match." % [host_version, game_version])
+
+
+# Joiner: tear the connection down and tell the player why.
+func _version_failed(message: String) -> void:
+	_host_confirmed = false
+	leave_game()
+	menu_notice = message
+	join_failed.emit(message)
+	# If a match scene is already up, send them back to the menu, which shows the notice.
+	if get_tree().current_scene and get_tree().current_scene.scene_file_path != "res://UI/index.tscn":
+		get_tree().paused = false
+		get_tree().change_scene_to_file("res://UI/index.tscn")
 
 
 # Called by a client's own UI once they've picked a color. Not authoritative
@@ -480,6 +555,10 @@ func _request_team(team: String, craft_id: StringName = CraftCatalog.DEFAULT_ID)
 		return
 	var requester_id := multiplayer.get_remote_sender_id()
 	if requester_id == 0:
+		return
+	# Nobody plays before the version check.
+	if not _verified.has(requester_id):
+		_reject_team_request.rpc_id(requester_id, "Version check not finished - try again in a moment.")
 		return
 	if not TEAM_NAMES.has(team):
 		_reject_team_request.rpc_id(requester_id, "Not a real team.")
@@ -536,6 +615,7 @@ func suggest_team() -> String:
 
 
 func _on_peer_disconnected(peer_id: int) -> void:
+	_verified.erase(peer_id)
 	peer_teams.erase(peer_id)
 	peer_crafts.erase(peer_id)
 	player_unregistered.emit(peer_id)

@@ -10,6 +10,7 @@ loot_name = "Energy Cell"
 loot_type = 1
 amount = 40.0
 drop_weight = 10.0
+requires = 1
 lifetime = 25.0
 color = Color(1, 1, 0, 1)
 visual_scene = ExtResource("2_visual")

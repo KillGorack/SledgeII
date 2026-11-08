@@ -20,6 +20,14 @@ enum LootType { HEALTH, POWER, JUICE, WEAPON, BOOST }
 # only meaningful next to the others: 10 / 10 / 10 / 0.3 means the last one
 # turns up roughly 1 drop in 100.
 @export var drop_weight: float = 10.0
+# What the match must have for this to be worth dropping. Anything else is left out of the roll, and
+# the remaining entries share its weight (so kills drop about as often as before). ALWAYS = no condition.
+#   POWER   a weapon in the loadout uses power
+#   RECONS  recons can be captured (the host's Recon Capture rule)
+#   DAMAGE  a weapon in the loadout does damage
+#   MISSILE a missile weapon is in the loadout
+enum Requires { ALWAYS, POWER, RECONS, DAMAGE, MISSILE }
+@export var requires: Requires = Requires.ALWAYS
 # Seconds it sits on the floor before vanishing (blinks for the last few).
 @export var lifetime: float = 25.0
 # The pickup's look: its root should be a Node3D with the sprite/light/etc.
@@ -39,3 +47,32 @@ enum LootType { HEALTH, POWER, JUICE, WEAPON, BOOST }
 @export_color_no_alpha var color: Color = Color(0.2, 1.0, 0.3)
 @export var icon: Texture2D
 @export var pickup_sound: AudioStream
+
+
+# --- match rules -------------------------------------------------------------
+
+# The facts about a match that `requires` is checked against. `weapons` is the
+# loadout everyone shares (WeaponSettings); mines are deliberately not part of it.
+static func match_facts(weapons: Array, recon_capture: bool) -> Dictionary:
+	var facts := {"power": false, "recons": recon_capture, "damage": false, "missile": false}
+	for weapon in weapons:
+		var w := weapon as WeaponSettings
+		if w == null:
+			continue
+		facts["power"] = facts["power"] or w.power_consumption > 0.0
+		facts["damage"] = facts["damage"] or w.hit_points > 0.0
+		facts["missile"] = facts["missile"] or w.weapon_kind == WeaponSettings.WeaponKind.MISSILE
+	return facts
+
+
+func is_available(facts: Dictionary) -> bool:
+	match requires:
+		Requires.POWER:
+			return facts.get("power", true)
+		Requires.RECONS:
+			return facts.get("recons", true)
+		Requires.DAMAGE:
+			return facts.get("damage", true)
+		Requires.MISSILE:
+			return facts.get("missile", true)
+	return true

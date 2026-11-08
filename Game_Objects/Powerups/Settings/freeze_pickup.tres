@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://m0ygem6thprc" path="res://Game_Objects/Powerups/_scripts/loot_settings.gd" id="1_loot"]
 [ext_resource type="PackedScene" path="res://Game_Objects/Powerups/Scenes/boost_freeze.tscn" id="2_visual"]
-[ext_resource type="AudioStream" uid="uid://cds8k4oewmn8" path="res://Game_Objects/Powerups/sounds/bottle.wav" id="3_sound"]
+[ext_resource type="AudioStream" path="res://Game_Objects/Powerups/sounds/ding.ogg" id="3_sound"]
 [ext_resource type="Resource" uid="uid://de54bsiu3dfs0" path="res://Game_Objects/Powerups/boosts/freeze.tres" id="4_boost"]
 
 [resource]
@@ -11,6 +11,7 @@ loot_name = "Freeze"
 loot_type = 4
 boost = ExtResource("4_boost")
 drop_weight = 1.0
+requires = 4
 visual_scene = ExtResource("2_visual")
 color = Color(0.45, 0.65, 1, 1)
 pickup_sound = ExtResource("3_sound")

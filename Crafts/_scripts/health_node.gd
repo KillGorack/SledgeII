@@ -420,6 +420,8 @@ func respawn_at(spawn_position: Vector3, spawn_basis: Basis) -> void:
 	var movement_node = body.get_node_or_null("movement_node")
 	if movement_node and movement_node.has_method("snap_net_target"):
 		movement_node.snap_net_target(new_transform)
+	if movement_node and movement_node.has_method("reset_aim"):
+		movement_node.reset_aim()
 	body.visible = true
 	# Collision only comes back now, once the body is already standing at the
 	# spawn point, so it is never solid at the old location.
