@@ -8,6 +8,8 @@ extends EditorPlugin
 # The script exports through a second headless Godot process, so a run takes a
 # minute or two; it runs on a thread, so the editor stays usable meanwhile.
 
+# Brings back the dry-run, local-site and zip-only entries (see _extra_items).
+const SHOW_EXTRA_ITEMS := false
 const SCRIPT_REL := "Documents/Pipeline/publish_sledge.py"
 
 var _confirm: ConfirmationDialog
@@ -21,17 +23,34 @@ func _enter_tree() -> void:
 	_confirm = ConfirmationDialog.new()
 	_confirm.confirmed.connect(_on_confirmed)
 	EditorInterface.get_base_control().add_child(_confirm)
-	add_tool_menu_item("Publish Sledge 2: dry run (local site)", _start.bind(PackedStringArray(["--profile", "local"])))
-	add_tool_menu_item("Publish Sledge 2: to LOCAL site...", _ask.bind(PackedStringArray(["--profile", "local", "--go"]),
-		"Export both builds, upload them, and DELETE every other file on the LOCAL site's record?"))
-	add_tool_menu_item("Publish Sledge 2: to LIVE site...", _ask.bind(PackedStringArray(["--profile", "live", "--go"]),
-		"Export both builds, upload them, and DELETE every other file on the LIVE site's record (killgorack.com)?\n\nThere is no backup."))
+	# The two real publishes. Both export fresh first.
+	add_tool_menu_item("Publish Sledge 2 to itch...", _ask.bind(PackedStringArray(["--itch-push"]),
+		"Export both builds and push them to killgorack.itch.io/sledge (linux and windows channels) with butler?"))
+	add_tool_menu_item("Publish Sledge 2 to LIVE site...", _ask.bind(PackedStringArray(["--profile", "live", "--go"]),
+		"Export both builds, upload them, and DELETE every other file of the Sledge downloads part on the LIVE site (killgorack.com)?\n\nThere is no backup."))
+	if SHOW_EXTRA_ITEMS:
+		for item in _extra_items():
+			add_tool_menu_item(item[0], item[1])
+
+
+# The dry runs, the local-site copies and the zip-only pack: still here, just not in the menu.
+# Set SHOW_EXTRA_ITEMS to true to bring them back.
+func _extra_items() -> Array:
+	return [
+		["Publish Sledge 2 to itch: dry run", _start.bind(PackedStringArray(["--itch-push", "--dry-run"]))],
+		["Pack Sledge 2 for itch (export + zip)", _start.bind(PackedStringArray(["--itch"]))],
+		["Publish Sledge 2: dry run (local site)", _start.bind(PackedStringArray(["--profile", "local"]))],
+		["Publish Sledge 2: to LOCAL site...", _ask.bind(PackedStringArray(["--profile", "local", "--go"]),
+			"Export both builds, upload them, and DELETE every other file of the Sledge downloads part on the LOCAL site?")],
+	]
 
 
 func _exit_tree() -> void:
-	remove_tool_menu_item("Publish Sledge 2: dry run (local site)")
-	remove_tool_menu_item("Publish Sledge 2: to LOCAL site...")
-	remove_tool_menu_item("Publish Sledge 2: to LIVE site...")
+	remove_tool_menu_item("Publish Sledge 2 to itch...")
+	remove_tool_menu_item("Publish Sledge 2 to LIVE site...")
+	if SHOW_EXTRA_ITEMS:
+		for item in _extra_items():
+			remove_tool_menu_item(item[0])
 	if _thread and _thread.is_started():
 		_thread.wait_to_finish()
 	if _confirm:

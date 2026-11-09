@@ -96,6 +96,11 @@ var _genre_filter: OptionButton
 # next visit - even after a restart. See _save_host_settings.
 const HOST_SETTINGS_PATH := "user://host_settings.cfg"
 var selected_game_row = null
+var _host_picker: OptionButton
+var _join_picker: OptionButton
+var _join_caption: Label
+var _craft_checklist: VBoxContainer
+var _craft_checklist_label: Label
 
 
 
@@ -133,7 +138,10 @@ func _ready() -> void:
 		host_team_picker.add_item(team.trim_prefix("team_").capitalize())
 	_add_vehicle_picker(vehicle_label)
 	_add_vehicle_picker(team_roster, true)
+	_build_craft_checklist()
+	NetworkManager.ruleset_received.connect(_refresh_join_picker)
 	_load_host_settings()
+	_refresh_host_picker()
 	feedback_base_x = ui_feedback.position.x + 25
 	login_timer.connect("timeout", Callable(self, "_on_cooldown_finished"))
 	http_request.connect("request_completed", Callable(self, "_on_request_completed"))
@@ -573,7 +581,8 @@ func _on_host_pressed():
 		_get_checked_mine_paths(),
 		rockets_check.button_pressed,
 		recon_capture_check.button_pressed,
-		_get_checked_specials()
+		_get_checked_specials(),
+		_checked_craft_ids()
 	)
 
 
@@ -594,6 +603,8 @@ func _save_host_settings() -> void:
 	cfg.set_value("host", "mines_checked", _get_checked_mine_paths())
 	cfg.set_value("host", "specials_listed", _listed_paths(mine_checklist, "special_id"))
 	cfg.set_value("host", "specials_checked", _get_checked_specials())
+	cfg.set_value("host", "crafts_listed", _listed_paths(_craft_checklist, "craft_id"))
+	cfg.set_value("host", "crafts_checked", _checked_craft_ids())
 	var err := cfg.save(HOST_SETTINGS_PATH)
 	if err != OK:
 		push_warning("Couldn't save host settings (%s)" % error_string(err))
@@ -616,6 +627,11 @@ func _load_host_settings() -> void:
 	_restore_checklist(weapon_checklist, "weapon_path", cfg.get_value("host", "weapons_listed", []), cfg.get_value("host", "weapons_checked", []))
 	_restore_checklist(mine_checklist, "mine_path", cfg.get_value("host", "mines_listed", []), cfg.get_value("host", "mines_checked", []))
 	_restore_checklist(mine_checklist, "special_id", cfg.get_value("host", "specials_listed", []), cfg.get_value("host", "specials_checked", []))
+	_restore_checklist(_craft_checklist, "craft_id", cfg.get_value("host", "crafts_listed", []), cfg.get_value("host", "crafts_checked", []))
+	if _checked_craft_ids().is_empty(): # a hand-edited or stale file: never start with no vehicle
+		for child in _craft_checklist.get_children():
+			if child is CheckBox:
+				child.button_pressed = true
 
 
 # Only the checkboxes carrying `meta` - the specials list mixes mines and built-ins.
@@ -702,24 +718,97 @@ func _on_team_request_rejected(reason: String) -> void:
 # same reasoning as _build_weapon_checklist: the whole list is cheap to
 # regenerate and this is only ever a handful of rows (4 teams), so there's no
 # real cost to not tracking a diff.
-# One OptionButton bound to NetworkManager.local_craft_id, placed right after
-# `anchor` (create-game's Vehicle label) or at the top of `anchor`'s parent
-# (the team-select roster, so joiners can choose too).
+# Vehicle pickers. Two of them, each an OptionButton bound to NetworkManager.local_craft_id: one on the
+# create-game screen (right after its Vehicle label) and one at the top of the team-select roster, so joiners
+# can choose too. Each lists only the crafts its game allows, and hides itself when there is nothing to choose.
 func _add_vehicle_picker(anchor: Control, before_anchor: bool = false) -> void:
 	var picker := OptionButton.new()
-	for def in CraftCatalog.DEFS:
-		picker.add_item(def.display_name)
-		picker.set_item_tooltip(picker.item_count - 1, def.description)
-	picker.select(0)
-	picker.item_selected.connect(func(index: int): NetworkManager.local_craft_id = CraftCatalog.DEFS[index].id)
+	picker.item_selected.connect(func(index: int): NetworkManager.local_craft_id = StringName(picker.get_item_metadata(index)))
 	var parent := anchor.get_parent()
 	parent.add_child(picker)
 	parent.move_child(picker, anchor.get_index() + (0 if before_anchor else 1))
 	if before_anchor:
-		var caption := Label.new()
-		caption.text = "Vehicle"
-		parent.add_child(caption)
-		parent.move_child(caption, picker.get_index())
+		_join_caption = Label.new()
+		_join_caption.text = "Vehicle"
+		parent.add_child(_join_caption)
+		parent.move_child(_join_caption, picker.get_index())
+		_join_picker = picker
+		_fill_vehicle_picker(_join_picker, _join_caption, NetworkManager.allowed_crafts())
+	else:
+		_host_picker = picker
+
+
+# Lists `defs`, keeps the player's current craft if it is among them (else the first), and hides the picker and its
+# caption when there is only one craft to be.
+func _fill_vehicle_picker(picker: OptionButton, caption: Control, defs: Array) -> void:
+	picker.clear()
+	var selected := 0
+	for i in defs.size():
+		var def: CraftDef = defs[i]
+		picker.add_item(def.display_name)
+		picker.set_item_metadata(i, String(def.id))
+		picker.set_item_tooltip(i, def.description)
+		if def.id == NetworkManager.local_craft_id:
+			selected = i
+	if defs.is_empty():
+		return
+	picker.select(selected)
+	NetworkManager.local_craft_id = StringName(picker.get_item_metadata(selected))
+	picker.visible = defs.size() > 1
+	caption.visible = defs.size() > 1
+
+
+# Joiners: the host's ruleset (with its craft list) has arrived.
+func _refresh_join_picker() -> void:
+	if _join_picker:
+		_fill_vehicle_picker(_join_picker, _join_caption, NetworkManager.allowed_crafts())
+
+
+# --- Which crafts this game allows (create-game screen) ---------------------------------------------------------
+# One tick per craft. The host chooses freely; the list is fixed once the game is created. At least one stays
+# ticked: unticking the last one puts the tick straight back.
+
+func _build_craft_checklist() -> void:
+	var parent := vehicle_label.get_parent()
+	_craft_checklist_label = Label.new()
+	_craft_checklist_label.text = "Vehicles allowed"
+	_craft_checklist = VBoxContainer.new()
+	parent.add_child(_craft_checklist_label)
+	parent.add_child(_craft_checklist)
+	var at := _host_picker.get_index() + 1
+	parent.move_child(_craft_checklist_label, at)
+	parent.move_child(_craft_checklist, at + 1)
+	for def in CraftCatalog.DEFS:
+		var check := CheckBox.new()
+		check.text = def.display_name
+		check.tooltip_text = def.description
+		check.button_pressed = true
+		check.set_meta("craft_id", String(def.id))
+		check.toggled.connect(func(on: bool) -> void:
+			if not on and _checked_craft_ids().is_empty():
+				check.set_pressed_no_signal(true)
+			_refresh_host_picker())
+		_craft_checklist.add_child(check)
+	# Nothing to choose between with a single craft in the game.
+	_craft_checklist_label.visible = CraftCatalog.DEFS.size() > 1
+	_craft_checklist.visible = CraftCatalog.DEFS.size() > 1
+
+
+func _checked_craft_ids() -> Array[StringName]:
+	var ids: Array[StringName] = []
+	for child in _craft_checklist.get_children():
+		if child is CheckBox and child.button_pressed:
+			ids.append(StringName(child.get_meta("craft_id")))
+	return ids
+
+
+# The host's own picker offers only the crafts ticked for the game.
+func _refresh_host_picker() -> void:
+	var defs: Array = []
+	for def in CraftCatalog.DEFS:
+		if _checked_craft_ids().has(def.id):
+			defs.append(def)
+	_fill_vehicle_picker(_host_picker, vehicle_label, defs)
 
 
 func _build_team_roster() -> void:

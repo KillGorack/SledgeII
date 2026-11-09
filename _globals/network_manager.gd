@@ -6,6 +6,8 @@ signal player_unregistered(peer_id: int)
 # annotation: Godot only looks for emits in the file that declares a signal.
 @warning_ignore("unused_signal")
 signal roster_changed
+# The host's ruleset (which crafts are allowed, ...) has just arrived or been set: pickers should rebuild.
+signal ruleset_received
 signal host_started(address: String)
 signal host_failed(reason: String)
 # Hosting itself still succeeds when this fires - port_forwarding just
@@ -93,6 +95,8 @@ var allowed_mine_paths: Array[String] = []
 # Built-in specials the host ticked (SpecialCatalog ids). Unlike the two lists
 # above, empty means none: these are extras, off unless asked for.
 var allowed_specials: Array[StringName] = []
+# Crafts the host allows for this match (CraftCatalog ids), fixed when the game is created. Empty = all of them.
+var allowed_craft_ids: Array[StringName] = []
 
 # Site stats (usr.game_score / game_vanquishes / game_falls, gameAPI addUserStats).
 # Each player posts only their OWN gains - only their client has their session
@@ -306,7 +310,7 @@ func _clock_pong(client_time: float, server_clock: float) -> void:
 	_clock_synced = _clock_samples.size() >= 3
 
 
-func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] = [], day_night: bool = true, host_address_override: String = "", host_team: String = "team_red", port: int = DEFAULT_PORT, max_players: int = 20, public_game: bool = false, base_gun_respawn: float = BASE_GUN_RESPAWN_SECONDS, mines: bool = true, mine_paths: Array[String] = [], rockets: bool = true, recon_capture: bool = true, specials: Array[StringName] = []) -> Error:
+func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] = [], day_night: bool = true, host_address_override: String = "", host_team: String = "team_red", port: int = DEFAULT_PORT, max_players: int = 20, public_game: bool = false, base_gun_respawn: float = BASE_GUN_RESPAWN_SECONDS, mines: bool = true, mine_paths: Array[String] = [], rockets: bool = true, recon_capture: bool = true, specials: Array[StringName] = [], craft_ids: Array[StringName] = []) -> Error:
 	peer = ENetMultiplayerPeer.new()
 	var err = peer.create_server(port, max_players)
 	if err != OK:
@@ -318,6 +322,8 @@ func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] 
 	current_map_file_id = map_file_id
 	current_map_title = game_name
 	peer_teams = {1: host_team}
+	allowed_craft_ids = craft_ids
+	local_craft_id = allowed_craft_for(local_craft_id)
 	peer_crafts = {1: local_craft_id}
 	allowed_weapon_paths = weapon_paths
 	day_night_enabled = day_night
@@ -392,6 +398,7 @@ func start_creative_session(level_data: Dictionary, editing: bool, team: String 
 	current_map_title = str(level_data.get("name", "Creative level"))
 	peer_teams = {1: team}
 	peer_crafts = {1: local_craft_id}
+	allowed_craft_ids = []
 	allowed_weapon_paths = []
 	allowed_mine_paths = []
 	allowed_specials = []
@@ -434,6 +441,7 @@ func stop_hosting() -> void:
 	_verified.clear()
 	peer_teams.clear()
 	peer_crafts.clear()
+	allowed_craft_ids.clear()
 	peer_names.clear()
 	peer_scores.clear()
 	_stats_seen = [0, 0, 0]
@@ -452,6 +460,7 @@ func leave_game() -> void:
 		multiplayer.multiplayer_peer = null
 	peer_teams.clear()
 	peer_crafts.clear()
+	allowed_craft_ids.clear()
 	peer_names.clear()
 	peer_scores.clear()
 	_stats_seen = [0, 0, 0]
@@ -484,7 +493,7 @@ func _send_initial_state(peer_id: int) -> void:
 	# One match-wide ruleset, not per-peer, so this is a single targeted send
 	# rather than the backfill loop below - there's nothing to backfill, the
 	# host is the only one who ever sets it.
-	_assign_ruleset.rpc_id(peer_id, allowed_weapon_paths, day_night_enabled, mines_enabled, allowed_mine_paths, rockets_enabled, recon_capture_enabled, allowed_specials)
+	_assign_ruleset.rpc_id(peer_id, allowed_weapon_paths, day_night_enabled, mines_enabled, allowed_mine_paths, rockets_enabled, recon_capture_enabled, allowed_specials, allowed_craft_ids)
 	# Backfill the roster so the newly joined peer sees everyone already
 	# assigned before picking their own - no auto-assignment anymore, the new
 	# peer isn't in peer_teams at all until request_team() below succeeds, so
@@ -566,8 +575,8 @@ func _request_team(team: String, craft_id: StringName = CraftCatalog.DEFAULT_ID)
 	if _team_count(team) >= MAX_PLAYERS_PER_TEAM:
 		_reject_team_request.rpc_id(requester_id, "%s is full." % team.trim_prefix("team_").capitalize())
 		return
-	if not CraftCatalog.has_id(craft_id):
-		craft_id = CraftCatalog.DEFAULT_ID
+	# A craft the host didn't allow (a stale or tampered request) becomes the first one they did.
+	craft_id = allowed_craft_for(craft_id)
 	peer_teams[requester_id] = team
 	peer_crafts[requester_id] = craft_id
 	_assign_team.rpc(requester_id, team, craft_id)
@@ -582,7 +591,7 @@ func _reject_team_request(reason: String) -> void:
 
 
 @rpc("authority", "call_local", "reliable")
-func _assign_ruleset(weapon_paths: Array, day_night: bool, mines: bool, mine_paths: Array, rockets: bool, recon_capture: bool, specials: Array) -> void:
+func _assign_ruleset(weapon_paths: Array, day_night: bool, mines: bool, mine_paths: Array, rockets: bool, recon_capture: bool, specials: Array, craft_ids: Array = []) -> void:
 	allowed_weapon_paths.assign(weapon_paths)
 	day_night_enabled = day_night
 	mines_enabled = mines
@@ -590,6 +599,29 @@ func _assign_ruleset(weapon_paths: Array, day_night: bool, mines: bool, mine_pat
 	rockets_enabled = rockets
 	recon_capture_enabled = recon_capture
 	allowed_specials.assign(specials)
+	allowed_craft_ids.assign(craft_ids)
+	local_craft_id = allowed_craft_for(local_craft_id)
+	ruleset_received.emit()
+
+
+# The crafts this match allows, in catalog order (all of them when the host set no list).
+func allowed_crafts() -> Array[CraftDef]:
+	var crafts: Array[CraftDef] = []
+	for def in CraftCatalog.DEFS:
+		if allowed_craft_ids.is_empty() or allowed_craft_ids.has(def.id):
+			crafts.append(def)
+	if crafts.is_empty(): # a list naming nothing real: never leave a match with no craft
+		crafts.append_array(CraftCatalog.DEFS)
+	return crafts
+
+
+# `id` if the match allows it, otherwise the first craft it does.
+func allowed_craft_for(id: StringName) -> StringName:
+	var crafts := allowed_crafts()
+	for def in crafts:
+		if def.id == id:
+			return id
+	return crafts[0].id
 
 
 func _team_count(team: String) -> int:
