@@ -44,42 +44,39 @@ var _thumb_for := 0
 const THUMBNAIL_URL := "https://www.killgorack.com/PX4/downloader.php?ap=tanarusmaps&id=%d&type=game_thumb&cn=fls"
 static var _thumb_cache: Dictionary = {}
 
-const BUTTON_HEIGHT := 42
+const BUTTON_HEIGHT := 46
+# The menu's card (a panel with corner brackets) and the pink it uses for the second card on a screen.
+const HUD_CARD := preload("res://UI/_scripts/hud_card.gd")
+const CARD_PINK := Color(1.0, 0.24, 0.65)
 
 
 func _ready() -> void:
-	add_theme_constant_override("margin_left", 15)
-	add_theme_constant_override("margin_top", 15)
-	add_theme_constant_override("margin_right", 15)
-	add_theme_constant_override("margin_bottom", 15)
-
+	# Two cards, like the other menu screens: the player's levels on the left, the selected one on the right.
 	var columns := HBoxContainer.new()
-	columns.add_theme_constant_override("separation", 15)
+	columns.add_theme_constant_override("separation", 16)
 	add_child(columns)
 
+	var list_body := _card(columns, "MY LEVELS", 1.2)
 	_list = ItemList.new()
-	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_list.size_flags_stretch_ratio = 1.4
+	_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_list.item_selected.connect(func(_i): _refresh_details())
 	_list.item_activated.connect(func(_i): _edit())
-	columns.add_child(_list)
+	list_body.add_child(_list)
 
-	var card := VBoxContainer.new()
-	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	card.add_theme_constant_override("separation", 8)
-	columns.add_child(card)
+	var card := _card(columns, "SELECTED LEVEL", 1.0, CARD_PINK)
+	card.add_child(HSeparator.new())
 	_title = Label.new()
-	_title.add_theme_font_size_override("font_size", 22)
+	_title.theme_type_variation = &"TitleLabel"
+	_title.add_theme_font_size_override("font_size", 24)
 	_title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	card.add_child(_title)
 	_thumb_frame = PanelContainer.new()
 	_thumb_frame.visible = false
 	var frame_style := StyleBoxFlat.new()
-	frame_style.bg_color = Color(0.03, 0.04, 0.06)
+	frame_style.bg_color = Color(0.008, 0.016, 0.035)
 	frame_style.set_border_width_all(1)
-	frame_style.border_color = Color(1.0, 0.8, 0.3, 0.35)
-	frame_style.set_corner_radius_all(4)
-	frame_style.set_content_margin_all(2)
+	frame_style.border_color = Color(0.27, 0.88, 1.0, 0.55)
+	frame_style.set_content_margin_all(1)
 	_thumb_frame.add_theme_stylebox_override("panel", frame_style)
 	# 16:9 like the picture itself, at a fixed size, so it never stretches or sits in bars.
 	_thumb_frame.custom_minimum_size = Vector2(448, 256)
@@ -102,15 +99,15 @@ func _ready() -> void:
 	# Two rows, each filling the width: what you do to the level, then what you do with it online. The main action of each
 	# is coloured.
 	var level_row := _button_row(card)
-	_add_button(level_row, "new", "New", _new)
-	_add_button(level_row, "edit", "Edit", _edit, "primary")
-	_add_button(level_row, "rename", "Rename", _rename)
-	_add_button(level_row, "copy", "Duplicate", _copy)
-	_add_button(level_row, "delete", "Delete", _confirm_delete, "danger")
+	_add_button(level_row, "new", "NEW", _new)
+	_add_button(level_row, "edit", "EDIT", _edit, "primary")
+	_add_button(level_row, "rename", "RENAME", _rename)
+	_add_button(level_row, "copy", "DUPLICATE", _copy)
+	_add_button(level_row, "delete", "DELETE", _confirm_delete, "danger")
 	var online_row := _button_row(card)
-	_add_button(online_row, "publish", "Publish", _publish, "go")
-	_add_button(online_row, "unpublish", "Remove from server", _confirm_unpublish)
-	_add_button(online_row, "refresh", "Check server", _sync_with_server)
+	_add_button(online_row, "publish", "PUBLISH", _publish, "go")
+	_add_button(online_row, "unpublish", "REMOVE FROM SERVER", _confirm_unpublish)
+	_add_button(online_row, "refresh", "CHECK SERVER", _sync_with_server)
 
 	_name_dialog = ConfirmationDialog.new()
 	_name_dialog.min_size = Vector2(420, 0)
@@ -210,7 +207,8 @@ func _reload(select_id: String = "") -> void:
 	for header in CreativeStore.list():
 		_ids.append(header.local_id)
 		var published := "   [%s]" % _status_word(header) if header.published_id > 0 else ""
-		_list.add_item("%s   (%d pieces)%s" % [header.name, header.surfaces + header.pieces + header.objects, published])
+		# The two leading spaces keep the name clear of the bar that marks the selected row.
+		_list.add_item("  %s   (%d pieces)%s" % [header.name, header.surfaces + header.pieces + header.objects, published])
 		if header.local_id == select_id:
 			_list.select(_ids.size() - 1)
 	if _list.get_selected_items().is_empty() and not _ids.is_empty():
@@ -224,7 +222,7 @@ func _refresh_details() -> void:
 	for key in ["edit", "rename", "copy", "delete"]:
 		_buttons[key].disabled = level.is_empty() or _busy
 	_buttons.publish.disabled = level.is_empty() or _busy
-	_buttons.publish.text = "Update" if not level.is_empty() and level.published_id > 0 else "Publish"
+	_buttons.publish.text = "UPDATE" if not level.is_empty() and level.published_id > 0 else "PUBLISH"
 	_buttons.unpublish.visible = not level.is_empty() and level.published_id > 0
 	_buttons.unpublish.disabled = _busy
 	_show_thumbnail(level)
@@ -253,6 +251,30 @@ func _refresh_details() -> void:
 	_details.text = "\n".join(lines)
 
 
+# One of the screen's two cards, with its heading. Returns the column to put the card's contents in.
+func _card(parent: Control, heading: String, share: float, accent: Color = Color(0.27, 0.88, 1.0)) -> VBoxContainer:
+	var panel: PanelContainer = HUD_CARD.new()
+	panel.accent = accent
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_stretch_ratio = share
+	parent.add_child(panel)
+	var body := VBoxContainer.new()
+	body.add_theme_constant_override("separation", 10)
+	panel.add_child(body)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 10)
+	body.add_child(head)
+	var mark := Label.new()
+	mark.theme_type_variation = &"IndexLabel"
+	mark.text = "//"
+	head.add_child(mark)
+	var title := Label.new()
+	title.theme_type_variation = &"HeaderLabel"
+	title.text = heading
+	head.add_child(title)
+	return body
+
+
 # A row of buttons that share the full width equally, however many there are.
 func _button_row(parent: Control) -> HBoxContainer:
 	var row := HBoxContainer.new()
@@ -261,7 +283,7 @@ func _button_row(parent: Control) -> HBoxContainer:
 	return row
 
 
-# A button with the editor's look. kind: "" plain, "primary" (the main thing to do), "go" (send it online),
+# A button in the menu theme's look. kind: "" plain, "primary" (the main thing to do), "go" (send it online),
 # "danger" (cannot be undone).
 func _add_button(row: Control, key: String, text: String, action: Callable, kind: String = "") -> void:
 	var button := Button.new()
@@ -269,27 +291,11 @@ func _add_button(row: Control, key: String, text: String, action: Callable, kind
 	button.focus_mode = Control.FOCUS_NONE
 	button.custom_minimum_size = Vector2(0, BUTTON_HEIGHT)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.clip_text = true
 	button.pressed.connect(action)
-	var base := {"primary": Color(0.78, 0.56, 0.12), "go": Color(0.18, 0.5, 0.28), "danger": Color(0.5, 0.17, 0.17)}.get(kind, Color(0.2, 0.22, 0.27)) as Color
-	button.add_theme_stylebox_override("normal", _button_style(base))
-	button.add_theme_stylebox_override("hover", _button_style(base.lightened(0.18)))
-	button.add_theme_stylebox_override("pressed", _button_style(base.darkened(0.2)))
-	button.add_theme_stylebox_override("disabled", _button_style(base.darkened(0.45)))
-	button.add_theme_color_override("font_color", Color(1, 1, 1) if kind != "" else Color(0.9, 0.92, 0.95))
-	button.add_theme_color_override("font_disabled_color", Color(1, 1, 1, 0.35))
+	button.theme_type_variation = {"primary": &"AccentButton", "go": &"GoButton", "danger": &"DangerButton"}.get(kind, &"")
 	row.add_child(button)
 	_buttons[key] = button
-
-
-func _button_style(color: Color) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = color
-	style.set_corner_radius_all(6)
-	style.set_border_width_all(1)
-	style.border_color = color.lightened(0.25)
-	style.content_margin_left = 14
-	style.content_margin_right = 14
-	return style
 
 
 # The picture of the selected level: the one on the server for a level that has been published, else none.

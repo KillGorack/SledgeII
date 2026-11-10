@@ -1,28 +1,41 @@
 [gd_scene format=3 uid="uid://3i2lruplttb"]
 
 [ext_resource type="Script" uid="uid://dp3ss8puir2iq" path="res://UI/_scripts/index.gd" id="1_4q77j"]
-[ext_resource type="Shader" uid="uid://blnar04a3mpnb" path="res://UI/shaders/texture_rect_scroll.gdshader" id="2_ijtma"]
-[ext_resource type="Texture2D" uid="uid://weqhjf5tdahr" path="res://UI/images/CP_Back.png" id="4_2lky4"]
-[ext_resource type="Texture2D" uid="uid://b6yq5ydqtr8ky" path="res://UI/backgrounds/space.jpg" id="4_q1cq1"]
+[ext_resource type="Shader" path="res://UI/shaders/menu_backdrop.gdshader" id="backdrop_shader"]
+[ext_resource type="Shader" path="res://UI/shaders/logo_sheen.gdshader" id="sheen_shader"]
+[ext_resource type="Shader" path="res://UI/shaders/intel_frame.gdshader" id="intel_shader"]
 [ext_resource type="Texture2D" uid="uid://chy7majjyx0r6" path="res://UI/backgrounds/starfield.png" id="5_q1cq1"]
-[ext_resource type="Texture2D" uid="uid://b0b1x4e3waodn" path="res://UI/images/btn_default.png" id="6_8ykvq"]
-[ext_resource type="Texture2D" uid="uid://b8xu530tvxg4u" path="res://UI/images/btn_pressed.png" id="7_4q77j"]
-[ext_resource type="Texture2D" uid="uid://nfvak46c043g" path="res://UI/images/btn_hover.png" id="8_q1cq1"]
-[ext_resource type="Texture2D" uid="uid://co231v8hb7frf" path="res://UI/images/btn_disabled.png" id="9_4q77j"]
-[ext_resource type="Texture2D" uid="uid://d0yhctug611wp" path="res://UI/images/CP_Back_light.png" id="9_8ykvq"]
 [ext_resource type="Texture2D" uid="uid://d0wltocm8ynx0" path="res://UI/images/SledgeTitle.png" id="12_nqws8"]
 [ext_resource type="Script" uid="uid://debyhb0ptjyoc" path="res://Creative/my_creations.gd" id="my_creations_script"]
 [ext_resource type="Theme" uid="uid://dmlpyqe111b7r" path="res://UI/theme/sledge_theme.tres" id="sledge_theme"]
+[ext_resource type="Script" path="res://UI/_scripts/hud_card.gd" id="hud_card"]
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_u58xb"]
-shader = ExtResource("2_ijtma")
-shader_parameter/scroll_speed = Vector2(0.01, 0.01)
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_backdrop"]
+shader = ExtResource("backdrop_shader")
+shader_parameter/stars = ExtResource("5_q1cq1")
+shader_parameter/horizon = 0.6
+shader_parameter/grid_speed = 0.35
+shader_parameter/intensity = 1.0
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_2lky4"]
-shader = ExtResource("2_ijtma")
-shader_parameter/scroll_speed = Vector2(0.005, 0.005)
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_sheen"]
+shader = ExtResource("sheen_shader")
+shader_parameter/period = 5.0
+shader_parameter/band_width = 0.09
+shader_parameter/strength = 0.85
+shader_parameter/lift = 1.5
 
-[node name="Index" type="Control" unique_id=23127720]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_intel"]
+shader = ExtResource("intel_shader")
+shader_parameter/tint = Color(0.27, 0.88, 1, 1)
+shader_parameter/bracket_inset = 10.0
+shader_parameter/bracket_length = 28.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_navline"]
+bg_color = Color(0.27, 0.88, 1, 1)
+shadow_color = Color(0.27, 0.88, 1, 0.55)
+shadow_size = 8
+
+[node name="Index" type="Control"]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -32,35 +45,21 @@ grow_vertical = 2
 theme = ExtResource("sledge_theme")
 script = ExtResource("1_4q77j")
 
-[node name="HTTPRequest" type="HTTPRequest" parent="." unique_id=1904323833]
+[node name="HTTPRequest" type="HTTPRequest" parent="."]
 
-[node name="TextureRect" type="TextureRect" parent="." unique_id=1733106850]
-material = SubResource("ShaderMaterial_u58xb")
+[node name="Backdrop" type="ColorRect" parent="."]
+unique_name_in_owner = true
+material = SubResource("ShaderMaterial_backdrop")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-texture = ExtResource("4_q1cq1")
-stretch_mode = 1
-flip_h = true
-flip_v = true
+mouse_filter = 2
+color = Color(0.012, 0.016, 0.045, 1)
 
-[node name="Stars_Scrolling" type="TextureRect" parent="." unique_id=1897145676]
-material = SubResource("ShaderMaterial_2lky4")
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-texture = ExtResource("5_q1cq1")
-stretch_mode = 1
-flip_h = true
-flip_v = true
-
-[node name="Screen_layout" type="HBoxContainer" parent="." unique_id=1817324921]
+[node name="Layout" type="VBoxContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -69,337 +68,292 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 0
 
-[node name="Buttons_Section" type="TextureRect" parent="Screen_layout" unique_id=1232907513]
-custom_minimum_size = Vector2(275, 0)
+[node name="TopBar" type="PanelContainer" parent="Layout"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 84)
 layout_mode = 2
-texture = ExtResource("4_2lky4")
+theme_type_variation = &"TopBar"
 
-[node name="Menu" type="MarginContainer" parent="Screen_layout/Buttons_Section" unique_id=1114785956]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_constants/margin_left = 25
-theme_override_constants/margin_top = 25
-theme_override_constants/margin_right = 25
-theme_override_constants/margin_bottom = 25
-
-[node name="VBox" type="VBoxContainer" parent="Screen_layout/Buttons_Section/Menu" unique_id=922004004]
+[node name="Row" type="HBoxContainer" parent="Layout/TopBar"]
 layout_mode = 2
+theme_override_constants/separation = 14
 
-[node name="btn_play" type="TextureButton" parent="Screen_layout/Buttons_Section/Menu/VBox" unique_id=1318437908]
+[node name="Logo" type="TextureRect" parent="Layout/TopBar/Row"]
+unique_name_in_owner = true
+material = SubResource("ShaderMaterial_sheen")
+custom_minimum_size = Vector2(200, 66)
 layout_mode = 2
-size_flags_horizontal = 0
-texture_normal = ExtResource("6_8ykvq")
-texture_pressed = ExtResource("7_4q77j")
-texture_hover = ExtResource("8_q1cq1")
-texture_disabled = ExtResource("9_4q77j")
-
-[node name="Label" type="Label" parent="Screen_layout/Buttons_Section/Menu/VBox/btn_play" unique_id=552106882]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -41.0
-offset_top = -13.5
-offset_right = 41.0
-offset_bottom = 9.5
-grow_horizontal = 2
-grow_vertical = 2
-text = "Play Game"
-horizontal_alignment = 1
-
-[node name="btn_settings" type="TextureButton" parent="Screen_layout/Buttons_Section/Menu/VBox" unique_id=910221252]
-layout_mode = 2
-size_flags_horizontal = 0
-texture_normal = ExtResource("6_8ykvq")
-texture_pressed = ExtResource("7_4q77j")
-texture_hover = ExtResource("8_q1cq1")
-texture_disabled = ExtResource("9_4q77j")
-
-[node name="Label" type="Label" parent="Screen_layout/Buttons_Section/Menu/VBox/btn_settings" unique_id=1999046568]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -41.0
-offset_top = -13.5
-offset_right = 41.0
-offset_bottom = 9.5
-grow_horizontal = 2
-grow_vertical = 2
-text = "Settings"
-horizontal_alignment = 1
-
-[node name="btn_credits" type="TextureButton" parent="Screen_layout/Buttons_Section/Menu/VBox" unique_id=336779778]
-layout_mode = 2
-size_flags_horizontal = 0
-texture_normal = ExtResource("6_8ykvq")
-texture_pressed = ExtResource("7_4q77j")
-texture_hover = ExtResource("8_q1cq1")
-texture_disabled = ExtResource("9_4q77j")
-
-[node name="Label" type="Label" parent="Screen_layout/Buttons_Section/Menu/VBox/btn_credits" unique_id=1312289913]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -41.0
-offset_top = -13.5
-offset_right = 41.0
-offset_bottom = 9.5
-grow_horizontal = 2
-grow_vertical = 2
-text = "Credits"
-horizontal_alignment = 1
-
-[node name="btn_quit" type="TextureButton" parent="Screen_layout/Buttons_Section/Menu/VBox" unique_id=1798246953]
-layout_mode = 2
-size_flags_horizontal = 0
-size_flags_vertical = 10
-texture_normal = ExtResource("6_8ykvq")
-texture_pressed = ExtResource("7_4q77j")
-texture_hover = ExtResource("8_q1cq1")
-texture_disabled = ExtResource("9_4q77j")
-
-[node name="Label" type="Label" parent="Screen_layout/Buttons_Section/Menu/VBox/btn_quit" unique_id=1973855556]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -53.0
-offset_top = -13.5
-offset_right = 53.0
-offset_bottom = 9.5
-grow_horizontal = 2
-grow_vertical = 2
-text = "Log out / Quit"
-horizontal_alignment = 1
-
-[node name="Border" type="TextureRect" parent="Screen_layout" unique_id=1940104516]
-custom_minimum_size = Vector2(3, 0)
-layout_mode = 2
-texture = ExtResource("9_8ykvq")
-expand_mode = 1
-
-[node name="VBoxContainer" type="VBoxContainer" parent="Screen_layout" unique_id=838066622]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="TextureRect" type="TextureRect" parent="Screen_layout/VBoxContainer" unique_id=802281822]
-custom_minimum_size = Vector2(0, 100)
-layout_mode = 2
+size_flags_vertical = 4
 texture = ExtResource("12_nqws8")
 expand_mode = 1
-stretch_mode = 4
+stretch_mode = 5
 
-[node name="MarginContainer" type="MarginContainer" parent="Screen_layout/VBoxContainer" unique_id=1780693900]
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_constants/margin_left = 25
-theme_override_constants/margin_top = 25
-theme_override_constants/margin_right = 25
-theme_override_constants/margin_bottom = 25
-
-[node name="Login Group" type="Control" parent="Screen_layout/VBoxContainer/MarginContainer" unique_id=14249099]
-visible = false
+[node name="LogoGap" type="Control" parent="Layout/TopBar/Row"]
+custom_minimum_size = Vector2(10, 0)
 layout_mode = 2
 
-[node name="TextureRect" type="TextureRect" parent="Screen_layout/VBoxContainer/MarginContainer/Login Group" unique_id=1285785815]
-layout_mode = 1
-offset_left = 527.5
-offset_top = 239.5
-offset_right = 1025.0
-offset_bottom = 485.0
-texture = ExtResource("9_8ykvq")
-expand_mode = 1
-
-[node name="MarginContainer" type="MarginContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect" unique_id=1918768648]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_constants/margin_left = 2
-theme_override_constants/margin_top = 2
-theme_override_constants/margin_right = 2
-theme_override_constants/margin_bottom = 2
-
-[node name="TextureRect" type="TextureRect" parent="Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect/MarginContainer" unique_id=387942232]
+[node name="Nav" type="HBoxContainer" parent="Layout/TopBar/Row"]
+unique_name_in_owner = true
 layout_mode = 2
-texture = ExtResource("4_2lky4")
-expand_mode = 1
-metadata/_edit_group_ = true
+theme_override_constants/separation = 0
 
-[node name="MarginContainer" type="MarginContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect/MarginContainer/TextureRect" unique_id=172178948]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_constants/margin_left = 2
-theme_override_constants/margin_top = 2
-theme_override_constants/margin_right = 2
-theme_override_constants/margin_bottom = 2
-
-[node name="MarginContainer" type="MarginContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect/MarginContainer/TextureRect/MarginContainer" unique_id=284498235]
+[node name="nav_create" type="Button" parent="Layout/TopBar/Row/Nav"]
 layout_mode = 2
-size_flags_vertical = 0
-theme_override_constants/margin_left = 15
-theme_override_constants/margin_top = 15
-theme_override_constants/margin_right = 15
-theme_override_constants/margin_bottom = 15
+focus_mode = 0
+theme_type_variation = &"NavButton"
+toggle_mode = true
+text = "CREATE GAME"
 
-[node name="VBoxContainer" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect/MarginContainer/TextureRect/MarginContainer/MarginContainer" unique_id=1369874432]
+[node name="nav_join" type="Button" parent="Layout/TopBar/Row/Nav"]
 layout_mode = 2
-theme_override_constants/separation = 10
+focus_mode = 0
+theme_type_variation = &"NavButton"
+toggle_mode = true
+text = "JOIN GAME"
 
-[node name="Label" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect/MarginContainer/TextureRect/MarginContainer/MarginContainer/VBoxContainer" unique_id=1997278017]
+[node name="nav_community" type="Button" parent="Layout/TopBar/Row/Nav"]
 layout_mode = 2
-text = "Player credentials"
+focus_mode = 0
+theme_type_variation = &"NavButton"
+toggle_mode = true
+text = "COMMUNITY LEVELS"
 
-[node name="HSeparator" type="HSeparator" parent="Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect/MarginContainer/TextureRect/MarginContainer/MarginContainer/VBoxContainer" unique_id=1665987901]
-layout_mode = 2
-
-[node name="hb_username" type="HBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect/MarginContainer/TextureRect/MarginContainer/MarginContainer/VBoxContainer" unique_id=1735047723]
-layout_mode = 2
-
-[node name="Label" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect/MarginContainer/TextureRect/MarginContainer/MarginContainer/VBoxContainer/hb_username" unique_id=1675496493]
-custom_minimum_size = Vector2(100, 0)
-layout_mode = 2
-text = "Username:"
-
-[node name="txt_username" type="LineEdit" parent="Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect/MarginContainer/TextureRect/MarginContainer/MarginContainer/VBoxContainer/hb_username" unique_id=26050902]
+[node name="Spacer" type="Control" parent="Layout/TopBar/Row"]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="hb_password" type="HBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect/MarginContainer/TextureRect/MarginContainer/MarginContainer/VBoxContainer" unique_id=722002904]
+[node name="PilotBox" type="VBoxContainer" parent="Layout/TopBar/Row"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_constants/separation = -2
+
+[node name="PilotCaption" type="Label" parent="Layout/TopBar/Row/PilotBox"]
+layout_mode = 2
+theme_type_variation = &"CapsLabel"
+text = "PILOT"
+horizontal_alignment = 2
+
+[node name="PilotName" type="Label" parent="Layout/TopBar/Row/PilotBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"AccentLabel"
+theme_override_font_sizes/font_size = 20
+text = "Callsign"
+horizontal_alignment = 2
+
+[node name="PilotGap" type="Control" parent="Layout/TopBar/Row"]
+custom_minimum_size = Vector2(6, 0)
 layout_mode = 2
 
-[node name="Label" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect/MarginContainer/TextureRect/MarginContainer/MarginContainer/VBoxContainer/hb_password" unique_id=952684787]
-custom_minimum_size = Vector2(100, 0)
+[node name="btn_settings" type="Button" parent="Layout/TopBar/Row"]
+unique_name_in_owner = true
 layout_mode = 2
-text = "Password:"
+size_flags_vertical = 4
+focus_mode = 0
+theme_type_variation = &"GhostButton"
+text = "SETTINGS"
 
-[node name="txt_password" type="LineEdit" parent="Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect/MarginContainer/TextureRect/MarginContainer/MarginContainer/VBoxContainer/hb_password" unique_id=2013791565]
+[node name="btn_credits" type="Button" parent="Layout/TopBar/Row"]
+unique_name_in_owner = true
 layout_mode = 2
-size_flags_horizontal = 3
-secret = true
+size_flags_vertical = 4
+focus_mode = 0
+theme_type_variation = &"GhostButton"
+text = "CREDITS"
 
-[node name="HSeparator2" type="HSeparator" parent="Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect/MarginContainer/TextureRect/MarginContainer/MarginContainer/VBoxContainer" unique_id=707889579]
+[node name="btn_quit" type="Button" parent="Layout/TopBar/Row"]
+unique_name_in_owner = true
 layout_mode = 2
+size_flags_vertical = 4
+focus_mode = 0
+theme_type_variation = &"GhostDangerButton"
+text = "QUIT"
 
-[node name="HBoxContainer" type="HBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect/MarginContainer/TextureRect/MarginContainer/MarginContainer/VBoxContainer" unique_id=166422755]
-layout_mode = 2
-size_flags_vertical = 3
-
-[node name="btn_register" type="TextureButton" parent="Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect/MarginContainer/TextureRect/MarginContainer/MarginContainer/VBoxContainer/HBoxContainer" unique_id=663239166]
-layout_mode = 2
-size_flags_horizontal = 2
-texture_normal = ExtResource("6_8ykvq")
-texture_pressed = ExtResource("7_4q77j")
-texture_hover = ExtResource("8_q1cq1")
-texture_disabled = ExtResource("9_4q77j")
-
-[node name="Label" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect/MarginContainer/TextureRect/MarginContainer/MarginContainer/VBoxContainer/HBoxContainer/btn_register" unique_id=1352825028]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -41.0
-offset_top = -13.5
-offset_right = 41.0
-offset_bottom = 9.5
-grow_horizontal = 2
-grow_vertical = 2
-text = "Register"
-horizontal_alignment = 1
-
-[node name="btn_submit_login" type="TextureButton" parent="Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect/MarginContainer/TextureRect/MarginContainer/MarginContainer/VBoxContainer/HBoxContainer" unique_id=1553161690]
-layout_mode = 2
-size_flags_horizontal = 10
-texture_normal = ExtResource("6_8ykvq")
-texture_pressed = ExtResource("7_4q77j")
-texture_hover = ExtResource("8_q1cq1")
-texture_disabled = ExtResource("9_4q77j")
-
-[node name="Label" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect/MarginContainer/TextureRect/MarginContainer/MarginContainer/VBoxContainer/HBoxContainer/btn_submit_login" unique_id=493561436]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -41.0
-offset_top = -13.5
-offset_right = 41.0
-offset_bottom = 9.5
-grow_horizontal = 2
-grow_vertical = 2
-text = "Submit"
-horizontal_alignment = 1
-
-[node name="Team Select" type="Control" parent="Screen_layout/VBoxContainer/MarginContainer" unique_id=708923305]
-visible = false
-layout_mode = 2
-
-[node name="MarginContainer" type="MarginContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Team Select" unique_id=708923306]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_constants/margin_left = 15
-theme_override_constants/margin_top = 15
-theme_override_constants/margin_right = 15
-theme_override_constants/margin_bottom = 15
-
-[node name="VBoxContainer" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Team Select/MarginContainer" unique_id=708923307]
-layout_mode = 2
-theme_override_constants/separation = 12
-
-[node name="TeamSelectTitle" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Team Select/MarginContainer/VBoxContainer" unique_id=708923308]
-layout_mode = 2
-text = "Choose Your Team"
-
-[node name="TeamRoster" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Team Select/MarginContainer/VBoxContainer" unique_id=708923309]
+[node name="Stage" type="MarginContainer" parent="Layout"]
+unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
-theme_override_constants/separation = 6
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 22
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 20
 
-[node name="TeamSelectFeedback" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Team Select/MarginContainer/VBoxContainer" unique_id=708923310]
-layout_mode = 2
-
-[node name="Settings" type="Control" parent="Screen_layout/VBoxContainer/MarginContainer" unique_id=826340148]
+[node name="Login Group" type="CenterContainer" parent="Layout/Stage"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
 
-[node name="Tabs" type="TabContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Settings" unique_id=60671341]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
+[node name="Column" type="VBoxContainer" parent="Layout/Stage/Login Group"]
+custom_minimum_size = Vector2(520, 0)
+layout_mode = 2
+theme_override_constants/separation = 30
+
+[node name="BigLogo" type="TextureRect" parent="Layout/Stage/Login Group/Column"]
+material = SubResource("ShaderMaterial_sheen")
+layout_mode = 2
+texture = ExtResource("12_nqws8")
+stretch_mode = 3
+
+[node name="LoginCard" type="PanelContainer" parent="Layout/Stage/Login Group/Column"]
+layout_mode = 2
+script = ExtResource("hud_card")
+
+[node name="Body" type="VBoxContainer" parent="Layout/Stage/Login Group/Column/LoginCard"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Head" type="HBoxContainer" parent="Layout/Stage/Login Group/Column/LoginCard/Body"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Index" type="Label" parent="Layout/Stage/Login Group/Column/LoginCard/Body/Head"]
+layout_mode = 2
+theme_type_variation = &"IndexLabel"
+text = "//"
+
+[node name="Title" type="Label" parent="Layout/Stage/Login Group/Column/LoginCard/Body/Head"]
+layout_mode = 2
+theme_type_variation = &"HeaderLabel"
+text = "PILOT LOGIN"
+
+[node name="Rule" type="HSeparator" parent="Layout/Stage/Login Group/Column/LoginCard/Body"]
+layout_mode = 2
+
+[node name="UsernameCaption" type="Label" parent="Layout/Stage/Login Group/Column/LoginCard/Body"]
+layout_mode = 2
+theme_type_variation = &"CapsLabel"
+text = "USERNAME"
+
+[node name="txt_username" type="LineEdit" parent="Layout/Stage/Login Group/Column/LoginCard/Body"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="FieldGap" type="Control" parent="Layout/Stage/Login Group/Column/LoginCard/Body"]
+custom_minimum_size = Vector2(0, 4)
+layout_mode = 2
+
+[node name="PasswordCaption" type="Label" parent="Layout/Stage/Login Group/Column/LoginCard/Body"]
+layout_mode = 2
+theme_type_variation = &"CapsLabel"
+text = "PASSWORD"
+
+[node name="txt_password" type="LineEdit" parent="Layout/Stage/Login Group/Column/LoginCard/Body"]
+unique_name_in_owner = true
+layout_mode = 2
+secret = true
+
+[node name="ButtonGap" type="Control" parent="Layout/Stage/Login Group/Column/LoginCard/Body"]
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+
+[node name="btn_submit_login" type="Button" parent="Layout/Stage/Login Group/Column/LoginCard/Body"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 54)
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"PrimaryButton"
+text = "LOG IN"
+
+[node name="RegisterRow" type="HBoxContainer" parent="Layout/Stage/Login Group/Column/LoginCard/Body"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="RegisterNote" type="Label" parent="Layout/Stage/Login Group/Column/LoginCard/Body/RegisterRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"DimLabel"
+text = "No account yet? It is free on killgorack.com."
+
+[node name="btn_register" type="Button" parent="Layout/Stage/Login Group/Column/LoginCard/Body/RegisterRow"]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"GhostButton"
+text = "REGISTER"
+
+[node name="Team Select" type="CenterContainer" parent="Layout/Stage"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+
+[node name="Column" type="VBoxContainer" parent="Layout/Stage/Team Select"]
+custom_minimum_size = Vector2(1120, 0)
+layout_mode = 2
+theme_override_constants/separation = 22
+
+[node name="TeamSelectTitle" type="Label" parent="Layout/Stage/Team Select/Column"]
+layout_mode = 2
+theme_type_variation = &"TitleLabel"
+text = "CHOOSE YOUR TEAM"
+horizontal_alignment = 1
+
+[node name="JoinVehicleRow" type="HBoxContainer" parent="Layout/Stage/Team Select/Column"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 14
+alignment = 1
+
+[node name="Caption" type="Label" parent="Layout/Stage/Team Select/Column/JoinVehicleRow"]
+layout_mode = 2
+theme_type_variation = &"CapsLabel"
+text = "YOUR VEHICLE"
+
+[node name="JoinVehiclePicker" type="OptionButton" parent="Layout/Stage/Team Select/Column/JoinVehicleRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(220, 0)
+layout_mode = 2
+
+[node name="TeamRoster" type="HBoxContainer" parent="Layout/Stage/Team Select/Column"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 340)
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="TeamSelectFeedback" type="Label" parent="Layout/Stage/Team Select/Column"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.33, 0.44, 1)
+horizontal_alignment = 1
+
+[node name="Settings" type="PanelContainer" parent="Layout/Stage"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+script = ExtResource("hud_card")
+
+[node name="Body" type="VBoxContainer" parent="Layout/Stage/Settings"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Head" type="HBoxContainer" parent="Layout/Stage/Settings/Body"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Index" type="Label" parent="Layout/Stage/Settings/Body/Head"]
+layout_mode = 2
+theme_type_variation = &"IndexLabel"
+text = "//"
+
+[node name="Title" type="Label" parent="Layout/Stage/Settings/Body/Head"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"HeaderLabel"
+text = "SETTINGS"
+
+[node name="btn_settings_back" type="Button" parent="Layout/Stage/Settings/Body/Head"]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"GhostButton"
+text = "BACK"
+
+[node name="Tabs" type="TabContainer" parent="Layout/Stage/Settings/Body"]
+layout_mode = 2
+size_flags_vertical = 3
 current_tab = 0
 
-[node name="Sounds" type="MarginContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Settings/Tabs" unique_id=1218142538]
+[node name="Sounds" type="MarginContainer" parent="Layout/Stage/Settings/Body/Tabs"]
 layout_mode = 2
 theme_override_constants/margin_left = 20
 theme_override_constants/margin_top = 20
@@ -407,13 +361,13 @@ theme_override_constants/margin_right = 20
 theme_override_constants/margin_bottom = 20
 metadata/_tab_index = 0
 
-[node name="Placeholder" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Settings/Tabs/Sounds" unique_id=2021513330]
-modulate = Color(1, 1, 1, 0.5)
+[node name="Placeholder" type="Label" parent="Layout/Stage/Settings/Body/Tabs/Sounds"]
 layout_mode = 2
 size_flags_vertical = 0
+theme_type_variation = &"DimLabel"
 text = "Sound settings are coming soon."
 
-[node name="Video" type="MarginContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Settings/Tabs" unique_id=903746164]
+[node name="Video" type="MarginContainer" parent="Layout/Stage/Settings/Body/Tabs"]
 visible = false
 layout_mode = 2
 theme_override_constants/margin_left = 20
@@ -422,13 +376,13 @@ theme_override_constants/margin_right = 20
 theme_override_constants/margin_bottom = 20
 metadata/_tab_index = 1
 
-[node name="Placeholder" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Settings/Tabs/Video" unique_id=956244435]
-modulate = Color(1, 1, 1, 0.5)
+[node name="Placeholder" type="Label" parent="Layout/Stage/Settings/Body/Tabs/Video"]
 layout_mode = 2
 size_flags_vertical = 0
+theme_type_variation = &"DimLabel"
 text = "Video settings are coming soon."
 
-[node name="Inputs" type="MarginContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Settings/Tabs" unique_id=868486659]
+[node name="Inputs" type="MarginContainer" parent="Layout/Stage/Settings/Body/Tabs"]
 visible = false
 layout_mode = 2
 theme_override_constants/margin_left = 20
@@ -437,114 +391,117 @@ theme_override_constants/margin_right = 20
 theme_override_constants/margin_bottom = 20
 metadata/_tab_index = 2
 
-[node name="Placeholder" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Settings/Tabs/Inputs" unique_id=145223199]
-modulate = Color(1, 1, 1, 0.5)
+[node name="Placeholder" type="Label" parent="Layout/Stage/Settings/Body/Tabs/Inputs"]
 layout_mode = 2
 size_flags_vertical = 0
+theme_type_variation = &"DimLabel"
 text = "Input settings are coming soon."
 
-[node name="Credits" type="Control" parent="Screen_layout/VBoxContainer/MarginContainer" unique_id=651244271]
+[node name="Credits" type="PanelContainer" parent="Layout/Stage"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
+script = ExtResource("hud_card")
+accent = Color(1, 0.24, 0.65, 1)
 
-[node name="Margin" type="MarginContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Credits" unique_id=1043322018]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_constants/margin_left = 20
-theme_override_constants/margin_top = 20
-theme_override_constants/margin_right = 20
-theme_override_constants/margin_bottom = 20
-
-[node name="Text" type="RichTextLabel" parent="Screen_layout/VBoxContainer/MarginContainer/Credits/Margin" unique_id=456544899]
+[node name="Body" type="VBoxContainer" parent="Layout/Stage/Credits"]
 layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Head" type="HBoxContainer" parent="Layout/Stage/Credits/Body"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Index" type="Label" parent="Layout/Stage/Credits/Body/Head"]
+layout_mode = 2
+theme_type_variation = &"IndexLabel"
+text = "//"
+
+[node name="Title" type="Label" parent="Layout/Stage/Credits/Body/Head"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"HeaderLabel"
+text = "CREDITS"
+
+[node name="btn_licenses" type="Button" parent="Layout/Stage/Credits/Body/Head"]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"GhostButton"
+text = "LICENSES"
+
+[node name="btn_credits_back" type="Button" parent="Layout/Stage/Credits/Body/Head"]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"GhostButton"
+text = "BACK"
+
+[node name="Rule" type="HSeparator" parent="Layout/Stage/Credits/Body"]
+layout_mode = 2
+
+[node name="CreditsText" type="RichTextLabel" parent="Layout/Stage/Credits/Body"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
 bbcode_enabled = true
 text = "[b]Sledge 2[/b]
 
-[b]Engine[/b]
-Made with the Godot Engine (MIT license), godotengine.org.
+The credits are filled in when the game runs (see credits.gd)."
 
-[b]Maps[/b]
-[i]Placeholder: map authors and sources.[/i]
-
-[b]Art, sound and music[/b]
-[i]Placeholder: attributions.[/i]
-
-[b]Thanks[/b]
-[i]Placeholder.[/i]"
-
-[node name="Load Game" type="Control" parent="Screen_layout/VBoxContainer/MarginContainer" unique_id=708923304]
+[node name="Load Game" type="TabContainer" parent="Layout/Stage"]
+unique_name_in_owner = true
 visible = false
 layout_mode = 2
-
-[node name="TabContainer" type="TabContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game" unique_id=1882045376]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
 current_tab = 0
+tabs_visible = false
 
-[node name="Create Game" type="TabBar" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer" unique_id=760376868]
+[node name="Create Game" type="VBoxContainer" parent="Layout/Stage/Load Game"]
 layout_mode = 2
+theme_override_constants/separation = 16
 metadata/_tab_index = 0
 
-[node name="MarginContainer" type="MarginContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game" unique_id=1086016838]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_constants/margin_left = 15
-theme_override_constants/margin_top = 15
-theme_override_constants/margin_right = 15
-theme_override_constants/margin_bottom = 15
-
-[node name="VBoxContainer" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer" unique_id=449342672]
-layout_mode = 2
-theme_override_constants/separation = 16
-
-[node name="Columns" type="HBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer" unique_id=286601176]
+[node name="Columns" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game"]
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/separation = 16
 
-[node name="MapCard" type="PanelContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns" unique_id=1398420296]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-size_flags_stretch_ratio = 2.3
-
-[node name="Body" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard" unique_id=592529923]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="Header" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body" unique_id=1354397533]
-layout_mode = 2
-theme_type_variation = &"HeaderLabel"
-text = "1   Pick a map"
-
-[node name="Rule" type="HSeparator" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body" unique_id=718786167]
-layout_mode = 2
-
-[node name="MapRow" type="HBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body" unique_id=1513557442]
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_constants/separation = 14
-
-[node name="WorldList" type="Tree" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body/MapRow" unique_id=1868414930]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(320, 0)
+[node name="ArenaCard" type="PanelContainer" parent="Layout/Stage/Load Game/Create Game/Columns"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 1.1
+script = ExtResource("hud_card")
+
+[node name="Body" type="VBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/ArenaCard"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Head" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/ArenaCard/Body"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Index" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/ArenaCard/Body/Head"]
+layout_mode = 2
+theme_type_variation = &"IndexLabel"
+text = "01"
+
+[node name="Title" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/ArenaCard/Body/Head"]
+layout_mode = 2
+theme_type_variation = &"HeaderLabel"
+text = "SELECT ARENA"
+
+[node name="LevelFilterBar" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/ArenaCard/Body"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="WorldList" type="Tree" parent="Layout/Stage/Load Game/Create Game/Columns/ArenaCard/Body"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(320, 0)
+layout_mode = 2
+size_flags_vertical = 3
 columns = 3
+column_titles_visible = true
 allow_search = false
 hide_folding = true
 enable_recursive_folding = false
@@ -552,192 +509,346 @@ enable_drag_unfolding = false
 hide_root = true
 select_mode = 1
 
-[node name="Preview" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body/MapRow" unique_id=728920934]
+[node name="IntelCard" type="PanelContainer" parent="Layout/Stage/Load Game/Create Game/Columns"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/separation = 8
+size_flags_stretch_ratio = 1.4
+script = ExtResource("hud_card")
+accent = Color(1, 0.24, 0.65, 1)
 
-[node name="ThumbFrame" type="AspectRatioContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body/MapRow/Preview" unique_id=1351058099]
+[node name="Body" type="VBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/IntelCard"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Head" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/IntelCard/Body"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Index" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/IntelCard/Body/Head"]
+layout_mode = 2
+theme_type_variation = &"IndexLabel"
+text = "//"
+
+[node name="Title" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/IntelCard/Body/Head"]
+layout_mode = 2
+theme_type_variation = &"HeaderLabel"
+text = "ARENA INTEL"
+
+[node name="ThumbFrame" type="AspectRatioContainer" parent="Layout/Stage/Load Game/Create Game/Columns/IntelCard/Body"]
 unique_name_in_owner = true
 layout_mode = 2
 ratio = 1.7778
 stretch_mode = 0
 alignment_vertical = 0
 
-[node name="ThumbBackdrop" type="Panel" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body/MapRow/Preview/ThumbFrame" unique_id=999473513]
+[node name="ThumbBackdrop" type="Panel" parent="Layout/Stage/Load Game/Create Game/Columns/IntelCard/Body/ThumbFrame"]
 layout_mode = 2
 theme_type_variation = &"InsetPanel"
 
-[node name="MapThumbnail" type="TextureRect" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body/MapRow/Preview/ThumbFrame" unique_id=950501442]
+[node name="ThumbEmpty" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/IntelCard/Body/ThumbFrame"]
+layout_mode = 2
+theme_type_variation = &"CapsLabel"
+text = "NO PICTURE"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="MapThumbnail" type="TextureRect" parent="Layout/Stage/Load Game/Create Game/Columns/IntelCard/Body/ThumbFrame"]
 unique_name_in_owner = true
 layout_mode = 2
 expand_mode = 1
 stretch_mode = 6
 
-[node name="ThumbBorder" type="Panel" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body/MapRow/Preview/ThumbFrame" unique_id=2100623155]
+[node name="ThumbScan" type="ColorRect" parent="Layout/Stage/Load Game/Create Game/Columns/IntelCard/Body/ThumbFrame"]
+material = SubResource("ShaderMaterial_intel")
+layout_mode = 2
+mouse_filter = 2
+
+[node name="ThumbBorder" type="Panel" parent="Layout/Stage/Load Game/Create Game/Columns/IntelCard/Body/ThumbFrame"]
 layout_mode = 2
 mouse_filter = 2
 theme_type_variation = &"FrameBorder"
 
-[node name="MapTitle" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body/MapRow/Preview" unique_id=199414167]
+[node name="MapTitle" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/IntelCard/Body"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 22
+theme_type_variation = &"TitleLabel"
 text = "Select a map"
+text_overrun_behavior = 3
 
-[node name="MapByline" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body/MapRow/Preview" unique_id=2019388533]
+[node name="MapByline" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/IntelCard/Body"]
 unique_name_in_owner = true
-modulate = Color(1, 1, 1, 0.65)
+layout_mode = 2
+theme_type_variation = &"AccentLabel"
+text_overrun_behavior = 3
+
+[node name="Rule" type="HSeparator" parent="Layout/Stage/Load Game/Create Game/Columns/IntelCard/Body"]
 layout_mode = 2
 
-[node name="MapDescription" type="RichTextLabel" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/MapCard/Body/MapRow/Preview" unique_id=2030438395]
+[node name="MapDescription" type="RichTextLabel" parent="Layout/Stage/Load Game/Create Game/Columns/IntelCard/Body"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
 text = "Pick a map from the list to see its details."
 
-[node name="RulesCard" type="PanelContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns" unique_id=2063335051]
+[node name="SetupColumn" type="VBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns"]
 layout_mode = 2
 size_flags_horizontal = 3
-size_flags_vertical = 3
-size_flags_stretch_ratio = 0.9
+theme_override_constants/separation = 16
 
-[node name="Body" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/RulesCard" unique_id=353694215]
+[node name="RulesCard" type="PanelContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn"]
 layout_mode = 2
-theme_override_constants/separation = 8
+script = ExtResource("hud_card")
 
-[node name="Header" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/RulesCard/Body" unique_id=2097592250]
+[node name="Body" type="VBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Head" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Index" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Head"]
+layout_mode = 2
+theme_type_variation = &"IndexLabel"
+text = "02"
+
+[node name="Title" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Head"]
 layout_mode = 2
 theme_type_variation = &"HeaderLabel"
-text = "2   Match rules"
+text = "MATCH RULES"
 
-[node name="Rule" type="HSeparator" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/RulesCard/Body" unique_id=1276254562]
+[node name="Rule" type="HSeparator" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body"]
 layout_mode = 2
 
-[node name="TeamRow" type="HBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/RulesCard/Body" unique_id=733419677]
+[node name="TeamRow" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body"]
 layout_mode = 2
 
-[node name="TeamLabel" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/RulesCard/Body/TeamRow" unique_id=453384863]
+[node name="TeamLabel" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/TeamRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Your team"
 
-[node name="HostTeamPicker" type="OptionButton" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/RulesCard/Body/TeamRow" unique_id=2083672678]
+[node name="HostTeamPicker" type="OptionButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/TeamRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(130, 0)
+custom_minimum_size = Vector2(170, 0)
 layout_mode = 2
 
-[node name="PublicGameCheck" type="CheckBox" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/RulesCard/Body" unique_id=934117626]
+[node name="HostVehicleRow" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body"]
 unique_name_in_owner = true
 layout_mode = 2
-tooltip_text = "Lists the game so people outside your network can join (the port is forwarded automatically where possible). Untick for a LAN-only game."
+
+[node name="VehicleLabel" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/HostVehicleRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Your vehicle"
+
+[node name="HostVehiclePicker" type="OptionButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/HostVehicleRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(170, 0)
+layout_mode = 2
+
+[node name="PickerGap" type="Control" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body"]
+custom_minimum_size = Vector2(0, 4)
+layout_mode = 2
+
+[node name="PublicGameCheck" type="CheckButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Lists the game so people outside your network can join (the port is forwarded automatically where possible). Turn off for a LAN-only game."
+focus_mode = 0
 button_pressed = true
 text = "Public game"
 
-[node name="RocketsCheck" type="CheckBox" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/RulesCard/Body" unique_id=257568465]
+[node name="RocketsCheck" type="CheckButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body"]
 unique_name_in_owner = true
 layout_mode = 2
 tooltip_text = "Rockets (R) lift your craft. Off: nobody can use them. Flipping an overturned craft back over always works."
+focus_mode = 0
 button_pressed = true
 text = "Rockets"
 
-[node name="ReconCaptureCheck" type="CheckBox" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/RulesCard/Body" unique_id=1146339297]
+[node name="ReconCaptureCheck" type="CheckButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body"]
 unique_name_in_owner = true
 layout_mode = 2
 tooltip_text = "Lets players capture recons. Off: recons stay as the map set them; they still heal and resupply."
+focus_mode = 0
 button_pressed = true
 text = "Recon capture"
 
-[node name="DayNightCheck" type="CheckBox" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/RulesCard/Body" unique_id=948644691]
+[node name="DayNightCheck" type="CheckButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body"]
 unique_name_in_owner = true
 layout_mode = 2
+focus_mode = 0
 text = "Day / night cycle"
 
-[node name="LoadoutCard" type="PanelContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns" unique_id=2084578260]
+[node name="LoadoutCard" type="PanelContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn"]
 layout_mode = 2
-size_flags_horizontal = 3
 size_flags_vertical = 3
+script = ExtResource("hud_card")
 
-[node name="Body" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard" unique_id=1009361224]
+[node name="Body" type="VBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="Header" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body" unique_id=1372371072]
+[node name="Head" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body"]
 layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Index" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body/Head"]
+layout_mode = 2
+theme_type_variation = &"IndexLabel"
+text = "03"
+
+[node name="Title" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body/Head"]
+layout_mode = 2
+size_flags_horizontal = 3
 theme_type_variation = &"HeaderLabel"
-text = "3   Loadout   (the same for every player)"
+text = "LOADOUT"
 
-[node name="Rule" type="HSeparator" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body" unique_id=1698851439]
+[node name="Note" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body/Head"]
+layout_mode = 2
+theme_type_variation = &"DimLabel"
+text = "The same for every player"
+
+[node name="Rule" type="HSeparator" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body"]
 layout_mode = 2
 
-[node name="Scroll" type="ScrollContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body" unique_id=2015633301]
+[node name="Scroll" type="ScrollContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body"]
 layout_mode = 2
 size_flags_vertical = 3
+horizontal_scroll_mode = 0
 
-[node name="Sections" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body/Scroll" unique_id=2103875170]
+[node name="Sections" type="VBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body/Scroll"]
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_constants/separation = 8
 
-[node name="WeaponsLabel" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body/Scroll/Sections" unique_id=1737002571]
+[node name="WeaponsLabel" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body/Scroll/Sections"]
 layout_mode = 2
-text = "Available weapons"
+theme_type_variation = &"CapsLabel"
+text = "WEAPONS"
 
-[node name="WeaponChecklist" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body/Scroll/Sections" unique_id=116037264]
+[node name="WeaponChecklist" type="HFlowContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body/Scroll/Sections"]
 unique_name_in_owner = true
 layout_mode = 2
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
 
-[node name="WeaponsSeparator" type="HSeparator" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body/Scroll/Sections" unique_id=259917462]
+[node name="SpecialsGap" type="Control" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body/Scroll/Sections"]
+custom_minimum_size = Vector2(0, 4)
 layout_mode = 2
 
-[node name="SpecialsLabel" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body/Scroll/Sections" unique_id=803802168]
+[node name="SpecialsLabel" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body/Scroll/Sections"]
 layout_mode = 2
-text = "Specials"
+theme_type_variation = &"CapsLabel"
+text = "SPECIALS"
 
-[node name="MineChecklist" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body/Scroll/Sections" unique_id=1329960903]
+[node name="MineChecklist" type="HFlowContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body/Scroll/Sections"]
 unique_name_in_owner = true
 layout_mode = 2
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
 
-[node name="SpecialsSeparator" type="HSeparator" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body/Scroll/Sections" unique_id=61158418]
-layout_mode = 2
-
-[node name="VehicleLabel" type="Label" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Columns/LoadoutCard/Body/Scroll/Sections" unique_id=1674211488]
+[node name="CraftSection" type="VBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body/Scroll/Sections"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Vehicle"
+theme_override_constants/separation = 8
 
-[node name="Footer" type="HBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer" unique_id=1234641443]
+[node name="CraftGap" type="Control" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body/Scroll/Sections/CraftSection"]
+custom_minimum_size = Vector2(0, 4)
 layout_mode = 2
 
-[node name="btn_host" type="Button" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Create Game/MarginContainer/VBoxContainer/Footer" unique_id=1669281041]
+[node name="CraftLabel" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body/Scroll/Sections/CraftSection"]
+layout_mode = 2
+theme_type_variation = &"CapsLabel"
+text = "VEHICLES ALLOWED"
+
+[node name="CraftChecklist" type="HFlowContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body/Scroll/Sections/CraftSection"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
+
+[node name="Footer" type="PanelContainer" parent="Layout/Stage/Load Game/Create Game"]
+layout_mode = 2
+theme_type_variation = &"ActionBar"
+
+[node name="Row" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Footer"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="HostSummary" type="RichTextLabel" parent="Layout/Stage/Load Game/Create Game/Footer/Row"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Host Game"
+size_flags_vertical = 4
+mouse_filter = 2
+bbcode_enabled = true
+text = "Pick an arena to host."
+fit_content = true
+scroll_active = false
+autowrap_mode = 0
 
-[node name="Join Game" type="TabBar" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer" unique_id=160290931]
+[node name="btn_host" type="Button" parent="Layout/Stage/Load Game/Create Game/Footer/Row"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(340, 56)
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"PrimaryButton"
+text = "HOST GAME"
+
+[node name="Join Game" type="HBoxContainer" parent="Layout/Stage/Load Game"]
 visible = false
 layout_mode = 2
+theme_override_constants/separation = 16
 metadata/_tab_index = 1
 
-[node name="MarginContainer" type="MarginContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Join Game" unique_id=1301657689]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_constants/margin_left = 15
-theme_override_constants/margin_top = 15
-theme_override_constants/margin_right = 15
-theme_override_constants/margin_bottom = 15
-
-[node name="VBoxContainer" type="VBoxContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Join Game/MarginContainer" unique_id=2122798910]
+[node name="GamesCard" type="PanelContainer" parent="Layout/Stage/Load Game/Join Game"]
 layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 2.3
+script = ExtResource("hud_card")
 
-[node name="GameList" type="Tree" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Join Game/MarginContainer/VBoxContainer" unique_id=1990540562]
+[node name="Body" type="VBoxContainer" parent="Layout/Stage/Load Game/Join Game/GamesCard"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Head" type="HBoxContainer" parent="Layout/Stage/Load Game/Join Game/GamesCard/Body"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Index" type="Label" parent="Layout/Stage/Load Game/Join Game/GamesCard/Body/Head"]
+layout_mode = 2
+theme_type_variation = &"IndexLabel"
+text = "//"
+
+[node name="Title" type="Label" parent="Layout/Stage/Load Game/Join Game/GamesCard/Body/Head"]
+layout_mode = 2
+theme_type_variation = &"HeaderLabel"
+text = "OPEN GAMES"
+
+[node name="GameCount" type="Label" parent="Layout/Stage/Load Game/Join Game/GamesCard/Body/Head"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"DimLabel"
+
+[node name="btn_refresh" type="Button" parent="Layout/Stage/Load Game/Join Game/GamesCard/Body/Head"]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"GhostButton"
+text = "REFRESH"
+
+[node name="ListStack" type="MarginContainer" parent="Layout/Stage/Load Game/Join Game/GamesCard/Body"]
 layout_mode = 2
 size_flags_vertical = 3
+
+[node name="GameList" type="Tree" parent="Layout/Stage/Load Game/Join Game/GamesCard/Body/ListStack"]
+unique_name_in_owner = true
+layout_mode = 2
 columns = 4
+column_titles_visible = true
 allow_search = false
 hide_folding = true
 enable_recursive_folding = false
@@ -745,45 +856,138 @@ enable_drag_unfolding = false
 hide_root = true
 select_mode = 1
 
-[node name="ListGap" type="Control" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Join Game/MarginContainer/VBoxContainer" unique_id=1222254781]
-custom_minimum_size = Vector2(0, 8)
+[node name="NoGames" type="VBoxContainer" parent="Layout/Stage/Load Game/Join Game/GamesCard/Body/ListStack"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+theme_override_constants/separation = 6
+
+[node name="Title" type="Label" parent="Layout/Stage/Load Game/Join Game/GamesCard/Body/ListStack/NoGames"]
+layout_mode = 2
+theme_type_variation = &"HeaderLabel"
+theme_override_colors/font_color = Color(0.5, 0.6, 0.72, 1)
+theme_override_font_sizes/font_size = 20
+text = "NO OPEN GAMES"
+horizontal_alignment = 1
+
+[node name="Note" type="Label" parent="Layout/Stage/Load Game/Join Game/GamesCard/Body/ListStack/NoGames"]
+layout_mode = 2
+theme_type_variation = &"DimLabel"
+text = "Nobody is hosting right now. The list checks again by itself."
+horizontal_alignment = 1
+
+[node name="DetailCard" type="PanelContainer" parent="Layout/Stage/Load Game/Join Game"]
+layout_mode = 2
+size_flags_horizontal = 3
+script = ExtResource("hud_card")
+accent = Color(1, 0.24, 0.65, 1)
+
+[node name="Body" type="VBoxContainer" parent="Layout/Stage/Load Game/Join Game/DetailCard"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Head" type="HBoxContainer" parent="Layout/Stage/Load Game/Join Game/DetailCard/Body"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Index" type="Label" parent="Layout/Stage/Load Game/Join Game/DetailCard/Body/Head"]
+layout_mode = 2
+theme_type_variation = &"IndexLabel"
+text = "//"
+
+[node name="Title" type="Label" parent="Layout/Stage/Load Game/Join Game/DetailCard/Body/Head"]
+layout_mode = 2
+theme_type_variation = &"HeaderLabel"
+text = "GAME DETAILS"
+
+[node name="Rule" type="HSeparator" parent="Layout/Stage/Load Game/Join Game/DetailCard/Body"]
 layout_mode = 2
 
-[node name="btn_refresh" type="Button" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Join Game/MarginContainer/VBoxContainer" unique_id=1297558828]
+[node name="JoinTitle" type="Label" parent="Layout/Stage/Load Game/Join Game/DetailCard/Body"]
+unique_name_in_owner = true
 layout_mode = 2
-text = "Refresh"
+theme_type_variation = &"TitleLabel"
+theme_override_font_sizes/font_size = 22
+text = "Select a game"
+text_overrun_behavior = 3
 
-[node name="btn_join" type="Button" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Join Game/MarginContainer/VBoxContainer" unique_id=588580773]
+[node name="JoinDetails" type="RichTextLabel" parent="Layout/Stage/Load Game/Join Game/DetailCard/Body"]
+unique_name_in_owner = true
 layout_mode = 2
-text = "Join Game"
+size_flags_vertical = 3
+bbcode_enabled = true
+text = "Pick a game from the list to see who is hosting and what is allowed."
 
-[node name="Community Levels" type="MarginContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer" unique_id=160290977]
+[node name="btn_join" type="Button" parent="Layout/Stage/Load Game/Join Game/DetailCard/Body"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"PrimaryButton"
+text = "JOIN GAME"
+
+[node name="Community Levels" type="MarginContainer" parent="Layout/Stage/Load Game"]
 visible = false
 layout_mode = 2
 metadata/_tab_index = 2
 
-[node name="My Creations" type="MarginContainer" parent="Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Community Levels" unique_id=160290980]
+[node name="My Creations" type="MarginContainer" parent="Layout/Stage/Load Game/Community Levels"]
 layout_mode = 2
 script = ExtResource("my_creations_script")
 
-[node name="StatusBar" type="TextureRect" parent="Screen_layout/VBoxContainer" unique_id=1203887572]
-custom_minimum_size = Vector2(0, 50)
+[node name="StatusBar" type="PanelContainer" parent="Layout"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 46)
 layout_mode = 2
-texture = ExtResource("4_2lky4")
-expand_mode = 1
+theme_type_variation = &"StatusBar"
 
-[node name="ui_feedback_node" type="MarginContainer" parent="Screen_layout/VBoxContainer/StatusBar" unique_id=62707638]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_constants/margin_left = 25
-theme_override_constants/margin_top = 15
-theme_override_constants/margin_right = 15
-theme_override_constants/margin_bottom = 15
-
-[node name="lbl_ui_feedback" type="Label" parent="Screen_layout/VBoxContainer/StatusBar/ui_feedback_node" unique_id=562498206]
+[node name="Row" type="HBoxContainer" parent="Layout/StatusBar"]
 layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="StatusLed" type="ColorRect" parent="Layout/StatusBar/Row"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(8, 8)
+layout_mode = 2
+size_flags_vertical = 4
+color = Color(0.27, 0.88, 1, 1)
+
+[node name="lbl_ui_feedback" type="Label" parent="Layout/StatusBar/Row"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 19
 text = "Sample text"
+text_overrun_behavior = 3
+
+[node name="MusicLabel" type="Label" parent="Layout/StatusBar/Row"]
+layout_mode = 2
+theme_type_variation = &"CapsLabel"
+text = "MUSIC"
+
+[node name="MusicSlider" type="HSlider" parent="Layout/StatusBar/Row"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(130, 0)
+layout_mode = 2
+size_flags_vertical = 4
+focus_mode = 0
+max_value = 1.0
+step = 0.05
+
+[node name="VersionRule" type="VSeparator" parent="Layout/StatusBar/Row"]
+layout_mode = 2
+
+[node name="VersionLabel" type="Label" parent="Layout/StatusBar/Row"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"CapsLabel"
+
+[node name="NavLine" type="Panel" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 0
+offset_right = 120.0
+offset_bottom = 3.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_navline")

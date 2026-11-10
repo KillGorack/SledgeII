@@ -22,6 +22,8 @@ const ASSETS := [
 	{"what": "Menu music: \"Break The Line\" (Uppbeat license code HYHE2XELUFQRVHCC)", "who": "Abbynoise, Uppbeat", "license": "Uppbeat free license", "url": "https://uppbeat.io/c/abbynoise"},
 	{"what": "Freeze powerup icon: \"Snow vector weather icon\" (made into a 3D medallion)", "who": "publicdomainvectors.org", "license": "Public Domain", "url": "https://publicdomainvectors.org/en/free-clipart/Snow-vector-weather-icon/1030.html"},
 	{"what": "Haste powerup icon: \"Curly wing\" (made into a 3D medallion)", "who": "Lorc, game-icons.net", "license": "CC BY 3.0", "url": "https://game-icons.net/1x1/lorc/curly-wing.html"},
+	{"what": "Menu font: Orbitron", "who": "The Orbitron Project Authors", "license": "SIL OFL 1.1", "url": "https://github.com/theleagueof/orbitron"},
+	{"what": "Menu font: Rajdhani", "who": "Indian Type Foundry", "license": "SIL OFL 1.1", "url": "https://fonts.google.com/specimen/Rajdhani"},
 ]
 
 const ENGINE := [
@@ -29,7 +31,8 @@ const ENGINE := [
 	{"what": "Jolt Physics", "license": "MIT license", "url": "https://github.com/jrouwe/JoltPhysics"},
 ]
 
-const HEADER_BG := "#ffffff1c"
+const HEADER_BG := "#45e0ff22"
+const LINK_COLOR := "#45e0ff"
 const TITLE_SIZE := 30
 const SECTION_SIZE := 20
 
@@ -67,7 +70,7 @@ static func _section(title: String) -> String:
 
 
 static func _link(label: String, url: String) -> String:
-	return "[url=%s]%s[/url]" % [url, label] if url != "" else label
+	return "[color=%s][url=%s]%s[/url][/color]" % [LINK_COLOR, url, label] if url != "" else label
 
 
 # A BBCode table. The first row is the header; `ratios` sets each column's share of the width.

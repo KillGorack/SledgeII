@@ -1,56 +1,79 @@
 extends Control
 
+# The line at the bottom of the screen: its colour, and the colour of the light beside it.
 const FEEDBACK_COLORS := {
-	"OK": Color.GREEN,
-	"COK": Color.YELLOW,
-	"NOK": Color.RED,
-	"INFO": Color.WHITE,
+	"OK": Color(0.3, 1.0, 0.69),
+	"COK": Color(1.0, 0.82, 0.3),
+	"NOK": Color(1.0, 0.33, 0.44),
+	"INFO": Color(0.85, 0.93, 1.0),
 }
-var feedback_base_x: float
+const ACCENT := Color(0.27, 0.88, 1.0)
+# Each team's colour on the team select cards, in NetworkManager.TEAM_NAMES order.
+const TEAM_COLORS := {
+	"team_red": Color(1.0, 0.3, 0.36),
+	"team_green": Color(0.3, 0.95, 0.5),
+	"team_blue": Color(0.3, 0.6, 1.0),
+	"team_gray": Color(0.72, 0.76, 0.82),
+}
 
-@onready var btn_quit: TextureButton = $Screen_layout/Buttons_Section/Menu/VBox/btn_quit
-@onready var btn_register: TextureButton = $"Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect/MarginContainer/TextureRect/MarginContainer/MarginContainer/VBoxContainer/HBoxContainer/btn_register"
-@onready var ui_feedback: Label = $Screen_layout/VBoxContainer/StatusBar/ui_feedback_node/lbl_ui_feedback
-@onready var btn_play: TextureButton = $Screen_layout/Buttons_Section/Menu/VBox/btn_play
-@onready var btn_settings: TextureButton = $Screen_layout/Buttons_Section/Menu/VBox/btn_settings
-@onready var btn_credits: TextureButton = $Screen_layout/Buttons_Section/Menu/VBox/btn_credits
+# The scene (index.tscn) marks every node this script needs with a unique name, so the layout can be moved
+# around in the editor without breaking the paths here.
+@onready var backdrop: ColorRect = %Backdrop
+@onready var stage: MarginContainer = %Stage
+@onready var nav: HBoxContainer = %Nav
+@onready var nav_line: Panel = %NavLine
+@onready var pilot_box: Control = %PilotBox
+@onready var pilot_name: Label = %PilotName
+@onready var status_led: ColorRect = %StatusLed
+@onready var btn_quit: Button = %btn_quit
+@onready var btn_register: Button = %btn_register
+@onready var ui_feedback: Label = %lbl_ui_feedback
+@onready var btn_settings: Button = %btn_settings
+@onready var btn_credits: Button = %btn_credits
 @onready var settings_group: Control = %Settings
 @onready var credits_group: Control = %Credits
 @onready var http_request = $HTTPRequest
 @onready var login_timer = Timer.new()
-@onready var load_group: Control = $"Screen_layout/VBoxContainer/MarginContainer/Load Game"
-@onready var login_group: Control = $"Screen_layout/VBoxContainer/MarginContainer/Login Group"
-@onready var txt_login: LineEdit = $"Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect/MarginContainer/TextureRect/MarginContainer/MarginContainer/VBoxContainer/hb_username/txt_username"
-@onready var txt_password: LineEdit = $"Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect/MarginContainer/TextureRect/MarginContainer/MarginContainer/VBoxContainer/hb_password/txt_password"
-@onready var btn_login: TextureButton = $"Screen_layout/VBoxContainer/MarginContainer/Login Group/TextureRect/MarginContainer/TextureRect/MarginContainer/MarginContainer/VBoxContainer/HBoxContainer/btn_submit_login"
+@onready var login_group: Control = $"Layout/Stage/Login Group"
+@onready var txt_login: LineEdit = %txt_username
+@onready var txt_password: LineEdit = %txt_password
+@onready var btn_login: Button = %btn_submit_login
 @onready var world_list: Tree = %WorldList
 @onready var map_thumbnail: TextureRect = %MapThumbnail
 @onready var thumb_frame: AspectRatioContainer = %ThumbFrame
 @onready var map_description: RichTextLabel = %MapDescription
 @onready var map_title: Label = %MapTitle
 @onready var map_byline: Label = %MapByline
+@onready var host_summary: RichTextLabel = %HostSummary
 @onready var btn_host: Button = %btn_host
-@onready var game_list: Tree = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Join Game/MarginContainer/VBoxContainer/GameList"
-@onready var btn_refresh: Button = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Join Game/MarginContainer/VBoxContainer/btn_refresh"
-@onready var btn_join: Button = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer/Join Game/MarginContainer/VBoxContainer/btn_join"
-@onready var load_game_tabs: TabContainer = $"Screen_layout/VBoxContainer/MarginContainer/Load Game/TabContainer"
+@onready var game_list: Tree = %GameList
+@onready var game_count: Label = %GameCount
+@onready var no_games: Control = %NoGames
+@onready var join_title: Label = %JoinTitle
+@onready var join_details: RichTextLabel = %JoinDetails
+@onready var btn_refresh: Button = %btn_refresh
+@onready var btn_join: Button = %btn_join
+# The three main screens (Create Game / Join Game / Community Levels). Its own tab strip is hidden; the buttons
+# in the top bar switch it.
+@onready var load_game_tabs: TabContainer = $"Layout/Stage/Load Game"
 @onready var game_list_poll_timer := Timer.new()
-@onready var mine_checklist: VBoxContainer = %MineChecklist
-@onready var rockets_check: CheckBox = %RocketsCheck
-@onready var recon_capture_check: CheckBox = %ReconCaptureCheck
-@onready var day_night_check: CheckBox = %DayNightCheck
-@onready var public_game_check: CheckBox = %PublicGameCheck
+@onready var mine_checklist: Container = %MineChecklist
+@onready var rockets_check: BaseButton = %RocketsCheck
+@onready var recon_capture_check: BaseButton = %ReconCaptureCheck
+@onready var day_night_check: BaseButton = %DayNightCheck
+@onready var public_game_check: BaseButton = %PublicGameCheck
 
 # Set by NetworkManager.port_forward_failed, read by _on_host_started - see
 # _on_host_pressed's comment for why this can't just be a set_ui_feedback()
 # call at the point it fires.
 var _pending_port_forward_warning: String = ""
-@onready var weapon_checklist: VBoxContainer = %WeaponChecklist
+@onready var weapon_checklist: Container = %WeaponChecklist
 @onready var host_team_picker: OptionButton = %HostTeamPicker
-@onready var team_select_group: Control = $"Screen_layout/VBoxContainer/MarginContainer/Team Select"
-@onready var vehicle_label: Label = %VehicleLabel
-@onready var team_roster: VBoxContainer = $"Screen_layout/VBoxContainer/MarginContainer/Team Select/MarginContainer/VBoxContainer/TeamRoster"
-@onready var team_select_feedback: Label = $"Screen_layout/VBoxContainer/MarginContainer/Team Select/MarginContainer/VBoxContainer/TeamSelectFeedback"
+@onready var team_select_group: Control = $"Layout/Stage/Team Select"
+@onready var host_vehicle_row: Control = %HostVehicleRow
+@onready var join_vehicle_row: Control = %JoinVehicleRow
+@onready var team_roster: Container = %TeamRoster
+@onready var team_select_feedback: Label = %TeamSelectFeedback
 
 # "Create Game" is tab 0, "Join Game" is tab 1 (see index.tscn) - only poll
 # the lobby API while the player is actually looking at the Join Game list,
@@ -64,6 +87,8 @@ const JOIN_GAME_TAB_INDEX := 1
 const MINE_CATALOG_DIR := "res://Weapons/settings_mines/"
 const WEAPON_CATALOG_DIRS: Array[String] = ["res://Weapons/settings/"]
 const CRAFT_SCENE_PATH := "res://Crafts/Scenes/craft.tscn"
+# The menu's card (a panel with corner brackets), for the cards this script builds itself.
+const HUD_CARD := preload("res://UI/_scripts/hud_card.gd")
 
 
 
@@ -96,11 +121,10 @@ var _genre_filter: OptionButton
 # next visit - even after a restart. See _save_host_settings.
 const HOST_SETTINGS_PATH := "user://host_settings.cfg"
 var selected_game_row = null
-var _host_picker: OptionButton
-var _join_picker: OptionButton
-var _join_caption: Label
-var _craft_checklist: VBoxContainer
-var _craft_checklist_label: Label
+@onready var _host_picker: OptionButton = %HostVehiclePicker
+@onready var _join_picker: OptionButton = %JoinVehiclePicker
+@onready var _craft_checklist: Container = %CraftChecklist
+@onready var _craft_section: Control = %CraftSection
 
 
 
@@ -111,7 +135,7 @@ const SHOW_SETTINGS := false
 # Menu music: "Break The Line" by Abbynoise (Uppbeat, credited in credits.gd). It lives on this scene, so it
 # stops by itself when a match loads and starts again when the player comes back to the menu.
 const MENU_MUSIC := preload("res://UI/music/break_the_line.mp3")
-# The player's music slider (bottom-left of the menu), 0 = off. Remembered between sessions.
+# The player's music slider (in the bar along the bottom of the menu), 0 = off. Remembered between sessions.
 const MENU_MUSIC_DEFAULT := 0.3
 const MENU_MUSIC_TOP_DB := -6.0 # slider all the way up
 const MUSIC_FADE_SECONDS := 1.5
@@ -124,6 +148,8 @@ func _ready() -> void:
 	_start_menu_music()
 	_build_credits()
 	_add_version_label()
+	_build_nav()
+	_setup_lists()
 	add_child(login_timer)
 	add_child(game_list_poll_timer)
 	# Same cadence NetworkManager already uses to keep a hosted game's own
@@ -136,13 +162,11 @@ func _ready() -> void:
 	_build_mine_checklist()
 	for team in NetworkManager.TEAM_NAMES:
 		host_team_picker.add_item(team.trim_prefix("team_").capitalize())
-	_add_vehicle_picker(vehicle_label)
-	_add_vehicle_picker(team_roster, true)
+	_setup_vehicle_pickers()
 	_build_craft_checklist()
 	NetworkManager.ruleset_received.connect(_refresh_join_picker)
 	_load_host_settings()
 	_refresh_host_picker()
-	feedback_base_x = ui_feedback.position.x + 25
 	login_timer.connect("timeout", Callable(self, "_on_cooldown_finished"))
 	http_request.connect("request_completed", Callable(self, "_on_request_completed"))
 	world_list.connect("item_selected", Callable(self, "_on_level_selected"))
@@ -150,10 +174,13 @@ func _ready() -> void:
 	game_list.connect("item_selected", Callable(self, "_on_game_selected"))
 	login_timer.one_shot = true
 	btn_quit.pressed.connect(func(): _on_quit())
-	btn_play.pressed.connect(_on_play_pressed)
 	thumb_frame.resized.connect(_fit_thumb_frame)
-	btn_settings.pressed.connect(func(): _show_info_panel(settings_group))
-	btn_credits.pressed.connect(func(): _show_info_panel(credits_group))
+	btn_settings.pressed.connect(func(): _toggle_info_panel(settings_group))
+	btn_credits.pressed.connect(func(): _toggle_info_panel(credits_group))
+	%btn_settings_back.pressed.connect(_leave_info_panel)
+	%btn_credits_back.pressed.connect(_leave_info_panel)
+	host_team_picker.item_selected.connect(func(_index): _refresh_host_summary())
+	public_game_check.toggled.connect(func(_on): _refresh_host_summary())
 	# host_started (see _on_host_started) takes it from there into match.tscn.
 	btn_register.pressed.connect(func(): _on_register())
 	btn_login.pressed.connect(func(): _on_login())
@@ -187,9 +214,9 @@ func _ready() -> void:
 	if UserData.user_id > 0:
 		_enter_load_screen("Welcome back, %s!" % UserData.username)
 	else:
-		login_group.visible = true
-		load_group.visible = false
+		_show_screen(login_group)
 		set_ui_feedback("Please login to continue...", "INFO")
+		txt_login.grab_focus.call_deferred()
 
 	# A join that failed while a match scene was up (see NetworkManager._version_failed) sends us here.
 	if NetworkManager.menu_notice != "":
@@ -204,43 +231,149 @@ func _show_menu_notice() -> void:
 		NetworkManager.menu_notice = ""
 
 
-# --- Menu buttons: Play / Settings / Credits --------------------------------
-# Settings and Credits take over the right-hand area; Play brings back whichever
-# of login / load game / team select was showing before.
+# --- Screens ----------------------------------------------------------------------------------------------------
+# One of these fills the stage at a time: login, the three main screens (one TabContainer, switched from the top
+# bar), team select, and the Settings / Credits panels. Those two remember what they covered and give it back.
+const STAGE_MARGIN_TOP := 22
+const SCREEN_SLIDE := 26
 var _return_panel: Control = null
+var _screen_tween: Tween
+var _screen_animated: Control
+var _backdrop_tween: Tween
+var _nav_tween: Tween
 
 
-func _main_panels() -> Array[Control]:
-	return [login_group, load_group, team_select_group]
+func _screens() -> Array[Control]:
+	return [login_group, load_game_tabs, team_select_group, settings_group, credits_group]
 
 
-func _show_info_panel(panel: Control) -> void:
-	for main in _main_panels():
-		if main.visible:
-			_return_panel = main
-			main.visible = false
-	settings_group.visible = panel == settings_group
-	credits_group.visible = panel == credits_group
+func _current_screen() -> Control:
+	for screen in _screens():
+		if screen.visible:
+			return screen
+	return null
 
 
-func _hide_info_panels() -> void:
-	settings_group.visible = false
-	credits_group.visible = false
+func _show_screen(screen: Control) -> void:
+	for other in _screens():
+		other.visible = other == screen
+	_animate_in(screen)
+	var logged_in: bool = UserData.user_id > 0
+	nav.visible = logged_in
+	pilot_box.visible = logged_in
+	pilot_name.text = str(UserData.username)
+	%Logo.visible = screen != login_group # the login screen shows the title large, above its card
+	_refresh_nav(false)
+	# The grid runs at full strength behind the login card and the team cards, and is turned down behind the
+	# screens that are mostly text.
+	var level := 1.0 if screen == login_group or screen == team_select_group else 0.4
+	if _backdrop_tween:
+		_backdrop_tween.kill()
+	_backdrop_tween = create_tween()
+	_backdrop_tween.tween_property(backdrop.material, "shader_parameter/intensity", level, 0.9).set_trans(Tween.TRANS_SINE)
 
 
-func _on_play_pressed() -> void:
-	if not (settings_group.visible or credits_group.visible):
+# A screen arrives by fading in while sliding up a little. The slide is the stage's top margin, since the
+# screens sit in a container and can't be moved directly.
+func _animate_in(screen: Control) -> void:
+	if _screen_tween and _screen_tween.is_valid():
+		_screen_tween.kill()
+		if is_instance_valid(_screen_animated):
+			_screen_animated.modulate.a = 1.0
+	_screen_animated = screen
+	screen.modulate.a = 0.0
+	stage.add_theme_constant_override("margin_top", STAGE_MARGIN_TOP + SCREEN_SLIDE)
+	_screen_tween = create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_screen_tween.tween_property(screen, "modulate:a", 1.0, 0.3)
+	_screen_tween.tween_method(func(margin: int) -> void: stage.add_theme_constant_override("margin_top", margin), STAGE_MARGIN_TOP + SCREEN_SLIDE, STAGE_MARGIN_TOP, 0.34)
+
+
+# The Settings and Credits buttons open their panel, and close it again if it is the one showing.
+func _toggle_info_panel(panel: Control) -> void:
+	if panel.visible:
+		_leave_info_panel()
 		return
-	_hide_info_panels()
-	var back: Control = _return_panel if _return_panel else (load_group if UserData.user_id > 0 else login_group)
-	back.visible = true
+	var current := _current_screen()
+	if current != settings_group and current != credits_group:
+		_return_panel = current
+	_show_screen(panel)
+
+
+func _leave_info_panel() -> void:
+	var back: Control = _return_panel if _return_panel else (load_game_tabs if UserData.user_id > 0 else login_group)
+	_return_panel = null
+	_show_screen(back)
+
+
+# --- Top bar ----------------------------------------------------------------------------------------------------
+# Create Game / Join Game / Community Levels. They switch load_game_tabs, whose own tab strip is hidden. The
+# bright line under the chosen one is a separate node (NavLine) so it can slide from button to button.
+
+func _build_nav() -> void:
+	for i in nav.get_child_count():
+		var button := nav.get_child(i) as Button
+		button.pressed.connect(_on_nav_pressed.bind(i))
+		# Follows the button when the window is resized or the bar lays itself out again.
+		button.item_rect_changed.connect(func() -> void: _place_nav_line(false))
+
+
+func _on_nav_pressed(tab: int) -> void:
+	if not load_game_tabs.visible:
+		_return_panel = null
+		_show_screen(load_game_tabs)
+	load_game_tabs.current_tab = tab
+	_refresh_nav()
+
+
+func _refresh_nav(animate: bool = true) -> void:
+	for i in nav.get_child_count():
+		(nav.get_child(i) as Button).set_pressed_no_signal(load_game_tabs.visible and i == load_game_tabs.current_tab)
+	_place_nav_line(animate)
+
+
+func _place_nav_line(animate: bool) -> void:
+	if _nav_tween:
+		_nav_tween.kill()
+	if not (nav.visible and load_game_tabs.visible):
+		nav_line.visible = false
+		return
+	var button := nav.get_child(load_game_tabs.current_tab) as Control
+	var bar: Control = %TopBar
+	var target := Vector2(button.global_position.x - global_position.x, bar.global_position.y - global_position.y + bar.size.y - 3.0)
+	if not nav_line.visible or not animate:
+		nav_line.visible = true
+		nav_line.position = target
+		nav_line.size = Vector2(button.size.x, 3.0)
+		return
+	_nav_tween = create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_nav_tween.tween_property(nav_line, "position", target, 0.28)
+	_nav_tween.tween_property(nav_line, "size", Vector2(button.size.x, 3.0), 0.28)
+
+
+# The two lists use real column headings, sized by share so a long name can't push the others off.
+func _setup_lists() -> void:
+	var world_titles := ["ARENA", "AUTHOR", "GENRE"]
+	var world_shares := [5, 3, 2]
+	for i in world_titles.size():
+		world_list.set_column_title(i, world_titles[i])
+		world_list.set_column_title_alignment(i, HORIZONTAL_ALIGNMENT_LEFT)
+		world_list.set_column_expand_ratio(i, world_shares[i])
+		world_list.set_column_clip_content(i, true)
+	var game_titles := ["ARENA", "HOSTED BY", "PILOTS", "DAY / NIGHT"]
+	var game_shares := [4, 3, 2, 2]
+	for i in game_titles.size():
+		game_list.set_column_title(i, game_titles[i])
+		game_list.set_column_title_alignment(i, HORIZONTAL_ALIGNMENT_LEFT)
+		game_list.set_column_expand_ratio(i, game_shares[i])
+		game_list.set_column_clip_content(i, true)
+	_show_game_details(null)
 
 
 func _enter_load_screen(feedback_message: String) -> void:
-	login_group.visible = false
-	load_group.visible = true
-	_hide_info_panels()
+	_return_panel = null
+	_show_screen(load_game_tabs)
 	load_game_tabs.current_tab = clampi(_last_load_tab, 0, load_game_tabs.get_tab_count() - 1)
+	_refresh_nav(false)
 	set_ui_feedback(feedback_message, "OK")
 	# Ask the server about the player's own levels now, whichever tab is showing, so My Creations is right when opened.
 	var my_creations := load_game_tabs.get_node_or_null("Community Levels/My Creations")
@@ -256,19 +389,9 @@ func _enter_load_screen(feedback_message: String) -> void:
 # while the player is just picking a map to host).
 # The Credits screen's text, and a Licenses button that shows the engine's notices.
 func _build_credits() -> void:
-	var text_label := credits_group.get_node("Margin/Text") as RichTextLabel
+	var text_label: RichTextLabel = %CreditsText
 	text_label.text = Credits.text()
 	text_label.meta_clicked.connect(func(meta): OS.shell_open(str(meta)))
-	var button := Button.new()
-	button.text = "Licenses"
-	button.focus_mode = Control.FOCUS_NONE
-	button.custom_minimum_size = Vector2(140, 44)
-	button.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	button.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	button.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	button.offset_right = -20.0
-	button.offset_bottom = -20.0
-	credits_group.add_child(button)
 	var dialog := AcceptDialog.new()
 	dialog.title = "Licenses"
 	dialog.exclusive = false
@@ -279,7 +402,7 @@ func _build_credits() -> void:
 	box.text = Credits.licenses_text()
 	dialog.add_child(box)
 	add_child(dialog)
-	button.pressed.connect(func() -> void: dialog.popup_centered())
+	%btn_licenses.pressed.connect(func() -> void: dialog.popup_centered())
 
 
 # Both ways into a match (hosting, and joining once a team is confirmed) end here. The music moves out of this
@@ -318,58 +441,29 @@ func _start_menu_music() -> void:
 	cfg.load(SETTINGS_PATH) # missing file is fine: defaults
 	var value := clampf(float(cfg.get_value("audio", "menu_music", MENU_MUSIC_DEFAULT)), 0.0, 1.0)
 	_apply_music_volume(value)
-	var layer := CanvasLayer.new()
-	layer.layer = 100
-	add_child(layer)
-	var row := HBoxContainer.new()
-	row.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	row.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	row.offset_left = 10.0
-	row.offset_bottom = -6.0
-	row.modulate = Color(1.0, 1.0, 1.0, 0.7)
-	layer.add_child(row)
-	var label := Label.new()
-	label.text = "Music"
-	row.add_child(label)
-	var slider := HSlider.new()
-	slider.min_value = 0.0
-	slider.max_value = 1.0
-	slider.step = 0.05
-	slider.value = value
-	slider.custom_minimum_size = Vector2(110.0, 0.0)
-	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var slider: HSlider = %MusicSlider
+	slider.set_value_no_signal(value)
 	slider.value_changed.connect(func(v: float) -> void:
 		_apply_music_volume(v)
 		var out := ConfigFile.new()
 		out.load(SETTINGS_PATH) # keep any other saved settings
 		out.set_value("audio", "menu_music", v)
 		out.save(SETTINGS_PATH))
-	row.add_child(slider)
 
 
-# The build's version (Project Settings > Application > Config > Version), small in the bottom-right corner, so a
+# The build's version (Project Settings > Application > Config > Version), at the right end of the bottom bar, so a
 # bug report can say which build it came from.
 func _add_version_label() -> void:
 	var version := str(ProjectSettings.get_setting("application/config/version", ""))
-	if version.is_empty():
-		return
-	var layer := CanvasLayer.new()
-	layer.layer = 100
-	add_child(layer)
-	var label := Label.new()
-	label.text = "v" + version
-	label.modulate = Color(1.0, 1.0, 1.0, 0.55)
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	label.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	label.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	label.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	label.offset_right = -10.0
-	label.offset_bottom = -6.0
-	layer.add_child(label)
+	var label: Label = %VersionLabel
+	label.text = "V" + version
+	label.visible = not version.is_empty()
 
 
 func _on_load_game_tab_changed(tab: int) -> void:
 	_last_load_tab = tab
+	_refresh_nav()
+	_animate_in(load_game_tabs.get_current_tab_control())
 	if tab == JOIN_GAME_TAB_INDEX:
 		NetworkManager.list_open_games() # don't make them wait a full interval for the first refresh
 		game_list_poll_timer.start()
@@ -381,7 +475,8 @@ func _on_load_game_tab_changed(tab: int) -> void:
 
 
 func _input(event):
-	if event.is_action_pressed("ui_accept"):
+	# Enter logs in, but only while the login card is the screen showing.
+	if event.is_action_pressed("ui_accept") and login_group.visible:
 		_on_login()
 
 
@@ -393,6 +488,22 @@ func _on_level_selected():
 		selected_map_file_id = int(selected.get_meta("fil_id", -1))
 		_last_selected_map_file_id = selected_map_file_id
 		_show_map_details(selected)
+		_refresh_host_summary()
+
+
+# The line beside the Host button: what is about to be hosted.
+func _refresh_host_summary() -> void:
+	if selected_map_title == "":
+		host_summary.text = "[color=#8099b8]Pick an arena to host.[/color]"
+		return
+	var parts: Array[String] = []
+	for pair in [
+		["ARENA", selected_map_title],
+		["TEAM", host_team_picker.get_item_text(host_team_picker.selected) if host_team_picker.selected >= 0 else "-"],
+		["GAME", "Public" if public_game_check.button_pressed else "LAN only"],
+	]:
+		parts.append("[color=#8099b8][font_size=14]%s[/font_size][/color]  [b]%s[/b]" % [pair[0], str(pair[1]).replace("[", "[lb]")])
+	host_summary.text = "        ".join(parts)
 
 
 # Same source the original Sledge uses for secret level thumbnails
@@ -414,12 +525,12 @@ func _show_map_details(row: TreeItem) -> void:
 	var description := str(row.get_meta("description", ""))
 	map_description.text = description if description != "" else "No description available."
 	map_title.text = row.get_text(0)
-	map_byline.text = "by %s   -   %s" % [row.get_text(1), row.get_text(2)]
+	map_byline.text = "by %s   //   %s" % [row.get_text(1), row.get_text(2)]
 	if row.get_meta("origin", "") == "Creative level":
-		map_byline.text += "   -   Community level"
+		map_byline.text += "   //   Community level"
 	var tan_id := int(row.get_meta("tan_id", -1))
 	if _thumb_cache.has(tan_id):
-		map_thumbnail.texture = _thumb_cache[tan_id]
+		_set_thumbnail(_thumb_cache[tan_id])
 		return
 	map_thumbnail.texture = null
 	if tan_id < 0:
@@ -445,11 +556,53 @@ func _on_thumbnail_loaded(_result: int, response_code: int, _headers: PackedStri
 		return
 	var texture := ImageTexture.create_from_image(image)
 	_thumb_cache[_thumb_request_id] = texture
+	_set_thumbnail(texture)
+
+
+var _thumb_tween: Tween
+
+
+# The picture fades in rather than popping.
+func _set_thumbnail(texture: Texture2D) -> void:
 	map_thumbnail.texture = texture
+	if _thumb_tween:
+		_thumb_tween.kill()
+	map_thumbnail.modulate.a = 0.0
+	_thumb_tween = create_tween()
+	_thumb_tween.tween_property(map_thumbnail, "modulate:a", 1.0, 0.25)
 
 
 func _on_game_selected():
 	selected_game_row = game_list.get_selected()
+	_show_game_details(selected_game_row)
+
+
+# The card beside the Join Game list: what the selected row's host has set up.
+func _show_game_details(row: TreeItem) -> void:
+	btn_join.disabled = row == null
+	if row == null:
+		join_title.text = "Select a game"
+		join_details.text = "[color=#8099b8]Pick a game from the list to see who is hosting and what is allowed.[/color]"
+		return
+	join_title.text = row.get_text(0)
+	var manifest: Dictionary = row.get_meta("manifest", {})
+	var lines: Array[String] = []
+	for pair in [["HOSTED BY", row.get_text(1)], ["PILOTS", row.get_text(2)], ["DAY / NIGHT", "On" if manifest.get("day_night", true) else "Off"]]:
+		lines.append("[color=#8099b8][font_size=14]%s[/font_size][/color]\n[b]%s[/b]\n" % [pair[0], str(pair[1]).replace("[", "[lb]")])
+	var weapons: Array = manifest.get("weapons", [])
+	if not weapons.is_empty():
+		lines.append("[color=#8099b8][font_size=14]WEAPONS[/font_size][/color]\n%s" % ", ".join(weapons).replace("[", "[lb]"))
+	join_details.text = "\n".join(lines)
+
+
+# One entry of the weapon / special / vehicle lists: a tick box drawn as a tag (ChipCheck in the theme).
+func _make_chip(text: String, tooltip: String = "") -> CheckBox:
+	var chip := CheckBox.new()
+	chip.theme_type_variation = &"ChipCheck"
+	chip.focus_mode = Control.FOCUS_NONE
+	chip.text = text
+	chip.tooltip_text = tooltip
+	return chip
 
 
 # Built once from disk, not maintained by hand - drop a new .tres in any of
@@ -482,8 +635,7 @@ func _build_weapon_checklist() -> void:
 	for weapon_path in weapon_paths:
 		var settings: WeaponSettings = load(weapon_path)
 		if settings:
-			var check := CheckBox.new()
-			check.text = settings.weapon_name
+			var check := _make_chip(settings.weapon_name)
 			check.button_pressed = settings.default_available
 			check.set_meta("weapon_path", weapon_path)
 			weapon_checklist.add_child(check)
@@ -517,16 +669,12 @@ func _build_mine_checklist() -> void:
 		var mine_path := MINE_CATALOG_DIR.path_join(file_name)
 		var settings: MineSettings = load(mine_path)
 		if settings:
-			var check := CheckBox.new()
-			check.text = settings.mine_name
-			check.tooltip_text = settings.mine_lore
+			var check := _make_chip(settings.mine_name, settings.mine_lore)
 			check.button_pressed = settings.default_available
 			check.set_meta("mine_path", mine_path)
 			mine_checklist.add_child(check)
 	for id in SpecialCatalog.ids():
-		var check := CheckBox.new()
-		check.text = SpecialCatalog.display_name(id)
-		check.tooltip_text = SpecialCatalog.description(id)
+		var check := _make_chip(SpecialCatalog.display_name(id), SpecialCatalog.description(id))
 		check.set_meta("special_id", id)
 		mine_checklist.add_child(check)
 
@@ -635,7 +783,7 @@ func _load_host_settings() -> void:
 
 
 # Only the checkboxes carrying `meta` - the specials list mixes mines and built-ins.
-func _listed_paths(checklist: VBoxContainer, meta: String) -> Array:
+func _listed_paths(checklist: Container, meta: String) -> Array:
 	var paths: Array = []
 	for child in checklist.get_children():
 		if child is CheckBox and child.has_meta(meta):
@@ -643,7 +791,7 @@ func _listed_paths(checklist: VBoxContainer, meta: String) -> Array:
 	return paths
 
 
-func _restore_checklist(checklist: VBoxContainer, meta: String, listed: Array, checked: Array) -> void:
+func _restore_checklist(checklist: Container, meta: String, listed: Array, checked: Array) -> void:
 	for child in checklist.get_children():
 		if child is CheckBox and child.has_meta(meta) and listed.has(child.get_meta(meta)):
 			child.button_pressed = checked.has(child.get_meta(meta))
@@ -679,11 +827,10 @@ func _on_join_pressed():
 func _on_join_failed(reason: String) -> void:
 	set_ui_feedback(reason, "NOK")
 	NetworkManager.menu_notice = ""
+	if _return_panel == team_select_group: # Credits is open over the team cards: don't go back to them
+		_return_panel = null
 	if team_select_group.visible:
-		team_select_group.visible = false
-		var logged_in: bool = UserData.user_id > 0
-		load_group.visible = logged_in
-		login_group.visible = not logged_in
+		_show_screen(load_game_tabs if UserData.user_id > 0 else login_group)
 
 
 func _on_joined_match():
@@ -691,10 +838,8 @@ func _on_joined_match():
 	# Hold here instead of jumping straight to match.tscn (like this used to)
 	# until the host actually confirms a team - see _on_player_registered,
 	# which is what does the real transition once that happens.
-	login_group.visible = false
-	load_group.visible = false
-	_hide_info_panels()
-	team_select_group.visible = true
+	_return_panel = null
+	_show_screen(team_select_group)
 	_build_team_roster()
 
 
@@ -719,27 +864,16 @@ func _on_team_request_rejected(reason: String) -> void:
 # regenerate and this is only ever a handful of rows (4 teams), so there's no
 # real cost to not tracking a diff.
 # Vehicle pickers. Two of them, each an OptionButton bound to NetworkManager.local_craft_id: one on the
-# create-game screen (right after its Vehicle label) and one at the top of the team-select roster, so joiners
+# create-game screen (in the Match rules card) and one above the team cards, so joiners
 # can choose too. Each lists only the crafts its game allows, and hides itself when there is nothing to choose.
-func _add_vehicle_picker(anchor: Control, before_anchor: bool = false) -> void:
-	var picker := OptionButton.new()
-	picker.item_selected.connect(func(index: int): NetworkManager.local_craft_id = StringName(picker.get_item_metadata(index)))
-	var parent := anchor.get_parent()
-	parent.add_child(picker)
-	parent.move_child(picker, anchor.get_index() + (0 if before_anchor else 1))
-	if before_anchor:
-		_join_caption = Label.new()
-		_join_caption.text = "Vehicle"
-		parent.add_child(_join_caption)
-		parent.move_child(_join_caption, picker.get_index())
-		_join_picker = picker
-		_fill_vehicle_picker(_join_picker, _join_caption, NetworkManager.allowed_crafts())
-	else:
-		_host_picker = picker
+func _setup_vehicle_pickers() -> void:
+	for picker: OptionButton in [_host_picker, _join_picker]:
+		picker.item_selected.connect(func(index: int): NetworkManager.local_craft_id = StringName(picker.get_item_metadata(index)))
+	_fill_vehicle_picker(_join_picker, join_vehicle_row, NetworkManager.allowed_crafts())
 
 
 # Lists `defs`, keeps the player's current craft if it is among them (else the first), and hides the picker and its
-# caption when there is only one craft to be.
+# row (the caption beside it) when there is only one craft to be.
 func _fill_vehicle_picker(picker: OptionButton, caption: Control, defs: Array) -> void:
 	picker.clear()
 	var selected := 0
@@ -760,8 +894,7 @@ func _fill_vehicle_picker(picker: OptionButton, caption: Control, defs: Array) -
 
 # Joiners: the host's ruleset (with its craft list) has arrived.
 func _refresh_join_picker() -> void:
-	if _join_picker:
-		_fill_vehicle_picker(_join_picker, _join_caption, NetworkManager.allowed_crafts())
+	_fill_vehicle_picker(_join_picker, join_vehicle_row, NetworkManager.allowed_crafts())
 
 
 # --- Which crafts this game allows (create-game screen) ---------------------------------------------------------
@@ -769,19 +902,8 @@ func _refresh_join_picker() -> void:
 # ticked: unticking the last one puts the tick straight back.
 
 func _build_craft_checklist() -> void:
-	var parent := vehicle_label.get_parent()
-	_craft_checklist_label = Label.new()
-	_craft_checklist_label.text = "Vehicles allowed"
-	_craft_checklist = VBoxContainer.new()
-	parent.add_child(_craft_checklist_label)
-	parent.add_child(_craft_checklist)
-	var at := _host_picker.get_index() + 1
-	parent.move_child(_craft_checklist_label, at)
-	parent.move_child(_craft_checklist, at + 1)
 	for def in CraftCatalog.DEFS:
-		var check := CheckBox.new()
-		check.text = def.display_name
-		check.tooltip_text = def.description
+		var check := _make_chip(def.display_name, def.description)
 		check.button_pressed = true
 		check.set_meta("craft_id", String(def.id))
 		check.toggled.connect(func(on: bool) -> void:
@@ -790,8 +912,7 @@ func _build_craft_checklist() -> void:
 			_refresh_host_picker())
 		_craft_checklist.add_child(check)
 	# Nothing to choose between with a single craft in the game.
-	_craft_checklist_label.visible = CraftCatalog.DEFS.size() > 1
-	_craft_checklist.visible = CraftCatalog.DEFS.size() > 1
+	_craft_section.visible = CraftCatalog.DEFS.size() > 1
 
 
 func _checked_craft_ids() -> Array[StringName]:
@@ -808,7 +929,7 @@ func _refresh_host_picker() -> void:
 	for def in CraftCatalog.DEFS:
 		if _checked_craft_ids().has(def.id):
 			defs.append(def)
-	_fill_vehicle_picker(_host_picker, vehicle_label, defs)
+	_fill_vehicle_picker(_host_picker, host_vehicle_row, defs)
 
 
 func _build_team_roster() -> void:
@@ -820,22 +941,48 @@ func _build_team_roster() -> void:
 		for peer_id in NetworkManager.peer_teams.keys():
 			if NetworkManager.peer_teams[peer_id] == team:
 				members.append("You" if peer_id == my_id else "Peer %d" % peer_id)
-		var row := HBoxContainer.new()
-		var label := Label.new()
-		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		label.text = "%s (%d/%d): %s" % [
-			team.trim_prefix("team_").capitalize(),
-			members.size(),
-			NetworkManager.MAX_PLAYERS_PER_TEAM,
-			", ".join(members) if not members.is_empty() else "empty"
-		]
-		row.add_child(label)
+		var color: Color = TEAM_COLORS.get(team, ACCENT)
+		var full := members.size() >= NetworkManager.MAX_PLAYERS_PER_TEAM
+		# One card a team, in the team's colour: its name, how full it is, who is on it, and the way in.
+		var card: PanelContainer = HUD_CARD.new()
+		card.accent = color
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var body := VBoxContainer.new()
+		body.add_theme_constant_override("separation", 8)
+		card.add_child(body)
+		var name_label := Label.new()
+		name_label.theme_type_variation = &"TitleLabel"
+		name_label.add_theme_font_size_override("font_size", 24)
+		name_label.add_theme_color_override("font_color", color)
+		name_label.text = team.trim_prefix("team_").to_upper()
+		body.add_child(name_label)
+		var count := Label.new()
+		count.theme_type_variation = &"CapsLabel"
+		count.text = "%d / %d PILOTS" % [members.size(), NetworkManager.MAX_PLAYERS_PER_TEAM]
+		body.add_child(count)
+		var fill := ProgressBar.new()
+		fill.show_percentage = false
+		fill.custom_minimum_size = Vector2(0, 5)
+		fill.max_value = NetworkManager.MAX_PLAYERS_PER_TEAM
+		fill.value = members.size()
+		var fill_style := StyleBoxFlat.new()
+		fill_style.bg_color = color
+		fill.add_theme_stylebox_override("fill", fill_style)
+		body.add_child(fill)
+		var list := Label.new()
+		list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		list.text = "\n".join(members) if not members.is_empty() else "Nobody yet"
+		if members.is_empty():
+			list.theme_type_variation = &"DimLabel"
+		body.add_child(list)
 		var join_button := Button.new()
-		join_button.text = "Join"
-		join_button.disabled = members.size() >= NetworkManager.MAX_PLAYERS_PER_TEAM
+		join_button.text = "FULL" if full else "JOIN"
+		join_button.focus_mode = Control.FOCUS_NONE
+		join_button.custom_minimum_size = Vector2(0, 46)
+		join_button.disabled = full
 		join_button.pressed.connect(_on_team_join_pressed.bind(team))
-		row.add_child(join_button)
-		team_roster.add_child(row)
+		body.add_child(join_button)
+		team_roster.add_child(card)
 
 
 func _on_team_join_pressed(team: String) -> void:
@@ -845,21 +992,17 @@ func _on_team_join_pressed(team: String) -> void:
 
 
 func _on_games_listed(games: Array):
+	# The list is rebuilt on every poll, so the player's pick is put back if that game is still there.
+	var picked := _game_key(selected_game_row)
 	game_list.clear()
+	selected_game_row = null
+	no_games.visible = games.is_empty()
+	game_count.text = "" if games.is_empty() else ("1 game" if games.size() == 1 else "%d games" % games.size())
 	if games.is_empty():
 		set_ui_feedback("No open games found.", "COK")
+		_show_game_details(null)
 		return
-	var root = game_list.create_item()
-	root.set_text(0, "")
-	var header = game_list.create_item()
-	header.set_text(0, "Arena")
-	header.set_text(1, "Hosted by")
-	header.set_text(2, "Players")
-	header.set_text(3, "Day/Night")
-	header.set_selectable(0, false)
-	header.set_selectable(1, false)
-	header.set_selectable(2, false)
-	header.set_selectable(3, false)
+	game_list.create_item() # the hidden root
 	for game in games:
 		var row = game_list.create_item()
 		row.set_text(0, game.get("hst_game_name", ""))
@@ -872,14 +1015,27 @@ func _on_games_listed(games: Array):
 		# hst_manifest is an opaque JSON blob (see NetworkManager._build_manifest) -
 		# add more fields to it later without ever touching the API/DB again,
 		# just what's read out of it here.
-		var manifest: Dictionary = JSON.parse_string(game.get("hst_manifest", "")) if game.get("hst_manifest", "") else {}
-		row.set_text(3, "Yes" if manifest.get("day_night", true) else "No")
+		var parsed: Variant = JSON.parse_string(game.get("hst_manifest", "")) if game.get("hst_manifest", "") else {}
+		var manifest: Dictionary = parsed if parsed is Dictionary else {}
+		row.set_meta("manifest", manifest)
+		row.set_text(3, "On" if manifest.get("day_night", true) else "Off")
 		var weapons: Array = manifest.get("weapons", [])
 		if not weapons.is_empty():
 			row.set_tooltip_text(0, "Weapons: %s" % ", ".join(weapons))
 		row.set_meta("hst_ip_address", game.get("hst_ip_address", ""))
 		row.set_meta("hst_port", game.get("hst_port", 0))
 		row.set_meta("hst_map_file_id", game.get("hst_map_file_id", 0))
+		if picked != "" and _game_key(row) == picked:
+			row.select(0)
+			selected_game_row = row
+	_show_game_details(selected_game_row)
+
+
+# Which game a row is, for finding it again after the list is rebuilt.
+func _game_key(row: Variant) -> String:
+	if row == null or not is_instance_valid(row):
+		return ""
+	return "%s:%s" % [row.get_meta("hst_ip_address", ""), row.get_meta("hst_port", 0)]
 
 
 
@@ -970,12 +1126,9 @@ func _on_request_completed(_result, response_code, _headers, body):
 
 
 
-# Origin and genre filters above the map list, added next to the list itself so
-# the scene file doesn't change.
+# Origin and genre filters above the map list, put in the row the scene keeps for them.
 func _build_level_filters() -> void:
-	var map_row := world_list.get_parent()
-	var bar := HBoxContainer.new()
-	bar.add_theme_constant_override("separation", 8)
+	var bar: HBoxContainer = %LevelFilterBar
 	_origin_filter = OptionButton.new()
 	_origin_filter.add_item("All origins")
 	for origin in ORIGIN_NAMES:
@@ -988,11 +1141,11 @@ func _build_level_filters() -> void:
 		bar.add_child(filter)
 	# The list is fetched at login; levels approved since then show up on a refresh.
 	var refresh := Button.new()
-	refresh.text = "Refresh"
+	refresh.text = "REFRESH"
+	refresh.theme_type_variation = &"GhostButton"
+	refresh.focus_mode = Control.FOCUS_NONE
 	refresh.pressed.connect(func(): getLevels())
 	bar.add_child(refresh)
-	map_row.get_parent().add_child(bar)
-	map_row.get_parent().move_child(bar, map_row.get_index())
 
 
 func populate_levels_tree(response_data):
@@ -1020,13 +1173,6 @@ func _fill_levels_tree() -> void:
 	var genre_pick := _genre_filter.get_item_text(_genre_filter.selected) if _genre_filter.selected > 0 else ""
 	var rootrow = world_list.create_item()
 	rootrow.set_text(0, "")
-	var firstrow = world_list.create_item()
-	firstrow.set_text(0, "Title")
-	firstrow.set_text(1, "Author")
-	firstrow.set_text(2, "Genre")
-	firstrow.set_selectable(0, false)
-	firstrow.set_selectable(1, false)
-	firstrow.set_selectable(2, false)
 	var first_row: TreeItem = null
 	var selected_any := false
 	for map_item in _level_rows:
@@ -1060,6 +1206,7 @@ func _fill_levels_tree() -> void:
 		# The filters left nothing: Host must not carry on with the map picked before.
 		selected_map_title = ""
 		selected_map_file_id = -1
+		_refresh_host_summary()
 
 
 
@@ -1112,16 +1259,23 @@ func encode_dict_string(data: Dictionary) -> String:
 
 
 
+var _feedback_tween: Tween
+
+
+# The line in the bottom bar. A new message types itself out and the light beside it blinks in the message's
+# colour; the same message again (a poll repeating itself) is left alone.
 func set_ui_feedback(err_msg: String, err_lvl: String) -> void:
 	var clr: Color = FEEDBACK_COLORS.get(err_lvl, Color.WHITE)
+	var repeated := err_msg == ui_feedback.text and status_led.color == clr
 	ui_feedback.add_theme_color_override("font_color", clr)
 	ui_feedback.text = err_msg
-	wiggle(ui_feedback)
-	
-	
-	
-func wiggle(node: Control, amount := 6.0, duration := 0.12):
-	var tween := create_tween()
-	tween.tween_property(node, "position:x", feedback_base_x - amount, duration / 3)
-	tween.tween_property(node, "position:x", feedback_base_x + amount, duration / 3)
-	tween.tween_property(node, "position:x", feedback_base_x, duration / 3)
+	status_led.color = clr
+	if repeated:
+		return
+	if _feedback_tween:
+		_feedback_tween.kill()
+	ui_feedback.visible_ratio = 0.0
+	status_led.modulate.a = 0.1
+	_feedback_tween = create_tween().set_parallel()
+	_feedback_tween.tween_property(ui_feedback, "visible_ratio", 1.0, clampf(err_msg.length() * 0.012, 0.15, 0.6))
+	_feedback_tween.tween_property(status_led, "modulate:a", 1.0, 0.45).set_trans(Tween.TRANS_BOUNCE)
