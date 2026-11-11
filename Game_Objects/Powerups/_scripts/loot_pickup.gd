@@ -88,14 +88,14 @@ const SEARCH_DEPTH := 80.0
 const WALL_MARGIN := 0.3
 
 
-# Where a drop at `position` should rest: on the floor directly BELOW it. The search starts
+# Where a drop at `point` should rest: on the floor directly BELOW it. The search starts
 # just above the spot, never from high up - from 2 m above, a ceiling lower than that
 # (a tunnel, an overhang, a bridge deck) was mistaken for the floor and the loot ended up
-# on top of it, out of reach. `anchor` is the wreck itself when `position` is a spot fanned
+# on top of it, out of reach. `anchor` is the wreck itself when `point` is a spot fanned
 # out to the side of it: if a wall is in between, the spot is pulled back to the wall instead
 # of landing inside it or behind it. Returns Vector3.INF when there is no floor below at all.
-static func floor_point(space: PhysicsDirectSpaceState3D, world_mask: int, position: Vector3, anchor: Vector3 = Vector3.INF) -> Vector3:
-	var spot := position
+static func floor_point(space: PhysicsDirectSpaceState3D, world_mask: int, point: Vector3, anchor: Vector3 = Vector3.INF) -> Vector3:
+	var spot := point
 	if anchor != Vector3.INF:
 		var from := anchor + Vector3.UP * PROBE_UP
 		var to := Vector3(spot.x, from.y, spot.z)
@@ -144,8 +144,8 @@ func _on_body_entered(body: Node) -> void:
 			used = power_node != null and power_node.add_power(settings.amount)
 		LootSettings.LootType.JUICE:
 			var weapon_node := body.get_node_or_null("weapon_node")
-			var match_node := get_tree().get_first_node_in_group("match")
-			used = weapon_node != null and match_node != null and match_node.add_team_juice(weapon_node.team, settings.amount)
+			var juice_match := get_tree().get_first_node_in_group("match")
+			used = weapon_node != null and juice_match != null and juice_match.add_team_juice(weapon_node.team, settings.amount)
 		LootSettings.LootType.BOOST:
 			var weapon_node := body.get_node_or_null("weapon_node")
 			used = weapon_node != null and weapon_node.server_grant_boost(settings.boost)

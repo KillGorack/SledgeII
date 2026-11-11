@@ -237,7 +237,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		_on_impact(collider, state.get_contact_local_position(i), state.get_contact_local_normal(i), impact)
 
 
-func _on_impact(collider: Node, point: Vector3, normal: Vector3, impact: float) -> void:
+func _on_impact(collider: Node, point: Vector3, normal: Vector3, _impact: float) -> void:
 	var id := collider.get_instance_id()
 	if _hit_times.has(id) and _age - float(_hit_times[id]) < HIT_COOLDOWN:
 		return

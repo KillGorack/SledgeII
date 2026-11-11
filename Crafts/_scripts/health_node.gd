@@ -273,13 +273,13 @@ func _process_station_healing(delta: float) -> void:
 	var at_own_station := _at_own_captured_station()
 	if (armor >= _armor_max and life >= _life_max) or not at_own_station:
 		return
-	var heal := stats.station_heal_rate * delta
+	var to_heal := stats.station_heal_rate * delta
 	if armor < _armor_max:
-		var to_armor = min(heal, _armor_max - armor)
+		var to_armor = min(to_heal, _armor_max - armor)
 		armor += to_armor
-		heal -= to_armor
-	if heal > 0.0 and life < _life_max:
-		life = min(_life_max, life + heal)
+		to_heal -= to_armor
+	if to_heal > 0.0 and life < _life_max:
+		life = min(_life_max, life + to_heal)
 # team lives on weapon_node (see recon_station.gd::color_for_team for the
 # string<->enum translation, and power_node.gd for the same lookup pattern) -
 # is_body_inside is the same boolean containment check match.gd's capture

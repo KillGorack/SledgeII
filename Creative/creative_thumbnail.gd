@@ -108,9 +108,9 @@ static func _frame(camera: Camera3D, bounds: AABB) -> void:
 	var basis := Basis.looking_at(-toward, Vector3.UP)
 	var shift := Vector2.ZERO
 
-	# Projected corners in the frame (-1..1 across and up), for a camera at `distance` slid by `shift` metres.
-	var project := func(distance: float, slide: Vector2) -> Rect2:
-		var position := centre + toward * distance + basis.x * slide.x + basis.y * slide.y
+	# Projected corners in the frame (-1..1 across and up), for a camera at `back_off` slid by `shift` metres.
+	var project := func(back_off: float, slide: Vector2) -> Rect2:
+		var position := centre + toward * back_off + basis.x * slide.x + basis.y * slide.y
 		var lo := Vector2(INF, INF)
 		var hi := Vector2(-INF, -INF)
 		for corner in corners:

@@ -156,15 +156,15 @@ func _has_line_of_sight(target: Node3D) -> bool:
 
 # Where to aim so a shot of this speed meets a moving target.
 func _lead_point(target: Node3D, delta: float) -> Vector3:
-	var position := target.global_position
+	var aim_from := target.global_position
 	var velocity := Vector3.ZERO
 	if target is RigidBody3D:
 		velocity = (target as RigidBody3D).linear_velocity
 	elif delta > 0.0 and _last_target_position != Vector3.ZERO:
-		velocity = (position - _last_target_position) / delta
-	_last_target_position = position
-	var travel := _turret.global_position.distance_to(position) / maxf(_weapon.projectile_speed, 1.0)
-	return position + velocity * travel
+		velocity = (aim_from - _last_target_position) / delta
+	_last_target_position = aim_from
+	var travel := _turret.global_position.distance_to(aim_from) / maxf(_weapon.projectile_speed, 1.0)
+	return aim_from + velocity * travel
 
 
 # The turret turns about the vertical, the barrel tips up and down; both ease toward the target.

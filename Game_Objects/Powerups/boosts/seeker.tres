@@ -11,7 +11,6 @@ region = Rect2(0, 1024, 256, 256)
 script = ExtResource("1_boost")
 boost_name = "Seeker"
 icon = SubResource("Icon")
-duration = 60.0
 projectile_color = Color(1, 0.85, 0.2, 1)
 affects = 2
 set_values = {

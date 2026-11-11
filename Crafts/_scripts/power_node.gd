@@ -57,15 +57,15 @@ func _process(delta: float) -> void:
 
 
 # Signed power change this frame from one source: positive from a friendly one,
-# negative from an enemy, tapering with distance. `scale` weakens it relative to
+# negative from an enemy, tapering with distance. strength weakens it relative to
 # a recon pad.
-func _source_rate(source_position: Vector3, friendly: bool, scale: float, delta: float) -> float:
+func _source_rate(source_position: Vector3, friendly: bool, strength: float, delta: float) -> float:
 	var distance = body.global_position.distance_to(source_position)
 	if distance > stats.max_effect_distance:
 		return 0.0
 	var t: float = distance / stats.max_effect_distance
 	var closeness: float = stats.power_falloff_curve.sample_baked(t) if stats.power_falloff_curve else 1.0 - t
-	var rate: float = stats.power_gain_rate * closeness * scale * delta
+	var rate: float = stats.power_gain_rate * closeness * strength * delta
 	return rate if friendly else -rate
 
 

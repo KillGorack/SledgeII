@@ -1238,14 +1238,14 @@ func _roll_loot_count() -> int:
 
 
 # Server only.
-func _drop_loot_at(position: Vector3, dropper_peer: int = 0) -> void:
+func _drop_loot_at(drop_at: Vector3, dropper_peer: int = 0) -> void:
 	if not multiplayer.is_server() or NetworkManager.creative_building:
 		return
 	if DEBUG_DROP_ALL:
 		var total := LOOT_TABLE.size()
 		for i in total:
 			var angle := TAU * i / total
-			_spawn_loot(LOOT_TABLE[i], position + Vector3(cos(angle), 0.0, sin(angle)) * 2.5, dropper_peer, position)
+			_spawn_loot(LOOT_TABLE[i], drop_at + Vector3(cos(angle), 0.0, sin(angle)) * 2.5, dropper_peer, drop_at)
 		return
 	var count := _roll_loot_count()
 	if count == 0:
@@ -1254,40 +1254,40 @@ func _drop_loot_at(position: Vector3, dropper_peer: int = 0) -> void:
 	# ring (random starting angle) so they never overlap.
 	var start_angle := randf() * TAU
 	for i in count:
-		var spot := position
+		var spot := drop_at
 		if count > 1:
 			var angle := start_angle + TAU * i / count
 			spot += Vector3(cos(angle), 0.0, sin(angle)) * LOOT_RING_RADIUS
-		_spawn_loot(_roll_loot(), spot, dropper_peer, position if count > 1 else Vector3.INF)
+		_spawn_loot(_roll_loot(), spot, dropper_peer, drop_at if count > 1 else Vector3.INF)
 
 
-# Server only: place one drop on the floor under `position` and announce it.
+# Server only: place one drop on the floor under `drop_at` and announce it.
 # dropper_peer: whose death left this - they can never pick it up (see loot_pickup.gd).
-# anchor: the wreck, when `position` is one of several spots fanned out around it.
-func _spawn_loot(settings: LootSettings, position: Vector3, dropper_peer: int = 0, anchor: Vector3 = Vector3.INF) -> void:
+# anchor: the wreck, when `drop_at` is one of several spots fanned out around it.
+func _spawn_loot(settings: LootSettings, drop_at: Vector3, dropper_peer: int = 0, anchor: Vector3 = Vector3.INF) -> void:
 	if settings == null or settings.resource_path.is_empty():
 		return
 	# Settle onto the floor under the wreck instead of hanging in the air (and never onto a
 	# ceiling above it - see LootPickup.floor_point).
 	var world_mask: int = 1 << (Utilities.GROUP_LAYER_SCOPE["world"]["layer"] - 1)
-	var floor_at := LootPickup.floor_point(get_viewport().world_3d.direct_space_state, world_mask, position, anchor)
+	var floor_at := LootPickup.floor_point(get_viewport().world_3d.direct_space_state, world_mask, drop_at, anchor)
 	if floor_at != Vector3.INF:
-		position = floor_at # pickups sit ON the floor; the visual is 0.31 up
-	elif position.y < HealthNode.FALL_DEATH_Y:
+		drop_at = floor_at # pickups sit ON the floor; the visual is 0.31 up
+	elif drop_at.y < HealthNode.FALL_DEATH_Y:
 		return # died in the void: nothing to land on, nobody could reach it
 	# Over the cap, the oldest goes.
 	while _loot.size() >= MAX_LOOT:
 		collect_loot(_loot.keys()[0], 0)
 	var id := _next_loot_id
 	_next_loot_id += 1
-	_make_loot(id, settings, position, dropper_peer)
+	_make_loot(id, settings, drop_at, dropper_peer)
 	for peer_id in _ready_peers:
 		if peer_id != 1:
-			_spawn_loot_event.rpc_id(peer_id, id, settings.resource_path, position)
+			_spawn_loot_event.rpc_id(peer_id, id, settings.resource_path, drop_at)
 	get_tree().create_timer(settings.lifetime).timeout.connect(func(): collect_loot(id, 0))
 
 
-func _make_loot(id: int, settings: LootSettings, position: Vector3, dropper_peer: int = 0) -> void:
+func _make_loot(id: int, settings: LootSettings, drop_at: Vector3, dropper_peer: int = 0) -> void:
 	if _loot_container == null:
 		_loot_container = Node3D.new()
 		_loot_container.name = "Loot"
@@ -1296,16 +1296,16 @@ func _make_loot(id: int, settings: LootSettings, position: Vector3, dropper_peer
 	pickup.loot_id = id
 	pickup.settings = settings
 	pickup.dropped_by = dropper_peer
-	pickup.position = position
+	pickup.position = drop_at
 	_loot[id] = pickup
 	_loot_container.add_child(pickup)
 
 
 @rpc("authority", "call_remote", "reliable", 2)
-func _spawn_loot_event(id: int, settings_path: String, position: Vector3) -> void:
+func _spawn_loot_event(id: int, settings_path: String, drop_at: Vector3) -> void:
 	var settings := load(settings_path) as LootSettings
 	if settings and not _loot.has(id):
-		_make_loot(id, settings, position)
+		_make_loot(id, settings, drop_at)
 
 
 # Server only. taker_peer 0 = expired / evicted rather than picked up.
@@ -1763,8 +1763,8 @@ func _say_to(peer_id: int, line: String) -> void:
 # same roll a destroyed craft gets (nobody is barred from picking it up). Their
 # respawn delay (NetworkManager.base_gun_respawn_seconds) is what keeps this
 # from being farmed.
-func drop_loot_for_structure(position: Vector3) -> void:
-	_drop_loot_at(position)
+func drop_loot_for_structure(drop_at: Vector3) -> void:
+	_drop_loot_at(drop_at)
 
 
 # Server-only, called by base_gun.gd when a gun is shot down.

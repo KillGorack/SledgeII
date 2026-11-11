@@ -11,7 +11,6 @@ region = Rect2(0, 512, 256, 256)
 script = ExtResource("1_boost")
 boost_name = "Haste"
 icon = SubResource("Icon")
-duration = 60.0
 projectile_color = Color(0.2, 0.9, 0.7, 1)
 multiply_values = {
 "cool_down": 0.5

@@ -55,8 +55,8 @@ enum Requires { ALWAYS, POWER, RECONS, DAMAGE, MISSILE }
 # loadout everyone shares (WeaponSettings); mines are deliberately not part of it.
 static func match_facts(weapons: Array, recon_capture: bool) -> Dictionary:
 	var facts := {"power": false, "recons": recon_capture, "damage": false, "missile": false}
-	for weapon in weapons:
-		var w := weapon as WeaponSettings
+	for entry in weapons:
+		var w := entry as WeaponSettings
 		if w == null:
 			continue
 		facts["power"] = facts["power"] or w.power_consumption > 0.0
