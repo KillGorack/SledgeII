@@ -4,7 +4,7 @@ shader_type canvas_item;
 // down, darkened edges and a bracket in each corner. It only ever adds light or shade; the picture is the
 // node underneath.
 
-uniform vec4 tint : source_color = vec4(0.27, 0.88, 1.0, 1.0);
+uniform vec4 tint : source_color = vec4(0.56, 0.85, 0.91, 1.0);
 uniform float bracket_inset = 10.0;
 uniform float bracket_length = 28.0;
 

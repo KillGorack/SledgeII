@@ -128,7 +128,7 @@ radius = 0.25
 [node name="Juice" type="Node3D" unique_id=1496726767]
 
 [node name="Sprite3D" type="AnimatedSprite3D" parent="." unique_id=317255288]
-billboard = 1
+billboard = 2
 sprite_frames = SubResource("SpriteFrames_q6084")
 autoplay = "default"
 

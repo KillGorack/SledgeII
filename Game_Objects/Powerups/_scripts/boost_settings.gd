@@ -13,6 +13,8 @@ class_name BoostSettings
 # just "later wins" and there's no stacking math to get wrong.
 
 @export var boost_name: String = "Boost"
+# Short player-facing text: what the boost does, in a line.
+@export_multiline var description: String = ""
 # HUD icon. Placeholder: frame 1 of the pickup's animation (an AtlasTexture).
 @export var icon: Texture2D
 # Flat time in seconds. Picking the same boost up again refreshes it.

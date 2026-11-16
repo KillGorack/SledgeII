@@ -43,6 +43,11 @@ const TEAM_NAMES: Array[String] = ["team_red", "team_green", "team_blue", "team_
 # Base pads are ~7x7 - capped low for now purely so there's room to spawn
 # without stacking players on top of each other, not a balance number.
 const MAX_PLAYERS_PER_TEAM := 5
+# Bots (computer-driven crafts, see Crafts/_scripts/bot_brain.gd) take part in the match like players and use this
+# reserved range of ids in peer_teams, peer_crafts, names and scores. Real peers get random ids from ENet, which could
+# in theory land up here, but the chance is about one in three million per player.
+const BOT_ID_BASE := 2147483000
+const MAX_BOTS_PER_TEAM := 5
 
 var peer: ENetMultiplayerPeer
 # Non-null only while a port_forwarding host is up - holds the mapping open
@@ -97,6 +102,12 @@ var allowed_mine_paths: Array[String] = []
 var allowed_specials: Array[StringName] = []
 # Crafts the host allows for this match (CraftCatalog ids), fixed when the game is created. Empty = all of them.
 var allowed_craft_ids: Array[StringName] = []
+# Host only: how many bots each team gets when the match starts (the host's "Bots" setting; 0 = none).
+var bots_per_team: int = 0
+# Host only: the "Bot skill" setting, an index into BotBrain.SKILLS (0 Easy, 1 Normal, 2 Hard).
+var bot_skill: int = 1
+# Host only: the "Drops" setting, an index into match.gd's LOOT_LEVELS (0 Normal ... 3 Absolute madness).
+var loot_level: int = 0
 
 # Site stats (usr.game_score / game_vanquishes / game_falls, gameAPI addUserStats).
 # Each player posts only their OWN gains - only their client has their session
@@ -310,7 +321,7 @@ func _clock_pong(client_time: float, server_clock: float) -> void:
 	_clock_synced = _clock_samples.size() >= 3
 
 
-func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] = [], day_night: bool = true, host_address_override: String = "", host_team: String = "team_red", port: int = DEFAULT_PORT, max_players: int = 20, public_game: bool = false, base_gun_respawn: float = BASE_GUN_RESPAWN_SECONDS, mines: bool = true, mine_paths: Array[String] = [], rockets: bool = true, recon_capture: bool = true, specials: Array[StringName] = [], craft_ids: Array[StringName] = []) -> Error:
+func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] = [], day_night: bool = true, host_address_override: String = "", host_team: String = "team_red", port: int = DEFAULT_PORT, max_players: int = 20, public_game: bool = false, base_gun_respawn: float = BASE_GUN_RESPAWN_SECONDS, mines: bool = true, mine_paths: Array[String] = [], rockets: bool = true, recon_capture: bool = true, specials: Array[StringName] = [], craft_ids: Array[StringName] = [], bots: int = 0, bot_skill_level: int = 1, drops: int = 0) -> Error:
 	peer = ENetMultiplayerPeer.new()
 	var err = peer.create_server(port, max_players)
 	if err != OK:
@@ -333,6 +344,9 @@ func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] 
 	rockets_enabled = rockets
 	recon_capture_enabled = recon_capture
 	allowed_specials = specials
+	bots_per_team = clampi(bots, 0, MAX_BOTS_PER_TEAM)
+	bot_skill = bot_skill_level
+	loot_level = drops
 	# _get_local_ip() just takes whatever address the OS happens to list
 	# first, which isn't stable if there's more than one active adapter (a
 	# VPN, a virtual bridge, Wi-Fi and Ethernet both up) - that's picked a
@@ -405,6 +419,8 @@ func start_creative_session(level_data: Dictionary, editing: bool, team: String 
 	# Fixed daylight while building: a moving sun changes how a level looks
 	# from one minute to the next.
 	day_night_enabled = false
+	bots_per_team = 0
+	loot_level = 0
 	mines_enabled = true
 	rockets_enabled = true
 	recon_capture_enabled = true
@@ -444,6 +460,7 @@ func stop_hosting() -> void:
 	allowed_craft_ids.clear()
 	peer_names.clear()
 	peer_scores.clear()
+	bots_per_team = 0
 	_stats_seen = [0, 0, 0]
 
 
@@ -624,12 +641,30 @@ func allowed_craft_for(id: StringName) -> StringName:
 	return crafts[0].id
 
 
+# People on `team`. Bots don't count, so they never keep a player out of a team.
 func _team_count(team: String) -> int:
 	var count := 0
-	for assigned_team in peer_teams.values():
-		if assigned_team == team:
+	for peer_id in peer_teams:
+		if peer_teams[peer_id] == team and not is_bot_id(peer_id):
 			count += 1
 	return count
+
+
+func is_bot_id(peer_id: int) -> bool:
+	return peer_id >= BOT_ID_BASE
+
+
+# Host only. Adds a bot to the match: it joins `team` in `craft_id` exactly the way a player does (everyone is told,
+# and match.gd spawns its craft on the player_registered signal), just with no connection behind it. Returns its id.
+func add_bot(team: String, craft_id: StringName) -> int:
+	var bot_id := BOT_ID_BASE
+	while peer_teams.has(bot_id):
+		bot_id += 1
+	craft_id = allowed_craft_for(craft_id)
+	peer_teams[bot_id] = team
+	peer_crafts[bot_id] = craft_id
+	_assign_team.rpc(bot_id, team, craft_id)
+	return bot_id
 
 
 # A sensible default for the UI to preselect, nothing more - actual

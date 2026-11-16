@@ -10,6 +10,7 @@ region = Rect2(0, 256, 256, 256)
 [resource]
 script = ExtResource("1_boost")
 boost_name = "Freeze"
+description = "You think this is actual freezing? No, this is a time stop for the targeted player. Worse... they get to watch."
 icon = SubResource("Icon")
 projectile_color = Color(0.9, 0.95, 1, 1)
 affects = 2

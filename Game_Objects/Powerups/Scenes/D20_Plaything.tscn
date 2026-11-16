@@ -128,7 +128,7 @@ radius = 0.25
 [node name="D20Plaything" type="Node3D" unique_id=1051606594]
 
 [node name="Sprite3D" type="AnimatedSprite3D" parent="." unique_id=592335629]
-billboard = 1
+billboard = 2
 sprite_frames = SubResource("SpriteFrames_ljmfs")
 autoplay = "default"
 frame = 8

@@ -10,11 +10,12 @@ region = Rect2(0, 1024, 256, 256)
 [resource]
 script = ExtResource("1_boost")
 boost_name = "Seeker"
+description = "Smart missiles chase your hind end down. They're relentless."
 icon = SubResource("Icon")
 projectile_color = Color(1, 0.85, 0.2, 1)
 affects = 2
 set_values = {
-"target_rotation_speed": 4.0,
+"target_rotation_speed": 8.0,
 "target_system_scan_radius": 50.0,
 "targeting_system": true
 }

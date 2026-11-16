@@ -14,9 +14,9 @@
 shader = ExtResource("backdrop_shader")
 shader_parameter/stars = ExtResource("5_q1cq1")
 shader_parameter/color_deep = Color(0.012, 0.016, 0.045, 1)
-shader_parameter/color_violet = Color(0.42, 0.25, 1, 1)
-shader_parameter/color_pink = Color(1, 0.2, 0.62, 1)
-shader_parameter/color_cyan = Color(0.2, 0.85, 1, 1)
+shader_parameter/color_violet = Color(0.41, 0.39, 0.74, 1)
+shader_parameter/color_pink = Color(0.83, 0.44, 0.6, 1)
+shader_parameter/color_cyan = Color(0.53, 0.82, 0.9, 1)
 shader_parameter/horizon = 0.6
 shader_parameter/grid_speed = 0.35
 shader_parameter/intensity = 1.0
@@ -30,13 +30,13 @@ shader_parameter/lift = 1.5
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_intel"]
 shader = ExtResource("intel_shader")
-shader_parameter/tint = Color(0.27, 0.88, 1, 1)
+shader_parameter/tint = Color(0.56, 0.85, 0.91, 1)
 shader_parameter/bracket_inset = 10.0
 shader_parameter/bracket_length = 28.0
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_navline"]
-bg_color = Color(0.27, 0.88, 1, 1)
-shadow_color = Color(0.27, 0.88, 1, 0.55)
+bg_color = Color(0.56, 0.85, 0.91, 1)
+shadow_color = Color(0.56, 0.85, 0.91, 0.55)
 shadow_size = 8
 
 [node name="Index" type="Control" unique_id=354085012]
@@ -317,7 +317,7 @@ theme_override_constants/separation = 16
 [node name="TeamSelectFeedback" type="Label" parent="Layout/Stage/Team Select/Column" unique_id=698302030]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.33, 0.44, 1)
+theme_override_colors/font_color = Color(0.85, 0.47, 0.51, 1)
 horizontal_alignment = 1
 
 [node name="Settings" type="PanelContainer" parent="Layout/Stage" unique_id=466261023]
@@ -406,7 +406,7 @@ unique_name_in_owner = true
 visible = false
 layout_mode = 2
 script = ExtResource("hud_card")
-accent = Color(1, 0.24, 0.65, 1)
+accent = Color(0.84, 0.46, 0.63, 1)
 
 [node name="Body" type="VBoxContainer" parent="Layout/Stage/Credits" unique_id=1233336731]
 layout_mode = 2
@@ -518,7 +518,7 @@ layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 1.4
 script = ExtResource("hud_card")
-accent = Color(1, 0.24, 0.65, 1)
+accent = Color(0.84, 0.46, 0.63, 1)
 
 [node name="Body" type="VBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/IntelCard" unique_id=137367853]
 layout_mode = 2
@@ -684,6 +684,51 @@ unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
 text = "Day / night cycle"
+
+[node name="BotCountRow" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body" unique_id=1904417731]
+layout_mode = 2
+tooltip_text = "Computer-driven crafts added to every team, in a random mix of the crafts this game allows. They never take a player's place on a team."
+
+[node name="BotCountLabel" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/BotCountRow" unique_id=1904417732]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Bots"
+
+[node name="BotCountPicker" type="OptionButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/BotCountRow" unique_id=1904417733]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(170, 0)
+layout_mode = 2
+focus_mode = 0
+
+[node name="BotSkillRow" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body" unique_id=1904417734]
+layout_mode = 2
+tooltip_text = "How well the bots aim and how quickly they react. Hard bots barely miss."
+
+[node name="BotSkillLabel" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/BotSkillRow" unique_id=1904417735]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Bot skill"
+
+[node name="BotSkillPicker" type="OptionButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/BotSkillRow" unique_id=1904417736]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(170, 0)
+layout_mode = 2
+focus_mode = 0
+
+[node name="DropsRow" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body" unique_id=1904417737]
+layout_mode = 2
+tooltip_text = "How much loot destroyed crafts, base guns, sentries and barrels leave behind."
+
+[node name="DropsLabel" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/DropsRow" unique_id=1904417738]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Drops"
+
+[node name="DropsPicker" type="OptionButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/DropsRow" unique_id=1904417739]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(170, 0)
+layout_mode = 2
+focus_mode = 0
 
 [node name="LoadoutCard" type="PanelContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn" unique_id=2075873942]
 layout_mode = 2
@@ -885,7 +930,7 @@ horizontal_alignment = 1
 layout_mode = 2
 size_flags_horizontal = 3
 script = ExtResource("hud_card")
-accent = Color(1, 0.24, 0.65, 1)
+accent = Color(0.84, 0.46, 0.63, 1)
 
 [node name="Body" type="VBoxContainer" parent="Layout/Stage/Load Game/Join Game/DetailCard" unique_id=1718092042]
 layout_mode = 2
@@ -955,7 +1000,7 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(8, 8)
 layout_mode = 2
 size_flags_vertical = 4
-color = Color(0.27, 0.88, 1, 1)
+color = Color(0.56, 0.85, 0.91, 1)
 
 [node name="lbl_ui_feedback" type="Label" parent="Layout/StatusBar/Row" unique_id=1849213651]
 unique_name_in_owner = true

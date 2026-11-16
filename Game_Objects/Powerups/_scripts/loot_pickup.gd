@@ -130,7 +130,7 @@ func _process(delta: float) -> void:
 func _on_body_entered(body: Node) -> void:
 	if _taken or settings == null:
 		return
-	if dropped_by != 0 and body.get_multiplayer_authority() == dropped_by:
+	if dropped_by != 0 and Utilities.craft_owner_id(body) == dropped_by:
 		return
 	var health_node := body.get_node_or_null("health_node")
 	if health_node == null:
@@ -158,4 +158,4 @@ func _on_body_entered(body: Node) -> void:
 	_taken = true
 	var match_node := get_tree().get_first_node_in_group("match")
 	if match_node:
-		match_node.collect_loot(loot_id, body.get_multiplayer_authority())
+		match_node.collect_loot(loot_id, Utilities.craft_owner_id(body))

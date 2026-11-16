@@ -13,11 +13,14 @@ const OUT_PATH := "res://UI/theme/sledge_theme.tres"
 const OUT_UID := "uid://dmlpyqe111b7r"
 const FONT_DIR := "res://UI/fonts/"
 
-const CYAN := Color(0.27, 0.88, 1.0)
-const PINK := Color(1.0, 0.24, 0.65)
-const VIOLET := Color(0.54, 0.36, 1.0)
-const GREEN := Color(0.3, 1.0, 0.69)
-const RED := Color(1.0, 0.33, 0.44)
+# The accent colours are the original neon set pulled back to 60% saturation (same hue and brightness), so the
+# menus sit closer to the muted look of the game. Full-strength originals, to re-tune from: cyan (0.27, 0.88, 1.0),
+# pink (1.0, 0.24, 0.65), violet (0.54, 0.36, 1.0), green (0.3, 1.0, 0.69), red (1.0, 0.33, 0.44).
+const CYAN := Color(0.56, 0.85, 0.91)
+const PINK := Color(0.84, 0.46, 0.63)
+const VIOLET := Color(0.52, 0.45, 0.80)
+const GREEN := Color(0.68, 0.93, 0.79)
+const RED := Color(0.85, 0.47, 0.51)
 const TEXT := Color(0.85, 0.93, 1.0)
 const TEXT_BRIGHT := Color(1.0, 1.0, 1.0)
 const TEXT_DIM := Color(0.5, 0.6, 0.72)
@@ -26,8 +29,8 @@ const PANEL := Color(0.03, 0.055, 0.105, 0.84)
 const PANEL_SOLID := Color(0.035, 0.06, 0.11, 0.985)
 const INSET := Color(0.012, 0.024, 0.05, 0.72)
 const FIELD := Color(0.06, 0.11, 0.18, 0.9)
-const LINE := Color(0.36, 0.72, 1.0, 0.24)
-const LINE_STRONG := Color(0.36, 0.8, 1.0, 0.5)
+const LINE := Color(0.50, 0.71, 0.89, 0.24)
+const LINE_STRONG := Color(0.53, 0.78, 0.91, 0.5)
 const CLEAR := Color(0, 0, 0, 0)
 
 var theme := Theme.new()
@@ -325,14 +328,14 @@ func _buttons() -> void:
 	_constants(&"OptionButton", {"arrow_margin": 10, "h_separation": 8, "modulate_arrow": 0})
 
 	# The one action a screen is for: Host, Join, Log in.
-	_solid_button(&"PrimaryButton", Color(0.86, 0.13, 0.53), PINK)
+	_solid_button(&"PrimaryButton", Color(0.71, 0.36, 0.52), PINK)
 	theme.set_font(&"font", &"PrimaryButton", _display(800, 2))
 	theme.set_font_size(&"font_size", &"PrimaryButton", 17)
 	# The same pink for the main button in a row of ordinary ones (Edit), in the ordinary button face.
-	_solid_button(&"AccentButton", Color(0.86, 0.13, 0.53), PINK)
+	_solid_button(&"AccentButton", Color(0.71, 0.36, 0.52), PINK)
 	# Sends something online (Publish) and can't be undone (Delete).
-	_solid_button(&"GoButton", Color(0.07, 0.5, 0.36), GREEN)
-	_solid_button(&"DangerButton", Color(0.6, 0.13, 0.22), RED)
+	_solid_button(&"GoButton", Color(0.24, 0.48, 0.38), GREEN)
+	_solid_button(&"DangerButton", Color(0.50, 0.25, 0.27), RED)
 
 	# Quiet buttons for the top bar: just a line until the mouse is over them.
 	theme.set_type_variation(&"GhostButton", &"Button")

@@ -6,9 +6,9 @@ shader_type canvas_item;
 
 uniform sampler2D stars : repeat_enable, filter_linear_mipmap;
 uniform vec3 color_deep : source_color = vec3(0.012, 0.016, 0.045);
-uniform vec3 color_violet : source_color = vec3(0.42, 0.25, 1.0);
-uniform vec3 color_pink : source_color = vec3(1.0, 0.2, 0.62);
-uniform vec3 color_cyan : source_color = vec3(0.2, 0.85, 1.0);
+uniform vec3 color_violet : source_color = vec3(0.41, 0.39, 0.74);
+uniform vec3 color_pink : source_color = vec3(0.83, 0.44, 0.60);
+uniform vec3 color_cyan : source_color = vec3(0.53, 0.82, 0.90);
 uniform float horizon : hint_range(0.3, 0.9) = 0.6;
 uniform float grid_speed = 0.35;
 uniform float intensity : hint_range(0.0, 1.0) = 1.0;

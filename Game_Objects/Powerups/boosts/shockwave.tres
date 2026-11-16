@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="BoostSettings" format=3 uid="uid://cyx6df55k1hj4"]
+
+[ext_resource type="Script" uid="uid://btdcni1f3pvbi" path="res://Game_Objects/Powerups/_scripts/boost_settings.gd" id="1_boost"]
+[ext_resource type="Texture2D" uid="uid://bqrxlwpbvv6l8" path="res://Game_Objects/Powerups/Spritesheets/POWERUPS.png" id="2_sheet"]
+
+[sub_resource type="AtlasTexture" id="Icon"]
+atlas = ExtResource("2_sheet")
+region = Rect2(0, 2304, 256, 256)
+
+[resource]
+script = ExtResource("1_boost")
+boost_name = "Shockwave"
+description = "AOE force, no need for good aim here... just get close and watch 'em scatter."
+icon = SubResource("Icon")
+projectile_color = Color(0.8, 0.3, 0.8, 1)
+affects = 2
+set_values = {
+"body_collection_max": 125,
+"explosive_force": 325.0,
+"explosive_force_distance": 10.0
+}

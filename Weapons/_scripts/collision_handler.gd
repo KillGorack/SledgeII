@@ -222,7 +222,7 @@ func _physics_process(delta: float) -> void:
 	max_distance = weapon_settings.projectile_range
 	_age += delta
 	if weapon_settings.projectile_lifetime > 0.0 and _age >= weapon_settings.projectile_lifetime:
-		destroy_self()
+		_expire()
 		return
 
 	var distance_this_frame = linear_velocity.length() * delta
@@ -245,7 +245,7 @@ func _physics_process(delta: float) -> void:
 		linear_velocity = current_direction * weapon_settings.projectile_speed
 
 	if distance_traveled >= max_distance:
-		destroy_self()
+		_expire()
 
 	if weapon_settings.targeting_system:
 		if guided_target == null and Utilities.GROUP_LAYER_SCOPE.has(allegiance_group):
@@ -422,29 +422,7 @@ func handle_collision() -> void:
 	var destroy = true
 	targeted_group = true if weapon_settings.friendly_fire else targeted_group
 
-	if (weapon_settings.explosive_force > 0 and weapon_settings.explosive_force_distance > 0) or weapon_settings.unfreeze:
-		var dist = weapon_settings.explosive_force_distance if weapon_settings.explosive_force_distance > 0 else weapon_settings.target_system_scan_radius
-		var scope_targets: Array = Utilities.GROUP_LAYER_SCOPE[allegiance_group]["target_groups"].duplicate() if Utilities.GROUP_LAYER_SCOPE.has(allegiance_group) else []
-		# friendly_fire means the blast hurts/shoves the shooter's own team
-		# too (including the shooter) - the scope only ever lists enemies.
-		if weapon_settings.friendly_fire and team != "" and team not in scope_targets:
-			scope_targets.append(team)
-
-		result = Utilities.collect_bodies(
-			get_world_3d().direct_space_state,
-			global_transform.origin,
-			weapon_settings.body_collection_max,
-			dist,
-			scope_targets
-		)
-
-		if weapon_settings.explosive_force > 0 and weapon_settings.explosive_force_distance > 0:
-			apply_explosive_forces(result)
-			if weapon_settings.hit_points > 0:
-				apply_aoe_damage(result)
-
-		if weapon_settings.unfreeze:
-			unfreeze_targets(result)
+	_apply_area_effects()
 
 	if targeted_group:
 		if weapon_settings.freeze_timer > 0:
@@ -479,6 +457,48 @@ func handle_collision() -> void:
 
 	if destroy:
 		destroy_self()
+
+
+# The blast part of an impact: area force, area damage and unfreeze, centred
+# on wherever the projectile is right now. Shared by handle_collision() and
+# _expire(), so a projectile that runs out of range/lifetime mid-air still
+# detonates instead of just vanishing - e.g. a seeker stuck orbiting its
+# target still gets its push off at the end.
+func _apply_area_effects() -> void:
+	if not ((weapon_settings.explosive_force > 0 and weapon_settings.explosive_force_distance > 0) or weapon_settings.unfreeze):
+		return
+	var dist = weapon_settings.explosive_force_distance if weapon_settings.explosive_force_distance > 0 else weapon_settings.target_system_scan_radius
+	var scope_targets: Array = Utilities.GROUP_LAYER_SCOPE[allegiance_group]["target_groups"].duplicate() if Utilities.GROUP_LAYER_SCOPE.has(allegiance_group) else []
+	# friendly_fire means the blast hurts/shoves the shooter's own team
+	# too (including the shooter) - the scope only ever lists enemies.
+	if weapon_settings.friendly_fire and team != "" and team not in scope_targets:
+		scope_targets.append(team)
+
+	result = Utilities.collect_bodies(
+		get_world_3d().direct_space_state,
+		global_transform.origin,
+		weapon_settings.body_collection_max,
+		dist,
+		scope_targets
+	)
+
+	if weapon_settings.explosive_force > 0 and weapon_settings.explosive_force_distance > 0:
+		apply_explosive_forces(result)
+		if weapon_settings.hit_points > 0:
+			apply_aoe_damage(result)
+
+	if weapon_settings.unfreeze:
+		unfreeze_targets(result)
+
+
+# Server-only. Range/lifetime ran out without hitting anything: detonate in
+# place, then go. Not folded into destroy_self() because handle_collision()
+# also ends there and has already applied the blast.
+func _expire() -> void:
+	if _destroying:
+		return
+	_apply_area_effects()
+	destroy_self()
 
 
 func unfreeze_targets(body_result) -> void:
@@ -580,6 +600,9 @@ func apply_explosive_forces(body_result) -> void:
 			var distance = global_transform.origin.distance_to(body.global_transform.origin)
 			if distance < weapon_settings.explosive_force_distance:
 				var force_strength = weapon_settings.explosive_force * (1.0 - (distance / weapon_settings.explosive_force_distance))
+				# Shift-fire (reverse_force) pulls everyone in, same rule as the direct hit.
+				if reverse_force:
+					force_strength = -force_strength
 				var direction = (body.global_transform.origin - global_transform.origin).normalized()
 				apply_hit_force(force_strength, body, direction)
 

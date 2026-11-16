@@ -121,6 +121,17 @@ func set_allegiance(body: Node3D, group_name: String):
 			body.collision_mask = mask_flags
 		body.add_to_group(group_name)
 
+# Whose craft this is: the player (or bot) id it scores for, takes credit for, and is named after. For a player it
+# is also the peer simulating it (its multiplayer authority); a bot is simulated by the host (authority 1) but keeps
+# its own id here - see match.gd::_spawn_craft.
+func craft_owner_id(craft: Node) -> int:
+	return int(craft.get_meta(&"owner_id", craft.get_multiplayer_authority()))
+
+
+func is_bot_craft(craft: Node) -> bool:
+	return NetworkManager.is_bot_id(craft_owner_id(craft))
+
+
 func encode_dict_string(data: Dictionary) -> String:
 	var query_string = []
 	for key in data.keys():
@@ -173,7 +184,9 @@ func select_target(origin: Vector3, forward_direction: Vector3, radius: float, m
 	var min_bound = origin - Vector3(radius, radius, radius)
 	var max_bound = origin + Vector3(radius, radius, radius)
 	var max_angle_rad = deg_to_rad(max_angle)
-	var potential_targets = []
+	# Nearest valid target inside the box + cone wins.
+	var best: Node = null
+	var best_d2 := INF
 	for group in target_group:
 		for body in get_tree().get_nodes_in_group(group):
 			if not is_instance_valid(body):
@@ -182,10 +195,11 @@ func select_target(origin: Vector3, forward_direction: Vector3, radius: float, m
 			if pos.x >= min_bound.x and pos.x <= max_bound.x and pos.y >= min_bound.y and pos.y <= max_bound.y and pos.z >= min_bound.z and pos.z <= max_bound.z:
 				var to_target = (pos - origin).normalized()
 				if abs(to_target.angle_to(forward_direction)) <= max_angle_rad:
-					potential_targets.append(body)
-	if potential_targets.size() > 0:
-		return potential_targets[randi() % potential_targets.size()]
-	return null
+					var d2 := origin.distance_squared_to(pos)
+					if d2 < best_d2:
+						best_d2 = d2
+						best = body
+	return best
 
 
 func play_sound(audio_input: Variant, position: Vector3 = Vector3.ZERO, vol: float = 1.0):

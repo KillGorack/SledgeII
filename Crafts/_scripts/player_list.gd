@@ -5,9 +5,10 @@ extends CenterContainer
 # HUD ever has one. Names come from NetworkManager.peer_names (pushed by the
 # server, see match.gd::_sync_roster), teams from NetworkManager.peer_teams.
 
-const COLUMN_WIDTH := 240.0
-# Scores are shown as "takedowns/wrecks bounty" next to each name - unlabelled
-# on screen until the names are settled.
+const COLUMN_WIDTH := 200.0
+# Each row is a name and that player's bounty, nothing else.
+const FONT_SIZE := 14
+const HEADER_FONT_SIZE := 18
 
 var _columns: Dictionary = {}
 
@@ -47,7 +48,7 @@ func _ready() -> void:
 		header.text = team.trim_prefix("team_").capitalize()
 		header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		header.add_theme_color_override("font_color", ReconStation.render_color_for_team(team))
-		header.add_theme_font_size_override("font_size", 20)
+		header.add_theme_font_size_override("font_size", HEADER_FONT_SIZE)
 		column.add_child(header)
 		column.add_child(HSeparator.new())
 		_columns[team] = column
@@ -91,13 +92,14 @@ func _refresh() -> void:
 		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		label.clip_text = true
 		label.add_theme_color_override("font_color", color)
+		label.add_theme_font_size_override("font_size", FONT_SIZE)
 		entry.add_child(label)
 		var score: Array = NetworkManager.peer_scores.get(peer_id, [0, 0, 0])
 		var score_label := Label.new()
-		# kills/deaths bounty score, e.g. "0/7 2450 S1225"
-		score_label.text = "%d/%d %d S%d" % [score[0], score[1], score[2] if score.size() > 2 else 0, score[3] if score.size() > 3 else 0]
-		score_label.custom_minimum_size.x = 150.0
+		score_label.text = str(score[2] if score.size() > 2 else 0)
+		score_label.custom_minimum_size.x = 60.0
 		score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		score_label.add_theme_color_override("font_color", color)
+		score_label.add_theme_font_size_override("font_size", FONT_SIZE)
 		entry.add_child(score_label)
 		_columns[team].add_child(entry)

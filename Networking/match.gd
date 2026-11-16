@@ -252,6 +252,8 @@ func _ready() -> void:
 		for team in NetworkManager.TEAM_NAMES:
 			_team_juice[team] = JUICE_CAPACITY
 		_broadcast_juice(true)
+		if not NetworkManager.creative_session:
+			_add_bots(NetworkManager.bots_per_team)
 
 
 func _process(delta: float) -> void:
@@ -1171,22 +1173,27 @@ const LOOT_TABLE: Array[LootSettings] = [
 	preload("res://Game_Objects/Powerups/Settings/ricochet_pickup.tres"),
 	preload("res://Game_Objects/Powerups/Settings/seeker_pickup.tres"),
 	preload("res://Game_Objects/Powerups/Settings/freeze_pickup.tres"),
+	preload("res://Game_Objects/Powerups/Settings/shockwave_pickup.tres"),
 ]
-const MAX_LOOT := 30
 var _next_loot_id := 1
 var _loot: Dictionary = {} # id -> LootPickup, on every peer
 var _loot_container: Node3D = null
 
 
-# How many drops a destroyed craft leaves. A kill drops NOTHING most of the
-# time: LOOT_DROP_CHANCE is the chance of at least one, then each further drop
-# needs LOOT_EXTRA_CHANCE again (so 2 is uncommon, 5 is a rarity), capped at
-# LOOT_MAX_DROPS. Every drop picks its own item by weight, so repeats can happen.
-const LOOT_DROP_CHANCE := 0.5
-const LOOT_EXTRA_CHANCE := 0.25
-const LOOT_MAX_DROPS := 5
-# Several drops fan out in a ring this far (meters) around the wreck.
+# How many drops a destroyed craft (or base gun, sentry, barrel) leaves, set by the host's "Drops" setting
+# (NetworkManager.loot_level picks a row). chance: the chance of at least one; extra: each further drop needs this
+# again (at Normal, 2 is uncommon and 5 a rarity); most: the cap per kill; cap: the most lying around the arena at
+# once (over it, the oldest goes). Every drop picks its own item by weight, so repeats can happen. On average a
+# kill leaves about 0.7 drops at Normal, 1.5 at Abundance, 2.9 at Cornucopia and 6.5 at Absolute madness.
+const LOOT_LEVELS := [
+	{"name": "Normal", "chance": 0.5, "extra": 0.25, "most": 5, "cap": 30},
+	{"name": "Abundance", "chance": 0.8, "extra": 0.45, "most": 6, "cap": 50},
+	{"name": "Cornucopia", "chance": 1.0, "extra": 0.65, "most": 8, "cap": 80},
+	{"name": "Absolute madness", "chance": 1.0, "extra": 0.85, "most": 12, "cap": 120},
+]
+# Several drops fan out in a ring around the wreck: this far (meters), plus a bit per drop so a big pile doesn't overlap.
 const LOOT_RING_RADIUS := 2.0
+const LOOT_RING_PER_DROP := 0.2
 # TEMPORARY test switch: a .tres path here makes EVERY drop that loot. Set back
 # to "" for normal weighted drops.
 const DEBUG_FORCE_LOOT := ""
@@ -1228,11 +1235,16 @@ func _roll_loot() -> LootSettings:
 	return pool.back()
 
 
+func _loot_level() -> Dictionary:
+	return LOOT_LEVELS[clampi(NetworkManager.loot_level, 0, LOOT_LEVELS.size() - 1)]
+
+
 func _roll_loot_count() -> int:
-	if randf() >= LOOT_DROP_CHANCE:
+	var level := _loot_level()
+	if randf() >= level.chance:
 		return 0
 	var count := 1
-	while count < LOOT_MAX_DROPS and randf() < LOOT_EXTRA_CHANCE:
+	while count < level.most and randf() < level.extra:
 		count += 1
 	return count
 
@@ -1257,7 +1269,7 @@ func _drop_loot_at(drop_at: Vector3, dropper_peer: int = 0) -> void:
 		var spot := drop_at
 		if count > 1:
 			var angle := start_angle + TAU * i / count
-			spot += Vector3(cos(angle), 0.0, sin(angle)) * LOOT_RING_RADIUS
+			spot += Vector3(cos(angle), 0.0, sin(angle)) * (LOOT_RING_RADIUS + LOOT_RING_PER_DROP * count)
 		_spawn_loot(_roll_loot(), spot, dropper_peer, drop_at if count > 1 else Vector3.INF)
 
 
@@ -1276,7 +1288,7 @@ func _spawn_loot(settings: LootSettings, drop_at: Vector3, dropper_peer: int = 0
 	elif drop_at.y < HealthNode.FALL_DEATH_Y:
 		return # died in the void: nothing to land on, nobody could reach it
 	# Over the cap, the oldest goes.
-	while _loot.size() >= MAX_LOOT:
+	while _loot.size() >= int(_loot_level().cap):
 		collect_loot(_loot.keys()[0], 0)
 	var id := _next_loot_id
 	_next_loot_id += 1
@@ -1575,9 +1587,52 @@ func _attach_local_camera(craft: Node) -> void:
 	local_camera.transform = Transform3D.IDENTITY
 
 
+# --- Bots ---------------------------------------------------------------------------------------------------------
+# Server only. Bots join like players (NetworkManager.add_bot): the same number on every team this map has a base
+# for, each in a random one of the crafts this game allows, and drive themselves (see _spawn_craft and bot_brain.gd).
+
+const BOT_NAMES := ["Arch", "Debian", "Fedora", "Gentoo", "Mint", "Ubuntu", "Slackware", "Manjaro", "Alpine", "NixOS", "Kali", "Void", "openSUSE", "Rocky", "Pop!_OS", "Zorin", "Solus", "Mageia", "CentOS", "Tails", "Puppy", "Qubes", "Knoppix", "Raspbian"]
+
+
+func _add_bots(per_team: int) -> void:
+	if per_team <= 0:
+		return
+	var crafts := NetworkManager.allowed_crafts()
+	var names := BOT_NAMES.duplicate()
+	names.shuffle()
+	var made := 0
+	for team in _bot_teams():
+		for i in per_team:
+			var def: CraftDef = crafts.pick_random()
+			var bot_id := NetworkManager.add_bot(team, def.id)
+			var bot_name := "BOT %s" % names[made % names.size()]
+			if made >= names.size():
+				bot_name += " %d" % (made / names.size() + 1)
+			made += 1
+			_peer_names[bot_id] = bot_name
+			_announce("%s has entered the arena." % _colored_name(bot_id, bot_name))
+	_push_roster()
+
+
+# The teams this map has a base for (all four if it has none, and players spawn at its fallback points).
+func _bot_teams() -> Array[String]:
+	var teams: Array[String] = []
+	for team in NetworkManager.TEAM_NAMES:
+		if not _spawn_points_by_team.get(team, []).is_empty():
+			teams.append(team)
+	if teams.is_empty():
+		teams = NetworkManager.TEAM_NAMES.duplicate()
+	return teams
+
+
 func _spawn_craft(data: Dictionary) -> Node:
 	var craft := CRAFT_SCENE.instantiate()
 	craft.name = "Craft_%d" % data["peer_id"]
+	# Who the craft belongs to, for scores, kill credit and names (Utilities.craft_owner_id). A player's craft is
+	# also simulated by that player; a bot's by the host.
+	var owner_id: int = data["peer_id"]
+	var is_bot := NetworkManager.is_bot_id(owner_id)
+	craft.set_meta(&"owner_id", owner_id)
 	# radar_controller.gd finds other crafts the same generic group-based way
 	# it finds anything else in its target_defs table.
 	craft.add_to_group("Craft")
@@ -1604,7 +1659,7 @@ func _spawn_craft(data: Dictionary) -> Node:
 		weapon_node.mine_settings = weapon_node.mine_settings.filter(
 			func(mine: MineSettings): return NetworkManager.allowed_mine_paths.has(mine.resource_path)
 		)
-	craft.set_multiplayer_authority(data["peer_id"])
+	craft.set_multiplayer_authority(1 if is_bot else owner_id)
 	# set_multiplayer_authority() above is recursive by default, so it just
 	# silently reassigned health_node's authority to the owning client too.
 	# health_node's _broadcast_destroyed/respawn_at RPCs are deliberately
@@ -1632,6 +1687,16 @@ func _spawn_craft(data: Dictionary) -> Node:
 	# to fire, so the server has to be the one computing/holding it, not the
 	# owning client - see power_node.gd's own _process gating.
 	craft.get_node("power_node").set_multiplayer_authority(1)
+	if is_bot:
+		# The HUD (and the chat, radar and reticle inside it) only runs on the peer it belongs to - see
+		# hud_controller.gd. Nobody sits in a bot, so it belongs to no real peer and stays off everywhere,
+		# the host included, even though the host simulates the craft.
+		craft.get_node("Hud_InGame").set_multiplayer_authority(owner_id)
+		if multiplayer.is_server():
+			var brain := BotBrain.new()
+			brain.name = "BotBrain"
+			craft.add_child(brain)
+			craft.get_node("movement_node").brain = brain
 	# Spawn gate. Godot decides who receives a spawn from the synchronizers
 	# rooted at the spawned node, but on the server it skips any it isn't the
 	# authority of - and the root synchronizer belongs to the owning client.

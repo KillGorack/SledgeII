@@ -192,7 +192,7 @@ func apply_damage(damage: float, attacker_id: int = 0, cause: int = DeathCause.W
 
 # Server-only. 0 (base guns, falls) and the craft's own owner never count.
 func note_attacker(attacker_id: int) -> void:
-	if attacker_id == 0 or attacker_id == body.get_multiplayer_authority():
+	if attacker_id == 0 or attacker_id == Utilities.craft_owner_id(body):
 		return
 	_last_attacker = attacker_id
 	_last_attacker_msec = Time.get_ticks_msec()
@@ -352,7 +352,7 @@ func destroy_self(death_time: float = 0.0) -> void:
 	# or the first tick after the respawn teleport immediately fights it.
 	_set_movement_frozen(true)
 	if multiplayer.is_server():
-		craft_defeated.emit(body.get_multiplayer_authority(), _credited_attacker(), _death_cause)
+		craft_defeated.emit(Utilities.craft_owner_id(body), _credited_attacker(), _death_cause)
 		_last_attacker = 0
 		_air.reset()
 

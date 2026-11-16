@@ -113,7 +113,7 @@ func _ready() -> void:
 	_base_weapon_count = weapon_settings.size()
 	# Everyone else sees this craft's boosts as orbiting coins; its owner doesn't
 	# (their HUD shows them, and the coins would block the view).
-	if not is_multiplayer_authority():
+	if not is_multiplayer_authority() or Utilities.is_bot_craft(get_parent()):
 		var orbit := BoostOrbit.new()
 		orbit.weapon_node = self
 		orbit.craft = get_parent() as Node3D
@@ -128,6 +128,14 @@ func _physics_process(_delta: float) -> void:
 	if not is_multiplayer_authority():
 		return
 	if weapon_settings.is_empty():
+		return
+	# A bot's craft is simulated here on the host, but the keyboard is the host's own: the bot's brain pulls the
+	# trigger instead (bot_brain.gd).
+	var brain := get_parent().get_node_or_null("BotBrain") as BotBrain
+	if brain:
+		_bot_trigger(brain)
+		return
+	if Utilities.is_bot_craft(get_parent()):
 		return
 	# Space/Enter are live keys while typing a chat message - see
 	# chat_controller.gd::is_open, same reasoning as movement.gd.
@@ -153,9 +161,24 @@ func _physics_process(_delta: float) -> void:
 	# makes each action fire only for its own exact key combination.
 	if Input.is_action_just_pressed("weapon_change", true):
 		switch_weapon()
+	if Input.is_action_pressed("fire_weapon"):
+		_fire_current(Input.is_action_pressed("reverso"))
+
+
+# A bot: the weapon its brain picked, fired whenever the brain holds the trigger.
+func _bot_trigger(brain: BotBrain) -> void:
+	if brain.weapon_index >= 0 and brain.weapon_index < weapon_settings.size():
+		current_weapon_index = brain.weapon_index
+	if brain.fire:
+		_fire_current(false)
+
+
+# Fires the current weapon if it is ready - the trigger for a player and a bot alike. Everything here is a prediction
+# for feel; the server re-checks all of it in request_fire.
+func _fire_current(reverse_force: bool) -> void:
 	var now = Time.get_ticks_msec() / 1000.0
 	# A frozen craft can look around but not shoot (health_node.gd::apply_weapon_freeze).
-	if Input.is_action_pressed("fire_weapon") and now >= _client_next_fire_time and not _is_frozen():
+	if now >= _client_next_fire_time and not _is_frozen():
 		var base_settings := weapon_settings[current_weapon_index]
 		var settings := effective(base_settings)
 		# Predicted locally off power_node's replicated current_power - same
@@ -197,7 +220,7 @@ func _physics_process(_delta: float) -> void:
 		# "reverso" held at the moment of firing flips this shot's hit force
 		# (push becomes pull) - the server decides what that means, see
 		# collision_handler.gd::reverse_force.
-		request_fire.rpc_id(1, current_weapon_index, _shot_seq, muzzle, Input.is_action_pressed("reverso"))
+		request_fire.rpc_id(1, current_weapon_index, _shot_seq, muzzle, reverse_force)
 
 
 func _muzzle_transform(settings: WeaponSettings) -> Transform3D:
@@ -346,7 +369,8 @@ func _try_fire(weapon_index: int, shot_seq: int, client_muzzle: Transform3D, sen
 	var fast_forward := 0.0
 	if sender != 1:
 		fast_forward = minf(match_node.peer_one_way_latency(sender), match_node.PROJECTILE_MAX_FAST_FORWARD)
-	match_node.spawn_projectile(path, team, muzzle, false, sender, shot_seq, fast_forward, reverse_force, boost_ops_for(base_settings))
+	# Credited to the craft's owner: the sender for a player, the bot's own id for a bot (whose requests the host sends).
+	match_node.spawn_projectile(path, team, muzzle, false, Utilities.craft_owner_id(get_parent()), shot_seq, fast_forward, reverse_force, boost_ops_for(base_settings))
 	return true
 
 

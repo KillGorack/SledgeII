@@ -1,7 +1,7 @@
 @tool
 extends EditorPlugin
 
-# Project > Tools > "Publish Sledge 2 ...". Runs ~/Documents/Pipeline/publish_sledge.py
+# Project > Tools > "Publish Sledge 2 ...". Runs ~/dev/tanarus/pipeline/publish_sledge.py
 # (export both builds, zip them, replace the Linux/Windows builds on Portal-X) and
 # prints its output in the editor's Output panel. The real runs ask first.
 #
@@ -10,7 +10,7 @@ extends EditorPlugin
 
 # Brings back the dry-run, local-site and zip-only entries (see _extra_items).
 const SHOW_EXTRA_ITEMS := false
-const SCRIPT_REL := "Documents/Pipeline/publish_sledge.py"
+const SCRIPT_REL := "dev/tanarus/pipeline/publish_sledge.py"
 
 var _confirm: ConfirmationDialog
 var _done: AcceptDialog

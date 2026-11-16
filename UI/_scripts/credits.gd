@@ -5,7 +5,7 @@ class_name Credits
 #
 # Not listed yet: the authors of the original maps. Those maps are hidden from the public list, so their credits wait
 # until they are shown. The 58 author names (from the pipeline's records, odd capitalisations merged, "unknown" left
-# out) are in /home/dave/Documents/Pipeline/out/map_authors.txt.
+# out) are in /home/dave/dev/tanarus/pipeline/out/map_authors.txt.
 
 # The third-party art, sound and music, one row each: what it is, who made it and where from, its license. A link
 # (opened by the Credits screen's meta_clicked handler in index.gd) makes the "who" cell clickable. Add a row here

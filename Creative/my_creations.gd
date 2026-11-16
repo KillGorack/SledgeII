@@ -47,7 +47,7 @@ static var _thumb_cache: Dictionary = {}
 const BUTTON_HEIGHT := 46
 # The menu's card (a panel with corner brackets) and the pink it uses for the second card on a screen.
 const HUD_CARD := preload("res://UI/_scripts/hud_card.gd")
-const CARD_PINK := Color(1.0, 0.24, 0.65)
+const CARD_PINK := Color(0.84, 0.46, 0.63)
 
 
 func _ready() -> void:
@@ -75,7 +75,7 @@ func _ready() -> void:
 	var frame_style := StyleBoxFlat.new()
 	frame_style.bg_color = Color(0.008, 0.016, 0.035)
 	frame_style.set_border_width_all(1)
-	frame_style.border_color = Color(0.27, 0.88, 1.0, 0.55)
+	frame_style.border_color = Color(0.56, 0.85, 0.91, 0.55)
 	frame_style.set_content_margin_all(1)
 	_thumb_frame.add_theme_stylebox_override("panel", frame_style)
 	# 16:9 like the picture itself, at a fixed size, so it never stretches or sits in bars.
@@ -252,7 +252,7 @@ func _refresh_details() -> void:
 
 
 # One of the screen's two cards, with its heading. Returns the column to put the card's contents in.
-func _card(parent: Control, heading: String, share: float, accent: Color = Color(0.27, 0.88, 1.0)) -> VBoxContainer:
+func _card(parent: Control, heading: String, share: float, accent: Color = Color(0.56, 0.85, 0.91)) -> VBoxContainer:
 	var panel: PanelContainer = HUD_CARD.new()
 	panel.accent = accent
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL

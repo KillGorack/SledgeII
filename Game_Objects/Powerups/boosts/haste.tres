@@ -10,6 +10,7 @@ region = Rect2(0, 512, 256, 256)
 [resource]
 script = ExtResource("1_boost")
 boost_name = "Haste"
+description = "Always underestimated. Everything doubles, just from the speed of things."
 icon = SubResource("Icon")
 projectile_color = Color(0.2, 0.9, 0.7, 1)
 multiply_values = {

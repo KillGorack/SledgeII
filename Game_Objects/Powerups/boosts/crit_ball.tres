@@ -10,9 +10,10 @@ region = Rect2(0, 0, 256, 256)
 [resource]
 script = ExtResource("1_boost")
 boost_name = "Crit Ball"
+description = "A chance for carnage... flip a coin, watch the destruction."
 icon = SubResource("Icon")
 projectile_color = Color(1, 0.2, 0.15, 1)
 set_values = {
-"crit_chance": 0.25,
+"crit_chance": 0.5,
 "crit_multiplier": 3.0
 }

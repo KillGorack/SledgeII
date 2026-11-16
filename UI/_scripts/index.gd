@@ -2,17 +2,17 @@ extends Control
 
 # The line at the bottom of the screen: its colour, and the colour of the light beside it.
 const FEEDBACK_COLORS := {
-	"OK": Color(0.3, 1.0, 0.69),
-	"COK": Color(1.0, 0.82, 0.3),
-	"NOK": Color(1.0, 0.33, 0.44),
+	"OK": Color(0.68, 0.93, 0.79),
+	"COK": Color(0.92, 0.84, 0.61),
+	"NOK": Color(0.85, 0.47, 0.51),
 	"INFO": Color(0.85, 0.93, 1.0),
 }
-const ACCENT := Color(0.27, 0.88, 1.0)
+const ACCENT := Color(0.56, 0.85, 0.91)
 # Each team's colour on the team select cards, in NetworkManager.TEAM_NAMES order.
 const TEAM_COLORS := {
-	"team_red": Color(1.0, 0.3, 0.36),
-	"team_green": Color(0.3, 0.95, 0.5),
-	"team_blue": Color(0.3, 0.6, 1.0),
+	"team_red": Color(0.84, 0.46, 0.47),
+	"team_green": Color(0.65, 0.88, 0.69),
+	"team_blue": Color(0.43, 0.61, 0.85),
 	"team_gray": Color(0.72, 0.76, 0.82),
 }
 
@@ -59,6 +59,9 @@ const TEAM_COLORS := {
 @onready var game_list_poll_timer := Timer.new()
 @onready var mine_checklist: Container = %MineChecklist
 @onready var rockets_check: BaseButton = %RocketsCheck
+@onready var bot_count_picker: OptionButton = %BotCountPicker
+@onready var bot_skill_picker: OptionButton = %BotSkillPicker
+@onready var drops_picker: OptionButton = %DropsPicker
 @onready var recon_capture_check: BaseButton = %ReconCaptureCheck
 @onready var day_night_check: BaseButton = %DayNightCheck
 @onready var public_game_check: BaseButton = %PublicGameCheck
@@ -165,6 +168,17 @@ func _ready() -> void:
 	_setup_vehicle_pickers()
 	_build_craft_checklist()
 	NetworkManager.ruleset_received.connect(_refresh_join_picker)
+	for i in NetworkManager.MAX_BOTS_PER_TEAM + 1:
+		bot_count_picker.add_item("None" if i == 0 else "%d per team" % i)
+	bot_count_picker.select(0)
+	for skill in BotBrain.SKILLS:
+		bot_skill_picker.add_item(skill.name)
+	bot_skill_picker.select(1)
+	for level in preload("res://Networking/match.gd").LOOT_LEVELS:
+		drops_picker.add_item(level.name)
+	drops_picker.select(0)
+	# Skill means nothing with no bots.
+	bot_count_picker.item_selected.connect(func(index: int): bot_skill_picker.disabled = index == 0)
 	_load_host_settings()
 	_refresh_host_picker()
 	login_timer.connect("timeout", Callable(self, "_on_cooldown_finished"))
@@ -730,7 +744,10 @@ func _on_host_pressed():
 		rockets_check.button_pressed,
 		recon_capture_check.button_pressed,
 		_get_checked_specials(),
-		_checked_craft_ids()
+		_checked_craft_ids(),
+		bot_count_picker.selected,
+		bot_skill_picker.selected,
+		drops_picker.selected
 	)
 
 
@@ -745,6 +762,9 @@ func _save_host_settings() -> void:
 	cfg.set_value("host", "rockets", rockets_check.button_pressed)
 	cfg.set_value("host", "recon_capture", recon_capture_check.button_pressed)
 	cfg.set_value("host", "day_night", day_night_check.button_pressed)
+	cfg.set_value("host", "bots_per_team", bot_count_picker.selected)
+	cfg.set_value("host", "bot_skill", bot_skill_picker.selected)
+	cfg.set_value("host", "drops", drops_picker.selected)
 	cfg.set_value("host", "weapons_listed", _listed_paths(weapon_checklist, "weapon_path"))
 	cfg.set_value("host", "weapons_checked", _get_checked_weapon_paths())
 	cfg.set_value("host", "mines_listed", _listed_paths(mine_checklist, "mine_path"))
@@ -772,6 +792,10 @@ func _load_host_settings() -> void:
 	rockets_check.button_pressed = cfg.get_value("host", "rockets", rockets_check.button_pressed)
 	recon_capture_check.button_pressed = cfg.get_value("host", "recon_capture", recon_capture_check.button_pressed)
 	day_night_check.button_pressed = cfg.get_value("host", "day_night", day_night_check.button_pressed)
+	bot_count_picker.select(clampi(int(cfg.get_value("host", "bots_per_team", 0)), 0, NetworkManager.MAX_BOTS_PER_TEAM))
+	bot_skill_picker.select(clampi(int(cfg.get_value("host", "bot_skill", 1)), 0, BotBrain.SKILLS.size() - 1))
+	bot_skill_picker.disabled = bot_count_picker.selected == 0
+	drops_picker.select(clampi(int(cfg.get_value("host", "drops", 0)), 0, drops_picker.item_count - 1))
 	_restore_checklist(weapon_checklist, "weapon_path", cfg.get_value("host", "weapons_listed", []), cfg.get_value("host", "weapons_checked", []))
 	_restore_checklist(mine_checklist, "mine_path", cfg.get_value("host", "mines_listed", []), cfg.get_value("host", "mines_checked", []))
 	_restore_checklist(mine_checklist, "special_id", cfg.get_value("host", "specials_listed", []), cfg.get_value("host", "specials_checked", []))
@@ -938,10 +962,16 @@ func _build_team_roster() -> void:
 	var my_id := NetworkManager.multiplayer.get_unique_id()
 	for team in NetworkManager.TEAM_NAMES:
 		var members: Array[String] = []
+		var bots := 0
 		for peer_id in NetworkManager.peer_teams.keys():
-			if NetworkManager.peer_teams[peer_id] == team:
+			if NetworkManager.peer_teams[peer_id] != team:
+				continue
+			if NetworkManager.is_bot_id(peer_id):
+				bots += 1
+			else:
 				members.append("You" if peer_id == my_id else "Peer %d" % peer_id)
 		var color: Color = TEAM_COLORS.get(team, ACCENT)
+		# Bots never fill a team (see NetworkManager._team_count); they are listed after the pilots.
 		var full := members.size() >= NetworkManager.MAX_PLAYERS_PER_TEAM
 		# One card a team, in the team's colour: its name, how full it is, who is on it, and the way in.
 		var card: PanelContainer = HUD_CARD.new()
@@ -971,6 +1001,8 @@ func _build_team_roster() -> void:
 		body.add_child(fill)
 		var list := Label.new()
 		list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		if bots > 0:
+			members.append("+ %d bot%s" % [bots, "" if bots == 1 else "s"])
 		list.text = "\n".join(members) if not members.is_empty() else "Nobody yet"
 		if members.is_empty():
 			list.theme_type_variation = &"DimLabel"

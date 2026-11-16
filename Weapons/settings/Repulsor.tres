@@ -24,7 +24,6 @@ hit_sound = ExtResource("4_g3ac4")
 projectile_count_capacity = 999
 projectile_count_actual = 999
 projectile_force = 320.0
-body_collection_max = 125
 target_system_scan_radius = 0.0
 projectile_speed = 30.0
 launch_offset = 0.0

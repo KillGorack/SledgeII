@@ -32,8 +32,12 @@ const KNOCKBACK_FALL_IMMUNITY := 0.5
 @export var SUSPENSION_RAY_LENGTH := 0.04
 @export var SUSPENSION_SPRING_STRENGTH := 7000.0
 @export var SUSPENSION_DAMPING := 100.0
-const LATERAL_GRIP_STRENGTH := 10.0
-const LONGITUDINAL_GRIP_STRENGTH := 2.0
+# Tyre grip, as friction: the most a wheel can push sideways / brake with, as a fraction of the weight the
+# suspension is carrying on it. Up to that limit the wheels hold the craft dead still (so it parks on a slope
+# of up to atan(grip): 45 degrees sideways, about 31 nose up or down); past it, it slides. Higher lateral grip
+# = turns on rails, lower = drifts. Higher longitudinal grip = stops shorter when the throttle is released.
+const LATERAL_GRIP := 1.0
+const LONGITUDINAL_GRIP := 0.6
 # The weight every force in this file was tuned at (the Lightning). A heavier craft's own forces are scaled up by
 # its weight over this, so it drives the same; see CraftStats.mass.
 const REFERENCE_MASS := 5.0
@@ -98,6 +102,10 @@ var _snapshots: Array[Dictionary] = []
 var _snap_time: float = -INF
 var _snap_position := Vector3.ZERO
 var recentering = false
+# Set on a bot's craft (host only, see match.gd::_spawn_craft): where the driving input comes from instead of the
+# keyboard. Read every physics tick: drive (-1..1, + = forward), turn (-1..1, + = left), rockets (bool), and
+# aim_yaw / aim_pitch (degrees, the same as yaw / pitch below).
+var brain: BotBrain = null
 @onready var barrel = $"../Turret/Barrel"
 @onready var turret = $"../Turret"
 @onready var chat: Control = get_node("../Hud_InGame/Chat")
@@ -119,7 +127,9 @@ func _ready() -> void:
 	engine_audio = engine_audio_path as AudioStreamPlayer3D
 	if engine_audio and stats and stats.engine_sound:
 		engine_audio.stream = stats.engine_sound
-	if engine_audio and is_multiplayer_authority():
+	# Only your own craft's engine is heard, so a bot (simulated on the host) is as quiet as any other player's.
+	var own_craft := is_multiplayer_authority() and not Utilities.is_bot_craft(body)
+	if engine_audio and own_craft:
 		engine_audio.pitch_scale = target_pitch
 		engine_audio.volume_db = target_volume
 		engine_audio.play()
@@ -130,9 +140,9 @@ func _ready() -> void:
 	yaw = get_node("../Turret").rotation_degrees.y if has_node("../Turret") else 0.0
 	pitch = barrel.rotation_degrees.x if barrel else 0.0
 	snap_net_target(body.global_transform)
-	if is_multiplayer_authority():
+	if own_craft:
 		_hide_own_body()
-	else:
+	if not is_multiplayer_authority():
 		# Only the owner simulates this craft. Every other copy used to stay a
 		# live dynamic body - falling under gravity between updates (nothing
 		# but the owner runs suspension) and then being teleported back by the
@@ -352,19 +362,32 @@ func _physics_process(delta: float) -> void:
 	var chatting: bool = chat.is_open
 	var forward_input = 0.0
 	var turn_input = 0.0
-	if not chatting:
+	if brain:
+		chatting = false
+		forward_input = -brain.drive
+		turn_input = brain.turn
+	elif not chatting:
 		forward_input = Input.get_action_strength("ui_down") - Input.get_action_strength("ui_up")
 		turn_input = Input.get_action_strength("ui_left") - Input.get_action_strength("ui_right")
+	# The rays sit after this node in the tree, so on their own they update AFTER this runs and everything
+	# below would be reading where the ground was one tick ago, from where the craft was one tick ago.
+	for ray in suspension_rays:
+		ray.force_raycast_update()
 	isGrounded = ground_check_area.get_overlapping_bodies().size() > 0
 	_track_fall()
-	_apply_suspension_forces(forward_input)
-	if not chatting:
+	_apply_suspension_forces(forward_input, delta)
+	var rockets: bool = false
+	if brain:
+		_bot_aim(delta)
+		rockets = brain.rockets
+	elif not chatting:
 		handle_turret_barrel_look()
 		if Input.is_action_just_pressed("ui_recenter"):
 			recentering = true
+		rockets = Input.is_action_pressed("rockets")
 	if recentering:
 		recenter_turret_barrel()
-	if not chatting and Input.is_action_pressed("rockets") and _rockets_allowed():
+	if rockets and _rockets_allowed():
 		activate_thrusters(delta)
 	elif not _unturtle(turn_input, delta):
 		if is_right_side_up() and isGrounded:
@@ -427,6 +450,17 @@ func _hermite(p0: Vector3, v0: Vector3, p1: Vector3, v1: Vector3, f: float, span
 		+ (f3 - 2.0 * f2 + f) * span * v0 \
 		+ (-2.0 * f3 + 3.0 * f2) * p1 \
 		+ (f3 - f2) * span * v1
+
+
+# Bots turn their turret toward where the brain wants it, at their skill's rate rather than snapping.
+func _bot_aim(delta: float) -> void:
+	var step := brain.turret_degrees_per_second * delta
+	yaw = move_toward(yaw, clampf(brain.aim_yaw, -90.0, 90.0), step)
+	pitch = move_toward(pitch, clampf(brain.aim_pitch, -90.0, 90.0), step)
+	if turret:
+		turret.rotation_degrees.y = yaw
+	if barrel:
+		barrel.rotation_degrees.x = pitch
 
 
 func handle_turret_barrel_look():
@@ -507,8 +541,13 @@ func move_player(forward_input):
 		var deceleration_force = -current_velocity * stats.deceleration * _weight_scale()
 		body.apply_central_force(deceleration_force)
 	if isGrounded and not _is_knockback_active():
-		var clamped_velocity = body.get_linear_velocity().limit_length(stats.max_speed)
-		body.set_linear_velocity(clamped_velocity)
+		# Top speed limits how fast the craft travels ALONG the ground. The part of its velocity toward or
+		# away from the ground (falling onto it, bouncing off it) is left alone - capping that too used to
+		# brake a fast fall in mid-air the moment the floor sensor reached the ground.
+		var up := body.global_basis.y
+		var velocity := body.linear_velocity
+		var off_ground := up * velocity.dot(up)
+		body.linear_velocity = off_ground + (velocity - off_ground).limit_length(stats.max_speed)
 
 
 
@@ -530,31 +569,50 @@ func update_engine_sound():
 
 
 
-func _apply_suspension_forces(forward_input: float) -> void:
-	var right: Vector3 = body.global_transform.basis.x
-	var forward: Vector3 = body.global_transform.basis.z
-	var is_accelerating := not is_zero_approx(forward_input)
+func _apply_suspension_forces(forward_input: float, delta: float) -> void:
+	var right: Vector3 = body.global_basis.x
+	var forward: Vector3 = body.global_basis.z
 	var weight := _weight_scale()
+	# Springs. Each wheel in contact pushes up; how hard it is pushing is also how much grip it has below.
+	var offsets: Array[Vector3] = []
+	var loads: Array[float] = []
+	var total_load := 0.0
 	for ray in suspension_rays:
 		if not ray.is_colliding():
 			continue
-		var hit_point: Vector3 = ray.get_collision_point()
-		var ray_up: Vector3 = ray.global_transform.basis.y
-		var current_length := ray.global_position.distance_to(hit_point)
+		var ray_up: Vector3 = ray.global_basis.y
+		# Measured along the ray, not point to point, so it is the true spring length.
+		var current_length := (ray.global_position - ray.get_collision_point()).dot(ray_up)
 		var compression := SUSPENSION_RAY_LENGTH - current_length
 		if compression <= 0.0:
 			continue
 		var offset: Vector3 = ray.global_position - body.global_position
 		var point_velocity: Vector3 = body.linear_velocity + body.angular_velocity.cross(offset)
 		var closing_speed := point_velocity.dot(ray_up)
-		var force_magnitude := ((compression * SUSPENSION_SPRING_STRENGTH) - (closing_speed * SUSPENSION_DAMPING)) * weight
+		var force_magnitude := maxf(0.0, ((compression * SUSPENSION_SPRING_STRENGTH) - (closing_speed * SUSPENSION_DAMPING)) * weight)
 		if force_magnitude > 0.0:
 			body.apply_force(ray_up * force_magnitude, offset)
-		var lateral_speed := point_velocity.dot(right)
-		body.apply_force(-right * lateral_speed * LATERAL_GRIP_STRENGTH * weight, offset)
-		if not is_accelerating:
-			var longitudinal_speed := point_velocity.dot(forward)
-			body.apply_force(-forward * longitudinal_speed * LONGITUDINAL_GRIP_STRENGTH * weight, offset)
+		offsets.append(offset)
+		loads.append(force_magnitude)
+		total_load += force_magnitude
+	if total_load <= 0.0:
+		return
+	# Grip. Work out the force that would stop the craft sliding by the end of this tick - cancelling the
+	# speed it has now AND what gravity is about to add, so it truly holds on a slope instead of creeping -
+	# then let the wheels supply as much of that as friction allows (grip x the weight on them), shared out
+	# by how loaded each wheel is. It acts on the craft's travel, not on its turning: steering sets the turn
+	# rate directly (adjust_rotation), like tracks driven at different speeds, and must not be fought here.
+	var velocity := body.linear_velocity
+	var pull := body.get_gravity()
+	var lateral_need := -(velocity.dot(right) / delta + pull.dot(right)) * body.mass
+	var lateral := clampf(lateral_need / total_load, -LATERAL_GRIP, LATERAL_GRIP)
+	# No braking while the throttle is held - the engine is driving the wheels.
+	var longitudinal := 0.0
+	if is_zero_approx(forward_input):
+		var longitudinal_need := -(velocity.dot(forward) / delta + pull.dot(forward)) * body.mass
+		longitudinal = clampf(longitudinal_need / total_load, -LONGITUDINAL_GRIP, LONGITUDINAL_GRIP)
+	for i in offsets.size():
+		body.apply_force((right * lateral + forward * longitudinal) * loads[i], offsets[i])
 
 
 

@@ -5,7 +5,7 @@ extends PanelContainer
 # and bottom-left corners; this adds brackets on the two square corners, a bright bar on the top edge and a
 # short row of ticks along the bottom.
 
-@export var accent := Color(0.27, 0.88, 1.0):
+@export var accent := Color(0.56, 0.85, 0.91):
 	set(value):
 		accent = value
 		queue_redraw()
