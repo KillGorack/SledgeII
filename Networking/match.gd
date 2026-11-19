@@ -1493,15 +1493,35 @@ func note_weapon_hit(volley_id: int, shooter_peer: int, shooter_team: String, we
 		for id in _scored_volleys.keys():
 			if id < cutoff:
 				_scored_volleys.erase(id)
-	if shooter_peer == multiplayer.get_unique_id():
-		NetworkManager.note_weapon_shot(weapon_name, 0, 1)
-	elif _ready_peers.has(shooter_peer):
-		_weapon_hit_event.rpc_id(shooter_peer, weapon_name)
+	credit_stat(shooter_peer, "weapon", weapon_name, 0, 1)
+
+
+# Server-only. Hands one of a player's site stats to that player's own game,
+# which adds it up and posts it with its session (NetworkManager._upload_stats).
+# kind: "weapon" (fired, hit), "mine" (laid, caught) or "counter" (amount, -).
+# Bots and base guns (peer 0) have no account, so they're skipped.
+func credit_stat(peer_id: int, kind: String, item: String, a: int, b: int = 0) -> void:
+	if not multiplayer.is_server() or peer_id <= 0 or NetworkManager.is_bot_id(peer_id):
+		return
+	if peer_id == multiplayer.get_unique_id():
+		_apply_stat(kind, item, a, b)
+	elif _ready_peers.has(peer_id):
+		_stat_event.rpc_id(peer_id, kind, item, a, b)
 
 
 @rpc("authority", "call_remote", "reliable")
-func _weapon_hit_event(weapon_name: String) -> void:
-	NetworkManager.note_weapon_shot(weapon_name, 0, 1)
+func _stat_event(kind: String, item: String, a: int, b: int) -> void:
+	_apply_stat(kind, item, a, b)
+
+
+func _apply_stat(kind: String, item: String, a: int, b: int) -> void:
+	match kind:
+		"weapon":
+			NetworkManager.note_weapon_shot(item, a, b)
+		"mine":
+			NetworkManager.note_mine(item, a, b)
+		"counter":
+			NetworkManager.note_counter(item, a)
 
 
 func _one_way_latency() -> float:
@@ -1893,6 +1913,7 @@ func on_gun_destroyed(attacker_id: int) -> void:
 func _on_recon_captured(requester_id: int, previous_color: int) -> void:
 	if not _peer_names.has(requester_id):
 		return
+	credit_stat(requester_id, "counter", "captures", 1)
 	var who := _colored_name(requester_id, _peer_names[requester_id])
 	if previous_color == ReconStation.StationColor.NONE:
 		_announce("%s captured a neutral recon station" % who)

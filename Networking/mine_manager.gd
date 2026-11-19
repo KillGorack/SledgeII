@@ -65,6 +65,8 @@ func request_lay_mine(mine_index: int = 0) -> void:
 		heading = up.cross(Vector3.RIGHT).normalized()
 	var placement := Transform3D(Basis(up.cross(heading), up, heading), hit.position)
 	_create_mine(id, sender, team, settings.resource_path, placement, true)
+	# Site stats: one mine laid (see match.gd::credit_stat).
+	_match.credit_stat(sender, "mine", settings.mine_name, 1, 0)
 	for peer_id in _match._ready_peers:
 		if peer_id != 1:
 			_spawn_mine_event.rpc_id(peer_id, id, sender, team, settings.resource_path, placement, true)
@@ -108,6 +110,9 @@ func _apply_blast(mine: Mine) -> void:
 		mine.get_world_3d().direct_space_state, centre + Vector3.UP * 0.5,
 		BLAST_MAX_BODIES, s.explosive_force_distance, targets)
 	var done: Dictionary = {}
+	# Site stats: a mine "catches" when its blast reaches any enemy craft or base
+	# gun - once per mine, however many it reaches.
+	var caught := false
 	for item in hits:
 		var body = item.collider
 		if done.has(body) or not is_instance_valid(body):
@@ -120,6 +125,11 @@ func _apply_blast(mine: Mine) -> void:
 		var health_node = body.get_node_or_null("health_node")
 		if health_node == null:
 			continue
+		if not caught:
+			for team_name in NetworkManager.TEAM_NAMES:
+				if team_name != mine.team and body.is_in_group(team_name):
+					caught = true
+					break
 		# Each effect on its own terms: a force-only mine never damages, a
 		# damage-only mine never pushes.
 		if s.freeze_timer > 0.0 and health_node.has_method("apply_weapon_freeze"):
@@ -134,6 +144,8 @@ func _apply_blast(mine: Mine) -> void:
 			health_node.apply_impulse.rpc(direction.normalized() * s.explosive_force * falloff)
 		if s.hit_points > 0.0:
 			health_node.apply_damage(s.hit_points * falloff, mine.owner_peer, HealthNode.DeathCause.MINE)
+	if caught:
+		_match.credit_stat(mine.owner_peer, "mine", s.mine_name, 0, 1)
 
 
 # --- Replication ---------------------------------------------------------------

@@ -128,8 +128,14 @@ var _stats_in_flight: bool = false
 # One "fired" per trigger pull and at most one "hit" per pull (match.gd::
 # note_weapon_hit), so hit/fired is a plain accuracy ratio. Misses are
 # fired - hit; the site never stores them.
-var _weapon_unsent: Dictionary = {}
+# Mines ride the same shape under "mines": laid / caught (a detonation that
+# reached an enemy, once per mine). Keyed by the addUserStats field name.
+var _shots_unsent: Dictionary = {"weapons": {}, "mines": {}}
 const WEAPON_POST_CAP := 5000
+# Plain per-player counts (sledge_profile columns), e.g. "captures" - the site
+# keeps an allow-list of names and a per-post cap for each.
+var _counters_unsent: Dictionary = {}
+const COUNTER_POST_CAP := 50
 
 # Community level (Creative origin) the match builds from data instead of
 # mounting a .pck - see match.gd::_load_map. Empty = a normal .pck map.
@@ -218,10 +224,26 @@ func _absorb_stats() -> void:
 
 # This player's own shots only (see match.gd) - never from a Creative session.
 func note_weapon_shot(weapon_name: String, fired: int, hit: int) -> void:
-	if creative_session or weapon_name.is_empty():
+	_note_shots("weapons", weapon_name, fired, hit)
+
+
+# This player's own mines (see mine_manager.gd): laid, and caught an enemy.
+func note_mine(mine_name: String, laid: int, caught: int) -> void:
+	_note_shots("mines", mine_name, laid, caught)
+
+
+# One of this player's plain counts, e.g. "captures" (see match.gd).
+func note_counter(counter_name: String, amount: int = 1) -> void:
+	if creative_session or counter_name.is_empty() or amount <= 0:
 		return
-	var counts: Array = _weapon_unsent.get(weapon_name, [0, 0])
-	_weapon_unsent[weapon_name] = [counts[0] + fired, counts[1] + hit]
+	_counters_unsent[counter_name] = int(_counters_unsent.get(counter_name, 0)) + amount
+
+
+func _note_shots(field: String, item_name: String, fired: int, hit: int) -> void:
+	if creative_session or item_name.is_empty():
+		return
+	var counts: Array = _shots_unsent[field].get(item_name, [0, 0])
+	_shots_unsent[field][item_name] = [counts[0] + fired, counts[1] + hit]
 
 
 func _upload_stats() -> void:
@@ -233,31 +255,48 @@ func _upload_stats() -> void:
 		sending[i] = mini(_stats_unsent[i], STATS_POST_CAPS[i])
 	# A hit can arrive after its shot was already posted, so one post may carry
 	# more hits than shots - the site clamps hit <= fired on the running totals.
-	var weapons_sending := {}
-	for weapon_name in _weapon_unsent:
-		var counts: Array = _weapon_unsent[weapon_name]
-		var fired := mini(counts[0], WEAPON_POST_CAP)
-		var hit := mini(counts[1], WEAPON_POST_CAP)
-		if fired > 0 or hit > 0:
-			weapons_sending[weapon_name] = [fired, hit]
-	if sending == [0, 0, 0] and weapons_sending.is_empty():
-		return
 	var fields := {"score": sending[0], "vanquishes": sending[1], "falls": sending[2]}
-	if not weapons_sending.is_empty():
-		fields["weapons"] = JSON.stringify(weapons_sending)
+	var shots_sending := {}
+	for field in _shots_unsent:
+		var batch := {}
+		for item_name in _shots_unsent[field]:
+			var counts: Array = _shots_unsent[field][item_name]
+			var fired := mini(counts[0], WEAPON_POST_CAP)
+			var hit := mini(counts[1], WEAPON_POST_CAP)
+			if fired > 0 or hit > 0:
+				batch[item_name] = [fired, hit]
+		if not batch.is_empty():
+			shots_sending[field] = batch
+			fields[field] = JSON.stringify(batch)
+	var counters_sending := {}
+	for counter_name in _counters_unsent:
+		var amount := mini(int(_counters_unsent[counter_name]), COUNTER_POST_CAP)
+		if amount > 0:
+			counters_sending[counter_name] = amount
+	if not counters_sending.is_empty():
+		fields["counters"] = JSON.stringify(counters_sending)
+	if sending == [0, 0, 0] and shots_sending.is_empty() and counters_sending.is_empty():
+		return
 	_stats_in_flight = true
 	var result := await CreativeApi.request(self, "addUserStats", fields)
 	_stats_in_flight = false
 	if result.ok:
 		for i in 3:
 			_stats_unsent[i] -= sending[i]
-		for weapon_name in weapons_sending:
-			var counts: Array = _weapon_unsent.get(weapon_name, [0, 0])
-			var left := [counts[0] - weapons_sending[weapon_name][0], counts[1] - weapons_sending[weapon_name][1]]
-			if left == [0, 0]:
-				_weapon_unsent.erase(weapon_name)
+		for field in shots_sending:
+			for item_name in shots_sending[field]:
+				var counts: Array = _shots_unsent[field].get(item_name, [0, 0])
+				var left := [counts[0] - shots_sending[field][item_name][0], counts[1] - shots_sending[field][item_name][1]]
+				if left == [0, 0]:
+					_shots_unsent[field].erase(item_name)
+				else:
+					_shots_unsent[field][item_name] = left
+		for counter_name in counters_sending:
+			var left := int(_counters_unsent.get(counter_name, 0)) - int(counters_sending[counter_name])
+			if left <= 0:
+				_counters_unsent.erase(counter_name)
 			else:
-				_weapon_unsent[weapon_name] = left
+				_counters_unsent[counter_name] = left
 	elif result.body.get("status", "") == "too_soon":
 		get_tree().create_timer(STATS_RETRY_SECONDS).timeout.connect(_upload_stats)
 
