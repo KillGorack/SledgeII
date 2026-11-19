@@ -1356,6 +1356,13 @@ var _projectiles: Dictionary = {}
 # Shooter-only: shot_seq -> Array of locally predicted projectiles, waiting
 # for the server to confirm (adopt) or reject them.
 var _predicted_shots: Dictionary = {}
+# Server-only: volley ids (a volley's first_id) that have already scored a hit
+# for weapon accuracy stats, so a multi-projectile, splash or ricochet shot
+# counts as one hit no matter how many things it damages. Pruned by age -
+# volley ids only grow, so anything this far behind _next_projectile_id is
+# long dead.
+var _scored_volleys: Dictionary = {}
+const SCORED_VOLLEY_KEEP := 5000
 
 
 # Server-only. shooter_peer 0 = not a player (base guns). The launch sound
@@ -1369,6 +1376,9 @@ func spawn_projectile(weapon_settings_path: String, team: String, muzzle_transfo
 	var first_id := _next_projectile_id
 	_next_projectile_id += maxi(BoostSettings.apply_ops(settings, overrides).projectile_count, 1)
 	_create_volley(first_id, weapon_settings_path, team, muzzle_transform, use_team_color, fast_forward, true, shooter_peer, reverse_force, overrides)
+	# The host's own shot; a client counts theirs when this event reaches them.
+	if shooter_peer == multiplayer.get_unique_id():
+		NetworkManager.note_weapon_shot(settings.weapon_name, 1, 0)
 	var team_index := NetworkManager.TEAM_NAMES.find(team)
 	# Only to peers whose match scene actually exists - see _ready_peers.
 	for peer_id in _ready_peers:
@@ -1378,6 +1388,12 @@ func spawn_projectile(weapon_settings_path: String, team: String, muzzle_transfo
 
 @rpc("authority", "call_remote", "reliable", 2)
 func _spawn_projectile_event(first_id: int, weapon_settings_path: String, team_index: int, muzzle_transform: Transform3D, use_team_color: bool, fast_forward: float, shooter_peer: int, shot_seq: int, overrides: Dictionary = {}) -> void:
+	# Server-confirmed shot of ours: one "fired" for accuracy stats (a rejected
+	# shot never gets here, so it never counts).
+	if shooter_peer == multiplayer.get_unique_id():
+		var fired_settings: WeaponSettings = load(weapon_settings_path)
+		if fired_settings:
+			NetworkManager.note_weapon_shot(fired_settings.weapon_name, 1, 0)
 	if shooter_peer == multiplayer.get_unique_id() and _predicted_shots.has(shot_seq):
 		# Our own shot - already flying since the moment we fired. Adopt the
 		# server's ids instead of spawning a duplicate.
@@ -1455,6 +1471,39 @@ func _apply_projectile_correction(net_id: int, server_transform: Transform3D, ve
 
 
 # Half the ENet-measured round trip to the server, capped. 0 on the server.
+# Server-only, from wherever a projectile damages something (collision_handler,
+# object_handler). Counts one hit per volley, and only on an enemy team's craft
+# or base gun - walls, barrels, teammates and yourself are misses. Base guns
+# (shooter 0) and bots aren't tracked.
+func note_weapon_hit(volley_id: int, shooter_peer: int, shooter_team: String, weapon_name: String, body: Object) -> void:
+	if not multiplayer.is_server() or volley_id < 0 or shooter_peer <= 0 or NetworkManager.is_bot_id(shooter_peer):
+		return
+	if _scored_volleys.has(volley_id) or not is_instance_valid(body) or not (body is Node):
+		return
+	var enemy := false
+	for team_name in NetworkManager.TEAM_NAMES:
+		if team_name != shooter_team and (body as Node).is_in_group(team_name):
+			enemy = true
+			break
+	if not enemy:
+		return
+	_scored_volleys[volley_id] = true
+	if _scored_volleys.size() > SCORED_VOLLEY_KEEP:
+		var cutoff := _next_projectile_id - SCORED_VOLLEY_KEEP
+		for id in _scored_volleys.keys():
+			if id < cutoff:
+				_scored_volleys.erase(id)
+	if shooter_peer == multiplayer.get_unique_id():
+		NetworkManager.note_weapon_shot(weapon_name, 0, 1)
+	elif _ready_peers.has(shooter_peer):
+		_weapon_hit_event.rpc_id(shooter_peer, weapon_name)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _weapon_hit_event(weapon_name: String) -> void:
+	NetworkManager.note_weapon_shot(weapon_name, 0, 1)
+
+
 func _one_way_latency() -> float:
 	if multiplayer.is_server():
 		return 0.0
@@ -1504,6 +1553,7 @@ func _create_volley(first_id: int, weapon_settings_path: String, team: String, m
 		projectile.weapon_settings_path = weapon_settings_path
 		projectile.team = team
 		projectile.shooter_peer = shooter_peer
+		projectile.volley_id = first_id
 		projectile.reverse_force = reverse_force
 		projectile.transform = transforms[i]
 		if first_id >= 0:

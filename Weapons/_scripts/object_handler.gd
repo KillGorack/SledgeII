@@ -27,6 +27,8 @@ var weapon_settings_path: String = ""
 var shooter_peer: int = 0
 var reverse_force: bool = false
 var net_id: int = -1
+# Shared by every projectile of one trigger pull - see collision_handler.gd.
+var volley_id: int = -1
 
 # Physics layer 15. Projectiles (collision_handler.gd) add this bit to their
 # mask so they strike objects; objects mask the world, every craft layer, and
@@ -245,6 +247,8 @@ func _on_impact(collider: Node, point: Vector3, normal: Vector3, _impact: float)
 	_play_hit_fx(point, normal)
 	if not _can_hurt(collider):
 		return
+	if _match_node:
+		_match_node.note_weapon_hit(volley_id, shooter_peer, team, weapon_settings.weapon_name, collider)
 	if weapon_settings.hit_points > 0.0:
 		var health_node = collider.get_node_or_null("health_node")
 		if health_node and health_node.has_method("apply_damage"):

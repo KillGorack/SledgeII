@@ -55,6 +55,10 @@ var net_id: int = -1
 # Peer that fired this, 0 for base guns. Server-side, credits takedowns - see
 # health_node.gd::note_attacker.
 var shooter_peer: int = 0
+# The volley this projectile belongs to (its first net_id) - every projectile
+# of one trigger pull shares it, so accuracy stats count the shot, not each
+# projectile. -1 on predicted/cosmetic copies; only the server's matters.
+var volley_id: int = -1
 # The shooter held "reverso" when firing: projectile_force pulls instead of
 # pushes. Only the server's copy resolves hits, so only it needs this.
 var reverse_force: bool = false
@@ -425,6 +429,11 @@ func handle_collision() -> void:
 	_apply_area_effects()
 
 	if targeted_group:
+		# A direct strike counts for accuracy even when the weapon does no
+		# damage (Repulsor's push, freeze-only shots) - damage-dealing hits are
+		# also noted in _apply_damage_to; the volley only ever scores once.
+		if _match_node:
+			_match_node.note_weapon_hit(volley_id, shooter_peer, team, weapon_settings.weapon_name, collided_object)
 		if weapon_settings.freeze_timer > 0:
 			freeze_target()
 
@@ -571,6 +580,8 @@ func _apply_damage_to(body: Object, damage: float) -> void:
 	if health_node and health_node.has_method("apply_damage"):
 		var cause: int = health_node.DeathCause.BASE_GUN if shooter_peer == 0 else health_node.DeathCause.WEAPON
 		health_node.apply_damage(damage, shooter_peer, cause)
+		if _match_node:
+			_match_node.note_weapon_hit(volley_id, shooter_peer, team, weapon_settings.weapon_name, body)
 
 
 # Routed through the target's health_node instead of being applied straight

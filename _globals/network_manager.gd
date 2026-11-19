@@ -124,6 +124,12 @@ const STATS_POST_CAPS := [100000, 50, 50]
 var _stats_seen: Array = [0, 0, 0]
 var _stats_unsent: Array = [0, 0, 0]
 var _stats_in_flight: bool = false
+# Weapon accuracy, posted alongside the above: weapon_name -> [fired, hit].
+# One "fired" per trigger pull and at most one "hit" per pull (match.gd::
+# note_weapon_hit), so hit/fired is a plain accuracy ratio. Misses are
+# fired - hit; the site never stores them.
+var _weapon_unsent: Dictionary = {}
+const WEAPON_POST_CAP := 5000
 
 # Community level (Creative origin) the match builds from data instead of
 # mounting a .pck - see match.gd::_load_map. Empty = a normal .pck map.
@@ -210,6 +216,14 @@ func _absorb_stats() -> void:
 		_stats_seen[i] = totals[i]
 
 
+# This player's own shots only (see match.gd) - never from a Creative session.
+func note_weapon_shot(weapon_name: String, fired: int, hit: int) -> void:
+	if creative_session or weapon_name.is_empty():
+		return
+	var counts: Array = _weapon_unsent.get(weapon_name, [0, 0])
+	_weapon_unsent[weapon_name] = [counts[0] + fired, counts[1] + hit]
+
+
 func _upload_stats() -> void:
 	_absorb_stats()
 	if _stats_in_flight or creative_session or not CreativeApi.logged_in():
@@ -217,14 +231,33 @@ func _upload_stats() -> void:
 	var sending := [0, 0, 0]
 	for i in 3:
 		sending[i] = mini(_stats_unsent[i], STATS_POST_CAPS[i])
-	if sending == [0, 0, 0]:
+	# A hit can arrive after its shot was already posted, so one post may carry
+	# more hits than shots - the site clamps hit <= fired on the running totals.
+	var weapons_sending := {}
+	for weapon_name in _weapon_unsent:
+		var counts: Array = _weapon_unsent[weapon_name]
+		var fired := mini(counts[0], WEAPON_POST_CAP)
+		var hit := mini(counts[1], WEAPON_POST_CAP)
+		if fired > 0 or hit > 0:
+			weapons_sending[weapon_name] = [fired, hit]
+	if sending == [0, 0, 0] and weapons_sending.is_empty():
 		return
+	var fields := {"score": sending[0], "vanquishes": sending[1], "falls": sending[2]}
+	if not weapons_sending.is_empty():
+		fields["weapons"] = JSON.stringify(weapons_sending)
 	_stats_in_flight = true
-	var result := await CreativeApi.request(self, "addUserStats", {"score": sending[0], "vanquishes": sending[1], "falls": sending[2]})
+	var result := await CreativeApi.request(self, "addUserStats", fields)
 	_stats_in_flight = false
 	if result.ok:
 		for i in 3:
 			_stats_unsent[i] -= sending[i]
+		for weapon_name in weapons_sending:
+			var counts: Array = _weapon_unsent.get(weapon_name, [0, 0])
+			var left := [counts[0] - weapons_sending[weapon_name][0], counts[1] - weapons_sending[weapon_name][1]]
+			if left == [0, 0]:
+				_weapon_unsent.erase(weapon_name)
+			else:
+				_weapon_unsent[weapon_name] = left
 	elif result.body.get("status", "") == "too_soon":
 		get_tree().create_timer(STATS_RETRY_SECONDS).timeout.connect(_upload_stats)
 
