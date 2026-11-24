@@ -118,6 +118,20 @@ static var _last_load_tab: int = 0
 # code above the list). "" means no filter.
 const ORIGIN_NAMES: Array[String] = ["Tanarus Original", "Submitted CAD model", "Creative level"]
 var _level_rows: Array = []
+
+# Bots per team the host asked for: the picker shows up to 5, or 10 on a 10vs10 arena, so switching maps can shorten
+# the list - this keeps the real wish (and the saved setting) for when a bigger arena is picked again.
+const LARGE_TEAMS_GENRE := "10vs10"
+var _wanted_bots: int = 0
+
+# Map ratings: the site's like / dislike votes on a map (gameAPI rateMap, the same votes as the thumbs on the map's
+# page on the site). Icons are the site's own (Lucide, ISC).
+const THUMB_UP := preload("res://UI/images/icons/thumbs-up.svg")
+const THUMB_DOWN := preload("res://UI/images/icons/thumbs-down.svg")
+const RATING_ICON_WIDTH := 16
+var _like_button: Button
+var _dislike_button: Button
+var _rating_tan_id: int = -1
 var _origin_filter: OptionButton
 var _genre_filter: OptionButton
 # The host screen's choices, saved when Host is pressed and restored on the
@@ -168,9 +182,7 @@ func _ready() -> void:
 	_setup_vehicle_pickers()
 	_build_craft_checklist()
 	NetworkManager.ruleset_received.connect(_refresh_join_picker)
-	for i in NetworkManager.MAX_BOTS_PER_TEAM + 1:
-		bot_count_picker.add_item("None" if i == 0 else "%d per team" % i)
-	bot_count_picker.select(0)
+	_fill_bot_count_picker(NetworkManager.BOTS_PER_TEAM_USUAL)
 	for skill in BotBrain.SKILLS:
 		bot_skill_picker.add_item(skill.name)
 	bot_skill_picker.select(1)
@@ -178,13 +190,17 @@ func _ready() -> void:
 		drops_picker.add_item(level.name)
 	drops_picker.select(0)
 	# Skill means nothing with no bots.
-	bot_count_picker.item_selected.connect(func(index: int): bot_skill_picker.disabled = index == 0)
+	bot_count_picker.item_selected.connect(func(index: int):
+		_wanted_bots = index
+		bot_skill_picker.disabled = index == 0)
+	NetworkManager.map_teams_received.connect(_build_team_roster)
 	_load_host_settings()
 	_refresh_host_picker()
 	login_timer.connect("timeout", Callable(self, "_on_cooldown_finished"))
 	http_request.connect("request_completed", Callable(self, "_on_request_completed"))
 	world_list.connect("item_selected", Callable(self, "_on_level_selected"))
 	_build_level_filters()
+	_build_rating_row()
 	game_list.connect("item_selected", Callable(self, "_on_game_selected"))
 	login_timer.one_shot = true
 	btn_quit.pressed.connect(func(): _on_quit())
@@ -366,8 +382,9 @@ func _place_nav_line(animate: bool) -> void:
 
 # The two lists use real column headings, sized by share so a long name can't push the others off.
 func _setup_lists() -> void:
-	var world_titles := ["ARENA", "AUTHOR", "GENRE"]
-	var world_shares := [5, 3, 2]
+	var world_titles := ["ARENA", "AUTHOR", "GENRE", "", ""]
+	var world_shares := [5, 3, 2, 1, 1]
+	world_list.columns = world_titles.size()
 	for i in world_titles.size():
 		world_list.set_column_title(i, world_titles[i])
 		world_list.set_column_title_alignment(i, HORIZONTAL_ALIGNMENT_LEFT)
@@ -502,6 +519,7 @@ func _on_level_selected():
 		selected_map_file_id = int(selected.get_meta("fil_id", -1))
 		_last_selected_map_file_id = selected_map_file_id
 		_show_map_details(selected)
+		_fill_bot_count_picker(NetworkManager.MAX_BOTS_PER_TEAM if selected.get_text(2) == LARGE_TEAMS_GENRE else NetworkManager.BOTS_PER_TEAM_USUAL)
 		_refresh_host_summary()
 
 
@@ -542,7 +560,13 @@ func _show_map_details(row: TreeItem) -> void:
 	map_byline.text = "by %s   //   %s" % [row.get_text(1), row.get_text(2)]
 	if row.get_meta("origin", "") == "Creative level":
 		map_byline.text += "   //   Community level"
+	var size_w := int(row.get_meta("size_w", 0))
+	var size_d := int(row.get_meta("size_d", 0))
+	if size_w > 0 and size_d > 0:
+		map_byline.text += "   //   %d × %d m" % [size_w, size_d]
 	var tan_id := int(row.get_meta("tan_id", -1))
+	_rating_tan_id = tan_id
+	_refresh_rating_buttons()
 	if _thumb_cache.has(tan_id):
 		_set_thumbnail(_thumb_cache[tan_id])
 		return
@@ -792,7 +816,8 @@ func _load_host_settings() -> void:
 	rockets_check.button_pressed = cfg.get_value("host", "rockets", rockets_check.button_pressed)
 	recon_capture_check.button_pressed = cfg.get_value("host", "recon_capture", recon_capture_check.button_pressed)
 	day_night_check.button_pressed = cfg.get_value("host", "day_night", day_night_check.button_pressed)
-	bot_count_picker.select(clampi(int(cfg.get_value("host", "bots_per_team", 0)), 0, NetworkManager.MAX_BOTS_PER_TEAM))
+	_wanted_bots = clampi(int(cfg.get_value("host", "bots_per_team", 0)), 0, NetworkManager.MAX_BOTS_PER_TEAM)
+	_fill_bot_count_picker(bot_count_picker.item_count - 1)
 	bot_skill_picker.select(clampi(int(cfg.get_value("host", "bot_skill", 1)), 0, BotBrain.SKILLS.size() - 1))
 	bot_skill_picker.disabled = bot_count_picker.selected == 0
 	drops_picker.select(clampi(int(cfg.get_value("host", "drops", 0)), 0, drops_picker.item_count - 1))
@@ -961,6 +986,9 @@ func _build_team_roster() -> void:
 		child.queue_free()
 	var my_id := NetworkManager.multiplayer.get_unique_id()
 	for team in NetworkManager.TEAM_NAMES:
+		# Only the colours this arena has a base for (all of them until the host's map has loaded).
+		if not NetworkManager.team_on_map(team):
+			continue
 		var members: Array[String] = []
 		var bots := 0
 		for peer_id in NetworkManager.peer_teams.keys():
@@ -1222,8 +1250,11 @@ func _fill_levels_tree() -> void:
 			row.set_meta("description", map_item.tan_description)
 			row.set_meta("fil_id", map_item.file_id)
 			row.set_meta("tan_id", map_item.tan_id)
+			row.set_meta("size_w", int(map_item.get("tan_width", 0) if map_item.get("tan_width") != null else 0))
+			row.set_meta("size_d", int(map_item.get("tan_depth", 0) if map_item.get("tan_depth") != null else 0))
 			row.set_meta("thm_id", map_item.thm_id)
 			row.set_meta("origin", str(map_item.get("tan_origin", "Tanarus Original")))
+			_show_row_rating(row, map_item)
 			if int(map_item.file_id) == _last_selected_map_file_id:
 				row.select(0)
 				# Deferred - the Tree hasn't laid out its new rows yet this frame.
@@ -1311,3 +1342,95 @@ func set_ui_feedback(err_msg: String, err_lvl: String) -> void:
 	_feedback_tween = create_tween().set_parallel()
 	_feedback_tween.tween_property(ui_feedback, "visible_ratio", 1.0, clampf(err_msg.length() * 0.012, 0.15, 0.6))
 	_feedback_tween.tween_property(status_led, "modulate:a", 1.0, 0.45).set_trans(Tween.TRANS_BOUNCE)
+
+
+# --- Map ratings ---------------------------------------------------------------
+
+# Thumbs up / down under the selected map's byline, like the site's: pressing your current vote takes it back.
+func _build_rating_row() -> void:
+	var bar := HBoxContainer.new()
+	bar.add_theme_constant_override("separation", 8)
+	_like_button = _make_rating_button(THUMB_UP, "Like this arena", 1)
+	_dislike_button = _make_rating_button(THUMB_DOWN, "Dislike this arena", -1)
+	bar.add_child(_like_button)
+	bar.add_child(_dislike_button)
+	map_byline.get_parent().add_child(bar)
+	map_byline.get_parent().move_child(bar, map_byline.get_index() + 1)
+	_refresh_rating_buttons()
+
+
+func _make_rating_button(icon: Texture2D, tooltip: String, value: int) -> Button:
+	var button := Button.new()
+	button.icon = icon
+	button.toggle_mode = true
+	button.tooltip_text = tooltip
+	button.focus_mode = Control.FOCUS_NONE
+	button.theme_type_variation = &"GhostButton"
+	button.add_theme_constant_override("icon_max_width", RATING_ICON_WIDTH)
+	button.pressed.connect(func(): _rate_selected_map(value))
+	return button
+
+
+# The list entry (one per file; a map has one) for a tan_id, or {}.
+func _level_row_data(tan_id: int) -> Dictionary:
+	for map_item in _level_rows:
+		if int(map_item.tan_id) == tan_id:
+			return map_item
+	return {}
+
+
+func _show_row_rating(row: TreeItem, map_item: Dictionary) -> void:
+	row.set_icon(3, THUMB_UP)
+	row.set_icon_max_width(3, RATING_ICON_WIDTH)
+	row.set_text(3, str(int(map_item.get("likes", 0))))
+	row.set_icon(4, THUMB_DOWN)
+	row.set_icon_max_width(4, RATING_ICON_WIDTH)
+	row.set_text(4, str(int(map_item.get("dislikes", 0))))
+
+
+func _refresh_rating_buttons() -> void:
+	if _like_button == null:
+		return
+	var map_item := _level_row_data(_rating_tan_id)
+	var usable := not map_item.is_empty() and CreativeApi.logged_in()
+	var mine := int(map_item.get("my_vote", 0))
+	_like_button.text = str(int(map_item.get("likes", 0)))
+	_dislike_button.text = str(int(map_item.get("dislikes", 0)))
+	_like_button.set_pressed_no_signal(mine == 1)
+	_dislike_button.set_pressed_no_signal(mine == -1)
+	_like_button.disabled = not usable
+	_dislike_button.disabled = not usable
+
+
+func _rate_selected_map(value: int) -> void:
+	var tan_id := _rating_tan_id
+	var map_item := _level_row_data(tan_id)
+	if map_item.is_empty():
+		return
+	# Same button as your current vote = take it back.
+	var sending := 0 if int(map_item.get("my_vote", 0)) == value else value
+	_like_button.disabled = true
+	_dislike_button.disabled = true
+	var result := await CreativeApi.request(self, "rateMap", {"tan_id": tan_id, "value": sending})
+	if result.ok and result.body.get("data") is Dictionary:
+		var data: Dictionary = result.body.data
+		for key in ["likes", "dislikes", "my_vote"]:
+			map_item[key] = int(data.get(key, 0))
+		var root := world_list.get_root()
+		if root:
+			for row in root.get_children():
+				if int(row.get_meta("tan_id", -1)) == tan_id:
+					_show_row_rating(row, map_item)
+	else:
+		set_ui_feedback("Rating not saved: %s" % result.message, "NOK")
+	_refresh_rating_buttons()
+
+
+# The bot count choices: None, then 1..max_bots per team, picking what the host asked for (or as close as it goes).
+func _fill_bot_count_picker(max_bots: int) -> void:
+	if bot_count_picker.item_count != max_bots + 1:
+		bot_count_picker.clear()
+		for i in max_bots + 1:
+			bot_count_picker.add_item("None" if i == 0 else "%d per team" % i)
+	bot_count_picker.select(mini(_wanted_bots, max_bots))
+	bot_skill_picker.disabled = bot_count_picker.selected == 0

@@ -287,6 +287,11 @@ func _has_world_contact() -> bool:
 	return false
 
 
+# Public read for the leave-to-lobby countdown: true while the craft touches the world.
+func is_grounded() -> bool:
+	return _has_world_contact()
+
+
 func _touching_world() -> bool:
 	var world_bit: int = 1 << (Utilities.GROUP_LAYER_SCOPE["world"]["layer"] - 1)
 	for other in body.get_colliding_bodies():

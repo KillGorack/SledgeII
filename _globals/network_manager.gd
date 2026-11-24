@@ -24,6 +24,8 @@ signal api_error(message: String)
 # so the UI needs its own signal to know to let the player pick again instead
 # of just silently not proceeding.
 signal team_request_rejected(reason: String)
+# Which teams the host's map has a base for has just arrived (see map_teams): team pickers should rebuild.
+signal map_teams_received
 # "Universe juice" - a team-wide resource (not per-player) that gates how
 # fast a team can churn through recon captures. Generated/spent server-side
 # in match.gd (the actual mechanic), broadcast here purely so any HUD element
@@ -47,7 +49,13 @@ const MAX_PLAYERS_PER_TEAM := 5
 # reserved range of ids in peer_teams, peer_crafts, names and scores. Real peers get random ids from ENet, which could
 # in theory land up here, but the chance is about one in three million per player.
 const BOT_ID_BASE := 2147483000
-const MAX_BOTS_PER_TEAM := 5
+# The bot count a host can pick: up to BOTS_PER_TEAM_USUAL, or MAX_BOTS_PER_TEAM on a 10vs10 arena (index.gd).
+const BOTS_PER_TEAM_USUAL := 5
+const MAX_BOTS_PER_TEAM := 10
+
+# The teams the host's map has a base for, set once its map has loaded (match.gd -> set_map_teams). Empty = not known
+# yet, or a map with no bases at all (everyone plays from its fallback spawn points) - every team is open then.
+var map_teams: Array[String] = []
 
 var peer: ENetMultiplayerPeer
 # Non-null only while a port_forwarding host is up - holds the mapping open
@@ -528,6 +536,7 @@ func stop_hosting() -> void:
 	is_host = false
 	_verified.clear()
 	peer_teams.clear()
+	map_teams.clear()
 	peer_crafts.clear()
 	allowed_craft_ids.clear()
 	peer_names.clear()
@@ -548,6 +557,7 @@ func leave_game() -> void:
 		multiplayer.multiplayer_peer.close()
 		multiplayer.multiplayer_peer = null
 	peer_teams.clear()
+	map_teams.clear()
 	peer_crafts.clear()
 	allowed_craft_ids.clear()
 	peer_names.clear()
@@ -583,6 +593,7 @@ func _send_initial_state(peer_id: int) -> void:
 	# rather than the backfill loop below - there's nothing to backfill, the
 	# host is the only one who ever sets it.
 	_assign_ruleset.rpc_id(peer_id, allowed_weapon_paths, day_night_enabled, mines_enabled, allowed_mine_paths, rockets_enabled, recon_capture_enabled, allowed_specials, allowed_craft_ids)
+	_sync_map_teams.rpc_id(peer_id, map_teams)
 	# Backfill the roster so the newly joined peer sees everyone already
 	# assigned before picking their own - no auto-assignment anymore, the new
 	# peer isn't in peer_teams at all until request_team() below succeeds, so
@@ -660,6 +671,9 @@ func _request_team(team: String, craft_id: StringName = CraftCatalog.DEFAULT_ID)
 		return
 	if not TEAM_NAMES.has(team):
 		_reject_team_request.rpc_id(requester_id, "Not a real team.")
+		return
+	if not team_on_map(team):
+		_reject_team_request.rpc_id(requester_id, "This arena has no %s base." % team.trim_prefix("team_").capitalize())
 		return
 	if _team_count(team) >= MAX_PLAYERS_PER_TEAM:
 		_reject_team_request.rpc_id(requester_id, "%s is full." % team.trim_prefix("team_").capitalize())
@@ -743,14 +757,38 @@ func add_bot(team: String, craft_id: StringName) -> int:
 # assignment always goes through request_team()/_request_team(), the only
 # thing that ever writes a non-host entry into peer_teams.
 func suggest_team() -> String:
-	var best_team := TEAM_NAMES[0]
-	var best_count := _team_count(best_team)
+	var best_team := ""
+	var best_count := 0
 	for team in TEAM_NAMES:
+		if not team_on_map(team):
+			continue
 		var count := _team_count(team)
-		if count < best_count:
+		if best_team.is_empty() or count < best_count:
 			best_team = team
 			best_count = count
-	return best_team
+	return best_team if not best_team.is_empty() else TEAM_NAMES[0]
+
+
+# Whether the host's map has a base for `team` (always true while that isn't known yet - see map_teams).
+func team_on_map(team: String) -> bool:
+	return map_teams.is_empty() or map_teams.has(team)
+
+
+# Host, once its map has loaded and before any craft spawns (match.gd::_ready): the teams that map has a base for.
+# Anyone already on a team it lacks - the host's own pick from the menu, or a joiner who picked while the map was
+# still loading - moves to the emptiest team it does have. Then everyone hears which teams exist.
+func set_map_teams(teams: Array[String]) -> void:
+	map_teams.assign(teams)
+	for peer_id in peer_teams.keys():
+		if not team_on_map(peer_teams[peer_id]):
+			_assign_team.rpc(peer_id, suggest_team(), peer_crafts.get(peer_id, CraftCatalog.DEFAULT_ID))
+	_sync_map_teams.rpc(map_teams)
+
+
+@rpc("authority", "call_local", "reliable")
+func _sync_map_teams(teams: Array) -> void:
+	map_teams.assign(teams)
+	map_teams_received.emit()
 
 
 func _on_peer_disconnected(peer_id: int) -> void:

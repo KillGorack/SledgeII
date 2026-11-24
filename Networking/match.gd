@@ -223,6 +223,13 @@ func _ready() -> void:
 	spawner.spawn_function = _spawn_craft
 	await _load_map()
 	_map_ready = true
+	# Which teams this map has bases for, before any craft spawns (the backfill below): nobody plays a colour it lacks.
+	if multiplayer.is_server() and not NetworkManager.creative_session:
+		var on_map: Array[String] = []
+		for team in NetworkManager.TEAM_NAMES:
+			if not _spawn_points_by_team.get(team, []).is_empty():
+				on_map.append(team)
+		NetworkManager.set_map_teams(on_map)
 	for craft in _pending_unfreeze:
 		# Remote copies stay frozen kinematic for good - see movement.gd::_ready.
 		if is_instance_valid(craft) and craft.is_multiplayer_authority():
@@ -257,6 +264,8 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if _leave_left >= 0.0:
+		_tick_leave(delta)
 	# See NetworkManager.is_live_server() for why not plain is_server().
 	if not NetworkManager.is_live_server():
 		return
@@ -319,7 +328,7 @@ func _generate_juice(delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("exit_main"):
-		_exit_to_main_menu()
+		_toggle_leave_countdown()
 	elif event.is_action_pressed("capture_recon"):
 		_try_start_capture()
 
@@ -406,6 +415,64 @@ func _sync_roster(names: Dictionary, scores: Dictionary) -> void:
 func _announce(line: String) -> void:
 	for peer_id in _ready_peers.keys():
 		_broadcast_chat_message.rpc_id(peer_id, line)
+
+
+const LEAVE_DELAY := 5.0
+
+var _leave_left := -1.0  # < 0 = not leaving
+var _leave_label: Label = null
+
+
+# Esc starts a 5 s countdown, shown on screen; Esc again cancels. When it runs
+# out the craft must also be on the ground - no logging out in the air.
+func _toggle_leave_countdown() -> void:
+	if _leave_left >= 0.0:
+		_cancel_leave()
+		return
+	if _my_craft == null or not is_instance_valid(_my_craft) or not _my_craft.visible:
+		_exit_to_main_menu()  # nothing to be stranded in the air
+		return
+	_leave_left = LEAVE_DELAY
+	if _leave_label == null:
+		var layer := CanvasLayer.new()
+		layer.layer = 90
+		add_child(layer)
+		_leave_label = Label.new()
+		_leave_label.add_theme_font_size_override("font_size", 28)
+		_leave_label.add_theme_color_override("font_outline_color", Color.BLACK)
+		_leave_label.add_theme_constant_override("outline_size", 8)
+		_leave_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
+		_leave_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+		_leave_label.position.y = 90
+		layer.add_child(_leave_label)
+	_leave_label.show()
+	_update_leave_label(true)
+
+
+func _cancel_leave() -> void:
+	_leave_left = -1.0
+	if _leave_label:
+		_leave_label.hide()
+
+
+func _update_leave_label(grounded: bool) -> void:
+	if _leave_left > 0.0:
+		_leave_label.text = "Leaving to lobby in %d...  (Esc to cancel)" % ceili(_leave_left)
+	else:
+		_leave_label.text = "Land to leave..." if not grounded else "Leaving..."
+
+
+func _tick_leave(delta: float) -> void:
+	if _my_craft == null or not is_instance_valid(_my_craft):
+		_exit_to_main_menu()
+		return
+	_leave_left = maxf(0.0, _leave_left - delta)
+	var movement := _my_craft.get_node_or_null("movement_node")
+	var grounded: bool = movement == null or movement.is_grounded()
+	_update_leave_label(grounded)
+	if _leave_left <= 0.0 and grounded:
+		_leave_left = -1.0
+		_exit_to_main_menu()
 
 
 func _exit_to_main_menu() -> void:
