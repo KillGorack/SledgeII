@@ -14,7 +14,7 @@ class_name BoostOrbit
 # origin is at the turret pivot, not the middle of the hull), turning with the
 # craft's heading but not its tilt, so the ring stays level.
 
-const SLOTS := 6
+const SLOTS := PowerupState.MAX_SHOWN
 const ORBIT_RADIUS := 0.4 # m: clears the 1.6 m hull
 const ORBIT_HEIGHT := 0.2 # m above the craft's origin: over the turret
 const COIN_WIDTH := 0.125 # m on screen
@@ -23,9 +23,6 @@ const BOB := 0.1 # m: how far each coin bobs up and down
 const BOB_RATE := 10.0 # rad/s: how fast (2 is about one bob every 3 s)
 const FRAME_SIZE := 256.0
 const WARN_SECONDS := 4.0 # blink like the HUD icon
-
-# boost resource_path -> SpriteFrames, shared by every craft's orbit.
-static var _frames_cache: Dictionary = {}
 
 var weapon_node: Node
 var craft: Node3D
@@ -49,19 +46,19 @@ func _ready() -> void:
 		add_child(sprite)
 		_slots.append(sprite)
 	if weapon_node:
-		weapon_node.boosts_changed.connect(_refresh)
+		weapon_node.powerups.changed.connect(_refresh)
 		_refresh()
 
 
 func _refresh() -> void:
-	var status: Array = weapon_node.boost_status()
+	var status: Array = weapon_node.powerups.status()
 	var now := Time.get_ticks_msec()
 	_end_msec.clear()
 	for i in SLOTS:
 		var sprite := _slots[i]
 		if i < status.size():
-			var boost: BoostSettings = status[i]["boost"]
-			var frames := _frames_for(boost)
+			var powerup: Powerup = status[i]["powerup"]
+			var frames := powerup.sprite_frames()
 			if frames:
 				sprite.sprite_frames = frames
 				sprite.play(&"default")
@@ -105,27 +102,3 @@ func _collider_centre() -> Vector3:
 		box = box.expand(point)
 	var centre := collider.transform * box.get_center()
 	return Vector3(centre.x, 0.0, centre.z)
-
-
-# The boost's pickup coin: its icon is frame 1 of a 16-frame row of the sheet, so
-# the rest of the row is the spin. Falls back to a still image for any other icon.
-static func _frames_for(boost: BoostSettings) -> SpriteFrames:
-	if boost == null or boost.icon == null:
-		return null
-	var key := boost.resource_path
-	if _frames_cache.has(key):
-		return _frames_cache[key]
-	var frames := SpriteFrames.new()
-	frames.set_animation_speed(&"default", 17.0)
-	frames.set_animation_loop(&"default", true)
-	var icon := boost.icon as AtlasTexture
-	if icon == null:
-		frames.add_frame(&"default", boost.icon)
-	else:
-		for i in 16:
-			var frame := AtlasTexture.new()
-			frame.atlas = icon.atlas
-			frame.region = Rect2(i * FRAME_SIZE, icon.region.position.y, FRAME_SIZE, FRAME_SIZE)
-			frames.add_frame(&"default", frame)
-	_frames_cache[key] = frames
-	return frames

@@ -435,7 +435,7 @@ func _apply_grant_weapon(path: String) -> void:
 
 # Every peer, from health_node.gd::destroy_self.
 func revoke_granted() -> void:
-	_clear_boosts()
+	powerups.clear()
 	if weapon_settings.size() <= _base_weapon_count:
 		return
 	weapon_settings.resize(_base_weapon_count)
@@ -443,44 +443,27 @@ func revoke_granted() -> void:
 	current_weapon_index = 0
 
 
-# --- Timed weapon boosts (BoostSettings) ---------------------------------------
-# The craft's active boosts live HERE, never on the weapon .tres files. Every
-# peer that cares (server for the real shot, owner for prediction + HUD, others
-# for the look) holds the same list, sent by the server whenever it changes.
-# Expiry is the server's call; each peer also keeps a local end time purely to
-# draw the HUD countdown.
+# --- Timed powerups --------------------------------------------------------------
+# The craft's active powerups live in a PowerupState child (made in _init, so it exists before any other
+# node's _ready - health_node connects to it). The names below are the weapon-facing shortcuts.
 
-signal boosts_changed
-
-var _boosts: Array[BoostSettings] = []
-var _boost_end_msec: Dictionary = {} # boost resource_path -> local end time
-var _ops_cache: Dictionary = {} # base WeaponSettings -> merged ops for ITS kind
-var _effective_cache: Dictionary = {} # base WeaponSettings -> boosted duplicate
+var powerups: PowerupState
 
 
-# The weapon as this craft currently fires it: base, plus active boosts.
+func _init() -> void:
+	powerups = PowerupState.new()
+	powerups.name = "powerup_state"
+	add_child(powerups)
+
+
+# The weapon as this craft currently fires it: base, plus active powerups.
 func effective(base: WeaponSettings) -> WeaponSettings:
-	var ops := boost_ops_for(base)
-	if ops.is_empty():
-		return base
-	if not _effective_cache.has(base):
-		_effective_cache[base] = BoostSettings.apply_ops(base, ops)
-	return _effective_cache[base]
+	return powerups.effective(base)
 
 
-# The factor active boosts apply to a CraftStats property (1.0 if none).
-func craft_factor(stat: String) -> float:
-	return BoostSettings.craft_factor(_boosts, stat)
-
-
-# What the active boosts do to THIS weapon (only boosts that affect its kind).
-# Sent with every shot so other peers build the same boosted weapon.
+# What the active powerups do to THIS weapon. Sent with every shot so other peers build the same weapon.
 func boost_ops_for(base: WeaponSettings) -> Dictionary:
-	if _boosts.is_empty() or base == null:
-		return {}
-	if not _ops_cache.has(base):
-		_ops_cache[base] = BoostSettings.resolve(_boosts, base.weapon_kind)
-	return _ops_cache[base]
+	return powerups.ops_for(base)
 
 
 func _is_frozen() -> bool:
@@ -488,107 +471,6 @@ func _is_frozen() -> bool:
 	return health != null and health.is_frozen()
 
 
-# For the radar: does this craft have any boost running? (No allocation.)
+# For the radar: does this craft have any powerup running?
 func has_boosts() -> bool:
-	return not _boosts.is_empty()
-
-
-# For the HUD: [{boost: BoostSettings, left: seconds}]
-func boost_status() -> Array:
-	var now := Time.get_ticks_msec()
-	var out: Array = []
-	for boost in _boosts:
-		out.append({"boost": boost, "left": maxf(0.0, (_boost_end_msec.get(boost.resource_path, now) - now) / 1000.0)})
-	return out
-
-
-# Server only. The same boost again ADDS its duration to what is left (see
-# boost_end_after_pickup), so a pickup is always "used".
-# Longest a boost can be stacked up to, so repeated pickups can't bank an hour of it.
-const MAX_BOOST_SECONDS := 300.0
-
-
-# When a boost ends after another pickup of it: the time it still has PLUS the new
-# duration (picking one up while it runs adds to it, it doesn't restart it), or just
-# the new duration if it wasn't running. Capped at MAX_BOOST_SECONDS from now.
-static func boost_end_after_pickup(now_msec: int, current_end_msec: int, duration: float) -> int:
-	var start := maxi(now_msec, current_end_msec)
-	return mini(start + int(duration * 1000.0), now_msec + int(MAX_BOOST_SECONDS * 1000.0))
-
-
-func server_grant_boost(boost: BoostSettings) -> bool:
-	if not multiplayer.is_server() or boost == null or boost.resource_path.is_empty():
-		return false
-	var now := Time.get_ticks_msec()
-	var end := boost_end_after_pickup(now, int(_boost_end_msec.get(boost.resource_path, 0)), boost.duration)
-	_boost_end_msec[boost.resource_path] = end
-	_boosts_changed_on_server()
-	# Boosts that reach other craft systems get their one-time pickup effect (the shield refill).
-	if boost.refill_shields or not boost.craft_multiply_values.is_empty():
-		var health = get_node_or_null("../health_node")
-		if health != null:
-			health.boost_granted(boost)
-	# An earlier pickup's timer may fire first - _expire_boosts only removes what has really run out.
-	get_tree().create_timer((end - now) / 1000.0 + 0.05).timeout.connect(_expire_boosts)
-	return true
-
-
-func _expire_boosts() -> void:
-	var now := Time.get_ticks_msec()
-	var changed := false
-	for path in _boost_end_msec.keys():
-		if _boost_end_msec[path] <= now:
-			_boost_end_msec.erase(path)
-			changed = true
-	if changed:
-		_boosts_changed_on_server()
-
-
-# Rebuild from the end-time table, tell every ready peer.
-func _boosts_changed_on_server() -> void:
-	var paths := PackedStringArray()
-	var left := PackedFloat32Array()
-	var now := Time.get_ticks_msec()
-	for path in _boost_end_msec:
-		paths.append(path)
-		left.append(maxf(0.0, (_boost_end_msec[path] - now) / 1000.0))
-	_apply_boosts(paths, left)
-	var match_node = get_tree().get_first_node_in_group("match")
-	if match_node == null:
-		return
-	for peer_id in match_node._ready_peers:
-		if peer_id != 1:
-			_sync_boosts.rpc_id(peer_id, paths, left)
-
-
-@rpc("any_peer", "call_remote", "reliable")
-func _sync_boosts(paths: PackedStringArray, left: PackedFloat32Array) -> void:
-	if multiplayer.get_remote_sender_id() != 1:
-		return
-	_apply_boosts(paths, left)
-
-
-func _apply_boosts(paths: PackedStringArray, left: PackedFloat32Array) -> void:
-	_boosts.clear()
-	_boost_end_msec.clear()
-	var now := Time.get_ticks_msec()
-	for i in paths.size():
-		var boost := load(paths[i]) as BoostSettings
-		if boost == null:
-			continue
-		_boosts.append(boost)
-		_boost_end_msec[paths[i]] = now + int(left[i] * 1000.0)
-	_ops_cache.clear()
-	_effective_cache.clear()
-	boosts_changed.emit()
-
-
-# Destruction: every peer drops its boosts locally (see revoke_granted).
-func _clear_boosts() -> void:
-	if _boosts.is_empty() and _boost_end_msec.is_empty():
-		return
-	_boosts.clear()
-	_boost_end_msec.clear()
-	_ops_cache.clear()
-	_effective_cache.clear()
-	boosts_changed.emit()
+	return powerups.has_any()

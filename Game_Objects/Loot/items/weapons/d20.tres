@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="WeaponPickup" format=3]
+
+[ext_resource type="Script" path="res://Game_Objects/Loot/_scripts/weapon_pickup.gd" id="1_w"]
+[ext_resource type="PackedScene" path="res://Game_Objects/Powerups/Scenes/D20_Plaything.tscn" id="2_vis"]
+[ext_resource type="AudioStream" path="res://Game_Objects/Powerups/sounds/ding.ogg" id="3_snd"]
+[ext_resource type="Resource" path="res://Weapons/settings_object/D20.tres" id="4_wpn"]
+
+[resource]
+script = ExtResource("1_w")
+item_name = "D20"
+visual_scene = ExtResource("2_vis")
+color = Color(1, 1, 0, 1)
+pickup_sound = ExtResource("3_snd")
+drop_weight = 1.0
+weapon = ExtResource("4_wpn")

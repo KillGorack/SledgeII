@@ -27,8 +27,10 @@ var armor: float
 var life: float
 
 var _shields_max: float
-# Boosted shield regen speed (1.0 = normal) - see _on_boosts_changed.
+# Powered-up shield regen speed (1.0 = normal) - see _on_powerups_changed.
 var _regen_factor: float = 1.0
+# Powered-up pause before regen starts after a hit (1.0 = normal; below 1 is shorter).
+var _regen_delay_factor: float = 1.0
 var _armor_max: float
 var _life_max: float
 
@@ -80,10 +82,10 @@ func _ready() -> void:
 	_shields_max = stats.shields
 	_armor_max = stats.armor
 	_life_max = stats.life
-	# Boosts can speed up shield regen (Fortitude).
+	# Powerups can speed up shield regen (Fortitude).
 	var weapon_node := get_node_or_null("../weapon_node")
 	if weapon_node != null:
-		weapon_node.boosts_changed.connect(_on_boosts_changed)
+		weapon_node.powerups.changed.connect(_on_powerups_changed)
 
 	_regeneration_timer = Timer.new()
 	_regeneration_timer.wait_time = stats.regeneration_delay
@@ -173,7 +175,7 @@ func apply_damage(damage: float, attacker_id: int = 0, cause: int = DeathCause.W
 	if NetworkManager.creative_building and cause != DeathCause.VOID:
 		return
 	note_attacker(attacker_id)
-	_regeneration_timer.start()
+	_regeneration_timer.start(stats.regeneration_delay * _regen_delay_factor)
 	_is_regenerating = false
 	if shields > 0:
 		shields -= damage
@@ -244,19 +246,20 @@ func request_fall_damage(impact_speed: float) -> void:
 	apply_damage(stats.fall_damage_coefficient * excess * excess, 0, DeathCause.FALL)
 
 
-# Active boosts changed: re-read how much faster shields regenerate (Fortitude). Regen only runs on the live
-# server (see _process), so only its copy of the boosts matters - no network traffic for this.
-func _on_boosts_changed() -> void:
+# Active powerups changed: re-read how much faster shields regenerate, and how much sooner they start (Fortitude). Regen only runs on the live
+# server (see _process), so only its copy of the powerups matters - no network traffic for this.
+func _on_powerups_changed() -> void:
 	var weapon_node := get_node_or_null("../weapon_node")
-	_regen_factor = weapon_node.craft_factor("regeneration_rate") if weapon_node != null else 1.0
+	_regen_factor = weapon_node.powerups.factor("regeneration_rate") if weapon_node != null else 1.0
+	_regen_delay_factor = weapon_node.powerups.factor("regeneration_delay") if weapon_node != null else 1.0
 
 
-# Server-only. A boost was just picked up: if it refills shields, they jump straight to max (shields
+# Server-only. A powerup was just picked up: if it refills shields, they jump straight to max (shields
 # alone, bypassing regeneration and its delay).
-func boost_granted(boost: BoostSettings) -> void:
+func powerup_granted(powerup: Powerup) -> void:
 	if not multiplayer.is_server() or _is_destroyed:
 		return
-	if boost.refill_shields:
+	if powerup.refill_shields:
 		shields = _shields_max
 
 
@@ -476,6 +479,11 @@ func apply_impulse(impulse: Vector3) -> void:
 	# "hit" - is untouched.
 	if movement_node and movement_node.isGrounded and impulse.y < 0.0:
 		impulse.y = 0.0
+	# Bulwark: powerups scale how hard shoves land (below 1 = you barely move). Every shove - blasts,
+	# direct hits, mines, thrown objects - comes through here.
+	var weapon_node = body.get_node_or_null("weapon_node")
+	if weapon_node != null:
+		impulse *= weapon_node.powerups.factor("knockback")
 	body.apply_central_impulse(impulse)
 	# movement.gd hard-sets linear velocity to max_speed every tick while
 	# grounded, which erases the shove on the very next tick. Ask it to stand

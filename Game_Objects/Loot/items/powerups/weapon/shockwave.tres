@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="Powerup" format=3 uid="uid://bnvqkujdmk2aj"]
+
+[ext_resource type="Script" uid="uid://cnjswx5f2jmo8" path="res://Game_Objects/Loot/_scripts/powerup.gd" id="1_pw"]
+[ext_resource type="Script" uid="uid://b870qiqrn23xt" path="res://Game_Objects/Loot/_scripts/stat_change.gd" id="2_sc"]
+[ext_resource type="AudioStream" uid="uid://b5pjnn22xeox0" path="res://Game_Objects/Powerups/sounds/ding.ogg" id="3_snd"]
+
+[sub_resource type="Resource" id="Change_0"]
+script = ExtResource("2_sc")
+targets = 2
+stat = "body_collection_max"
+value = 125
+
+[sub_resource type="Resource" id="Change_1"]
+script = ExtResource("2_sc")
+targets = 2
+stat = "explosive_force"
+value = 325.0
+
+[sub_resource type="Resource" id="Change_2"]
+script = ExtResource("2_sc")
+targets = 2
+stat = "explosive_force_distance"
+value = 10.0
+
+[resource]
+script = ExtResource("1_pw")
+changes = Array[ExtResource("2_sc")]([SubResource("Change_0"), SubResource("Change_1"), SubResource("Change_2")])
+item_name = "Shockwave"
+description = "AOE force, no need for good aim here... just get close and watch 'em scatter."
+sheet_row = 9
+color = Color(0.8, 0.3, 0.8, 1)
+pickup_sound = ExtResource("3_snd")
+drop_weight = 1.0
+requires = 4

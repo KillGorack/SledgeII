@@ -168,6 +168,9 @@ func _update_health() -> void:
 		_ratio(health_node.shields, health_node._shields_max),
 		_ratio(health_node.armor, health_node._armor_max),
 		_ratio(health_node.life, health_node._life_max),
+		health_node.shields,
+		health_node.armor,
+		health_node.life,
 	)
 
 

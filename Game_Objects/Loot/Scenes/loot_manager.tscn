@@ -1,0 +1,10 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://Game_Objects/Loot/_scripts/loot_manager.gd" id="1_mgr"]
+[ext_resource type="Resource" path="res://Game_Objects/Loot/tables/consumables.tres" id="2_con"]
+[ext_resource type="Resource" path="res://Game_Objects/Loot/tables/powerups.tres" id="3_pow"]
+
+[node name="LootManager" type="Node3D"]
+script = ExtResource("1_mgr")
+consumables = ExtResource("2_con")
+powerups = ExtResource("3_pow")

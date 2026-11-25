@@ -186,9 +186,9 @@ func _ready() -> void:
 	for skill in BotBrain.SKILLS:
 		bot_skill_picker.add_item(skill.name)
 	bot_skill_picker.select(1)
-	for level in preload("res://Networking/match.gd").LOOT_LEVELS:
+	for level in LootManager.LOOT_LEVELS:
 		drops_picker.add_item(level.name)
-	drops_picker.select(0)
+	drops_picker.select(LootManager.DEFAULT_LEVEL)
 	# Skill means nothing with no bots.
 	bot_count_picker.item_selected.connect(func(index: int):
 		_wanted_bots = index
@@ -788,7 +788,7 @@ func _save_host_settings() -> void:
 	cfg.set_value("host", "day_night", day_night_check.button_pressed)
 	cfg.set_value("host", "bots_per_team", bot_count_picker.selected)
 	cfg.set_value("host", "bot_skill", bot_skill_picker.selected)
-	cfg.set_value("host", "drops", drops_picker.selected)
+	cfg.set_value("host", "drops_level", drops_picker.selected)
 	cfg.set_value("host", "weapons_listed", _listed_paths(weapon_checklist, "weapon_path"))
 	cfg.set_value("host", "weapons_checked", _get_checked_weapon_paths())
 	cfg.set_value("host", "mines_listed", _listed_paths(mine_checklist, "mine_path"))
@@ -820,7 +820,7 @@ func _load_host_settings() -> void:
 	_fill_bot_count_picker(bot_count_picker.item_count - 1)
 	bot_skill_picker.select(clampi(int(cfg.get_value("host", "bot_skill", 1)), 0, BotBrain.SKILLS.size() - 1))
 	bot_skill_picker.disabled = bot_count_picker.selected == 0
-	drops_picker.select(clampi(int(cfg.get_value("host", "drops", 0)), 0, drops_picker.item_count - 1))
+	drops_picker.select(clampi(int(cfg.get_value("host", "drops_level", LootManager.DEFAULT_LEVEL)), 0, drops_picker.item_count - 1))
 	_restore_checklist(weapon_checklist, "weapon_path", cfg.get_value("host", "weapons_listed", []), cfg.get_value("host", "weapons_checked", []))
 	_restore_checklist(mine_checklist, "mine_path", cfg.get_value("host", "mines_listed", []), cfg.get_value("host", "mines_checked", []))
 	_restore_checklist(mine_checklist, "special_id", cfg.get_value("host", "specials_listed", []), cfg.get_value("host", "specials_checked", []))

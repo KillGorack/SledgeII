@@ -47,6 +47,19 @@ var _life_ratio: float = 1.0
 var _armor_ratio: float = 1.0
 var _shields_ratio: float = 1.0
 
+# Digital readout of the three values in the middle of the rings, stacked in the same order as the rings
+# (shields on top = outermost ring, then armor, then life). Each number warms up with its own ring.
+# -1 = no value given yet, nothing is drawn.
+const READOUT_FONT := preload("res://UI/fonts/Orbitron.ttf")
+@export var show_readout: bool = true
+@export var readout_font_size: int = 16
+# Distance between the three lines, in px. The middle line sits on the ring center.
+@export var readout_line_gap: float = 20.0
+@export var readout_shadow: Color = Color(0, 0, 0, 0.85)
+var _shields_value: float = -1.0
+var _armor_value: float = -1.0
+var _life_value: float = -1.0
+
 # Fixed start point (top, sweeping clockwise) rather than derived from any
 # art - there's no baked shape here to match, so this is just a style choice.
 const START_ANGLE_DEG := -90.0
@@ -67,6 +80,29 @@ func _draw() -> void:
 	_draw_ring(armor_radius, _armor_ratio)
 	_draw_ring(shields_radius, _shields_ratio)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	if show_readout:
+		_draw_readout()
+
+
+func _draw_readout() -> void:
+	_draw_value(_shields_value, _shields_ratio, -readout_line_gap)
+	_draw_value(_armor_value, _armor_ratio, 0.0)
+	_draw_value(_life_value, _life_ratio, readout_line_gap)
+
+
+# One centered number, `y_offset` px above/below the ring center. Not stretched like the rings (this is
+# drawn with the identity transform), so the digits keep their proportions.
+func _draw_value(value: float, ratio: float, y_offset: float) -> void:
+	if value < 0.0:
+		return
+	var text := str(ceili(value))
+	var width := 80.0
+	# Digits sit between the baseline and about 0.72 em above it, so drop the baseline by half of that to
+	# center them on the line.
+	var baseline := size.y / 2.0 + y_offset + readout_font_size * 0.36
+	var x := size.x / 2.0 - width / 2.0
+	draw_string(READOUT_FONT, Vector2(x + 1.0, baseline + 1.0), text, HORIZONTAL_ALIGNMENT_CENTER, width, readout_font_size, readout_shadow)
+	draw_string(READOUT_FONT, Vector2(x, baseline), text, HORIZONTAL_ALIGNMENT_CENTER, width, readout_font_size, _color_for_ratio(ratio))
 
 
 func _draw_ring(radius: float, ratio: float) -> void:
@@ -100,8 +136,11 @@ func _color_for_ratio(ratio: float) -> Color:
 
 # Single call so all three rings redraw together off one set of numbers,
 # rather than three separate setters each triggering their own redraw.
-func update_ratios(shields_ratio: float, armor_ratio: float, life_ratio: float) -> void:
+func update_ratios(shields_ratio: float, armor_ratio: float, life_ratio: float, shields: float = -1.0, armor: float = -1.0, life: float = -1.0) -> void:
 	_shields_ratio = clamp(shields_ratio, 0.0, 1.0)
 	_armor_ratio = clamp(armor_ratio, 0.0, 1.0)
 	_life_ratio = clamp(life_ratio, 0.0, 1.0)
+	_shields_value = shields
+	_armor_value = armor
+	_life_value = life
 	queue_redraw()

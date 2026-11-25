@@ -114,8 +114,8 @@ var allowed_craft_ids: Array[StringName] = []
 var bots_per_team: int = 0
 # Host only: the "Bot skill" setting, an index into BotBrain.SKILLS (0 Easy, 1 Normal, 2 Hard).
 var bot_skill: int = 1
-# Host only: the "Drops" setting, an index into match.gd's LOOT_LEVELS (0 Normal ... 3 Absolute madness).
-var loot_level: int = 0
+# Host only: the "Drops" setting, an index into LootManager.LOOT_LEVELS (0 None, 1 Normal ... 4 Absolute madness).
+var loot_level: int = LootManager.DEFAULT_LEVEL
 
 # Site stats (usr.game_score / game_vanquishes / game_falls, gameAPI addUserStats).
 # Each player posts only their OWN gains - only their client has their session
@@ -500,7 +500,7 @@ func start_creative_session(level_data: Dictionary, editing: bool, team: String 
 	# from one minute to the next.
 	day_night_enabled = false
 	bots_per_team = 0
-	loot_level = 0
+	loot_level = LootManager.DEFAULT_LEVEL
 	mines_enabled = true
 	rockets_enabled = true
 	recon_capture_enabled = true

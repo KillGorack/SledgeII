@@ -22,7 +22,7 @@ enum ReloadOn { NEUTRAL, CAPTURED }
 @export var power_consumption: float = 0.0
 
 @export var projectile_prefab: PackedScene
-# What sort of weapon this is. Boosts (boost_settings.gd) only apply to the
+# What sort of weapon this is. Boosts (powerup.gd) only apply to the
 # kinds they list: lasers and plasma are LASER, rockets and shells are MISSILE,
 # thrown objects like the D20 are OBJECT.
 enum WeaponKind { LASER, MISSILE, OBJECT }

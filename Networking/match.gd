@@ -198,6 +198,9 @@ var _capturing_recons: Dictionary = {}
 var _my_craft: Node3D = null
 # Lays/blows/replicates mines - see mine_manager.gd.
 var mines: MineManager = null
+# Everything about drops - see loot_manager.gd. Made in _ready.
+const LOOT_MANAGER_SCENE := preload("res://Game_Objects/Loot/Scenes/loot_manager.tscn")
+var loot: LootManager = null
 # The Controller special: calling base guns out and home - see gun_controller.gd.
 var gun_control: GunController = null
 # This peer's own copy of env.tscn (see _apply_custom_environment) - kept so
@@ -212,6 +215,10 @@ var _pending_unfreeze: Array = []
 
 func _ready() -> void:
 	add_to_group("match")
+	# Named, because its RPCs find their way to the same node on every peer by path.
+	loot = LOOT_MANAGER_SCENE.instantiate()
+	loot.name = "LootManager"
+	add_child(loot)
 	mines = MineManager.new()
 	mines.name = "MineManager"
 	add_child(mines)
@@ -829,10 +836,7 @@ func _notify_ready(username: String = "") -> void:
 	_push_roster()
 	_sync_bounty(requester_id)
 	# Drops already on the floor, so a late joiner doesn't miss them.
-	for loot_id in _loot:
-		var existing: LootPickup = _loot[loot_id]
-		if is_instance_valid(existing):
-			_spawn_loot_event.rpc_id(requester_id, loot_id, existing.settings.resource_path, existing.global_position)
+	loot.sync_to(requester_id)
 	for other_peer_id in _spawned_peers.keys():
 		var craft = craft_container.get_node_or_null("Craft_%d" % other_peer_id)
 		if is_instance_valid(craft):
@@ -1224,197 +1228,6 @@ func _sync_recon_capture(recon_path: NodePath, team: String) -> void:
 # one-way latency (the shot left their barrel that long ago), and every
 # other peer by that plus its own one-way latency. The shooter themselves
 # never waits at all - see predict_shot.
-# --- Loot drops --------------------------------------------------------------
-# Server rolls and places a drop when a craft is destroyed, then sends ONE
-# reliable event (same channel as projectile spawn/end, so ordering holds).
-# Every peer spawns its own static copy; the server detects pickups and
-# announces them. Nothing about a drop is streamed.
-const LOOT_SCENE := preload("res://Game_Objects/Powerups/Scenes/loot_pickup.tscn")
-const LOOT_TABLE: Array[LootSettings] = [
-	preload("res://Game_Objects/Powerups/Settings/health_pack.tres"),
-	preload("res://Game_Objects/Powerups/Settings/energy_pack.tres"),
-	preload("res://Game_Objects/Powerups/Settings/juice_pack.tres"),
-	preload("res://Game_Objects/Powerups/Settings/d20_pickup.tres"),
-	preload("res://Game_Objects/Powerups/Settings/crit_ball_pickup.tres"),
-	preload("res://Game_Objects/Powerups/Settings/haste_pickup.tres"),
-	preload("res://Game_Objects/Powerups/Settings/ricochet_pickup.tres"),
-	preload("res://Game_Objects/Powerups/Settings/seeker_pickup.tres"),
-	preload("res://Game_Objects/Powerups/Settings/freeze_pickup.tres"),
-	preload("res://Game_Objects/Powerups/Settings/shockwave_pickup.tres"),
-	preload("res://Game_Objects/Powerups/Settings/perfect_shot_pickup.tres"),
-	preload("res://Game_Objects/Powerups/Settings/fortitude_pickup.tres"),
-]
-var _next_loot_id := 1
-var _loot: Dictionary = {} # id -> LootPickup, on every peer
-var _loot_container: Node3D = null
-
-
-# How many drops a destroyed craft (or base gun, sentry, barrel) leaves, set by the host's "Drops" setting
-# (NetworkManager.loot_level picks a row). chance: the chance of at least one; extra: each further drop needs this
-# again (at Normal, 2 is uncommon and 5 a rarity); most: the cap per kill; cap: the most lying around the arena at
-# once (over it, the oldest goes). Every drop picks its own item by weight, so repeats can happen. On average a
-# kill leaves about 0.7 drops at Normal, 1.5 at Abundance, 2.9 at Cornucopia and 6.5 at Absolute madness.
-const LOOT_LEVELS := [
-	{"name": "Normal", "chance": 0.5, "extra": 0.25, "most": 5, "cap": 30},
-	{"name": "Abundance", "chance": 0.8, "extra": 0.45, "most": 6, "cap": 50},
-	{"name": "Cornucopia", "chance": 1.0, "extra": 0.65, "most": 8, "cap": 80},
-	{"name": "Absolute madness", "chance": 1.0, "extra": 0.85, "most": 12, "cap": 120},
-]
-# Several drops fan out in a ring around the wreck: this far (meters), plus a bit per drop so a big pile doesn't overlap.
-const LOOT_RING_RADIUS := 2.0
-const LOOT_RING_PER_DROP := 0.2
-# TEMPORARY test switch: a .tres path here makes EVERY drop that loot. Set back
-# to "" for normal weighted drops.
-const DEBUG_FORCE_LOOT := ""
-# TEMPORARY test switch: every kill drops the WHOLE table, in a ring around the
-# wreck. Set to false for normal weighted drops. Wins over DEBUG_FORCE_LOOT.
-const DEBUG_DROP_ALL := false
-
-
-# What this match is made of, for LootSettings.requires. Everyone shares one loadout, so any craft's
-# (already host-filtered) weapon list is the match's. Recomputed per roll: a handful of weapons, a few rolls
-# per kill. No craft to read from = no conditions, everything may drop.
-func _loot_facts() -> Dictionary:
-	for craft in get_tree().get_nodes_in_group("Craft"):
-		var weapon_node := craft.get_node_or_null("weapon_node")
-		if weapon_node:
-			return LootSettings.match_facts(weapon_node.weapon_settings, NetworkManager.recon_capture_enabled)
-	return {}
-
-
-# Weighted pick from LOOT_TABLE. Rare drops just have a small drop_weight. Entries the match has no use for
-# (LootSettings.requires) sit out the roll, so their weight goes to the rest in proportion.
-func _roll_loot() -> LootSettings:
-	if not DEBUG_FORCE_LOOT.is_empty():
-		return load(DEBUG_FORCE_LOOT) as LootSettings
-	var facts := _loot_facts()
-	var pool: Array[LootSettings] = []
-	var total := 0.0
-	for entry in LOOT_TABLE:
-		if entry.is_available(facts):
-			pool.append(entry)
-			total += maxf(entry.drop_weight, 0.0)
-	if total <= 0.0:
-		return null
-	var roll := randf() * total
-	for entry in pool:
-		roll -= maxf(entry.drop_weight, 0.0)
-		if roll < 0.0:
-			return entry
-	return pool.back()
-
-
-func _loot_level() -> Dictionary:
-	return LOOT_LEVELS[clampi(NetworkManager.loot_level, 0, LOOT_LEVELS.size() - 1)]
-
-
-func _roll_loot_count() -> int:
-	var level := _loot_level()
-	if randf() >= level.chance:
-		return 0
-	var count := 1
-	while count < level.most and randf() < level.extra:
-		count += 1
-	return count
-
-
-# Server only.
-func _drop_loot_at(drop_at: Vector3, dropper_peer: int = 0) -> void:
-	if not multiplayer.is_server() or NetworkManager.creative_building:
-		return
-	if DEBUG_DROP_ALL:
-		var total := LOOT_TABLE.size()
-		for i in total:
-			var angle := TAU * i / total
-			_spawn_loot(LOOT_TABLE[i], drop_at + Vector3(cos(angle), 0.0, sin(angle)) * 2.5, dropper_peer, drop_at)
-		return
-	var count := _roll_loot_count()
-	if count == 0:
-		return
-	# One drop sits right under the wreck; several fan out in an evenly spaced
-	# ring (random starting angle) so they never overlap.
-	var start_angle := randf() * TAU
-	for i in count:
-		var spot := drop_at
-		if count > 1:
-			var angle := start_angle + TAU * i / count
-			spot += Vector3(cos(angle), 0.0, sin(angle)) * (LOOT_RING_RADIUS + LOOT_RING_PER_DROP * count)
-		_spawn_loot(_roll_loot(), spot, dropper_peer, drop_at if count > 1 else Vector3.INF)
-
-
-# Server only: place one drop on the floor under `drop_at` and announce it.
-# dropper_peer: whose death left this - they can never pick it up (see loot_pickup.gd).
-# anchor: the wreck, when `drop_at` is one of several spots fanned out around it.
-func _spawn_loot(settings: LootSettings, drop_at: Vector3, dropper_peer: int = 0, anchor: Vector3 = Vector3.INF) -> void:
-	if settings == null or settings.resource_path.is_empty():
-		return
-	# Settle onto the floor under the wreck instead of hanging in the air (and never onto a
-	# ceiling above it - see LootPickup.floor_point).
-	var world_mask: int = 1 << (Utilities.GROUP_LAYER_SCOPE["world"]["layer"] - 1)
-	var floor_at := LootPickup.floor_point(get_viewport().world_3d.direct_space_state, world_mask, drop_at, anchor)
-	if floor_at != Vector3.INF:
-		drop_at = floor_at # pickups sit ON the floor; the visual is 0.31 up
-	elif drop_at.y < HealthNode.FALL_DEATH_Y:
-		return # died in the void: nothing to land on, nobody could reach it
-	# Over the cap, the oldest goes.
-	while _loot.size() >= int(_loot_level().cap):
-		collect_loot(_loot.keys()[0], 0)
-	var id := _next_loot_id
-	_next_loot_id += 1
-	_make_loot(id, settings, drop_at, dropper_peer)
-	for peer_id in _ready_peers:
-		if peer_id != 1:
-			_spawn_loot_event.rpc_id(peer_id, id, settings.resource_path, drop_at)
-	get_tree().create_timer(settings.lifetime).timeout.connect(func(): collect_loot(id, 0))
-
-
-func _make_loot(id: int, settings: LootSettings, drop_at: Vector3, dropper_peer: int = 0) -> void:
-	if _loot_container == null:
-		_loot_container = Node3D.new()
-		_loot_container.name = "Loot"
-		add_child(_loot_container)
-	var pickup: LootPickup = LOOT_SCENE.instantiate()
-	pickup.loot_id = id
-	pickup.settings = settings
-	pickup.dropped_by = dropper_peer
-	pickup.position = drop_at
-	_loot[id] = pickup
-	_loot_container.add_child(pickup)
-
-
-@rpc("authority", "call_remote", "reliable", 2)
-func _spawn_loot_event(id: int, settings_path: String, drop_at: Vector3) -> void:
-	var settings := load(settings_path) as LootSettings
-	if settings and not _loot.has(id):
-		_make_loot(id, settings, drop_at)
-
-
-# Server only. taker_peer 0 = expired / evicted rather than picked up.
-func collect_loot(id: int, taker_peer: int) -> void:
-	if not _loot.has(id):
-		return
-	_remove_loot(id, taker_peer)
-	for peer_id in _ready_peers:
-		if peer_id != 1:
-			_remove_loot_event.rpc_id(peer_id, id, taker_peer)
-
-
-@rpc("authority", "call_remote", "reliable", 2)
-func _remove_loot_event(id: int, taker_peer: int) -> void:
-	_remove_loot(id, taker_peer)
-
-
-func _remove_loot(id: int, taker_peer: int) -> void:
-	var pickup: LootPickup = _loot.get(id)
-	_loot.erase(id)
-	if not is_instance_valid(pickup):
-		return
-	# Only the taker hears the pickup sound.
-	if taker_peer != 0 and taker_peer == multiplayer.get_unique_id() and pickup.settings.pickup_sound:
-		Utilities.play_sound(pickup.settings.pickup_sound, pickup.global_position, 3)
-	pickup.queue_free()
-
-
 const PROJECTILE_MAX_FAST_FORWARD := 0.15
 const _VOLLEY_START_ANGLES := [0, 0, -30, 45, 18, 0]
 
@@ -1443,7 +1256,7 @@ func spawn_projectile(weapon_settings_path: String, team: String, muzzle_transfo
 	if settings == null or settings.projectile_prefab == null:
 		return
 	var first_id := _next_projectile_id
-	_next_projectile_id += maxi(BoostSettings.apply_ops(settings, overrides).projectile_count, 1)
+	_next_projectile_id += maxi(Powerup.apply_ops(settings, overrides).projectile_count, 1)
 	_create_volley(first_id, weapon_settings_path, team, muzzle_transform, use_team_color, fast_forward, true, shooter_peer, reverse_force, overrides)
 	# The host's own shot; a client counts theirs when this event reaches them.
 	if shooter_peer == multiplayer.get_unique_id():
@@ -1620,10 +1433,10 @@ func _create_volley(first_id: int, weapon_settings_path: String, team: String, m
 	if settings == null or settings.projectile_prefab == null:
 		return []
 	# Boosts: a duplicate with this craft's active boosts applied - see
-	# boost_settings.gd. Done before anything reads the settings, so the volley
+	# powerup.gd. Done before anything reads the settings, so the volley
 	# layout, tint and the projectile itself all see the boosted weapon.
 	if not overrides.is_empty():
-		settings = BoostSettings.apply_ops(settings, overrides)
+		settings = Powerup.apply_ops(settings, overrides)
 	if use_team_color:
 		# load() caches and shares this exact Resource across every shot of
 		# this weapon by every player, so mutating projectile_color directly
@@ -1968,7 +1781,7 @@ func _say_to(peer_id: int, line: String) -> void:
 # respawn delay (NetworkManager.base_gun_respawn_seconds) is what keeps this
 # from being farmed.
 func drop_loot_for_structure(drop_at: Vector3) -> void:
-	_drop_loot_at(drop_at)
+	loot.drop_at(drop_at)
 
 
 # Server-only, called by base_gun.gd when a gun is shot down.
@@ -2045,7 +1858,7 @@ func _on_craft_defeated(peer_id: int, attacker_id: int, cause: int) -> void:
 		var juggle := " [color=orange]Juggled x%d![/color]" % multiplier if multiplier > 1 else ""
 		_announce("[color=yellow]Bounty collected by[/color] %s[color=yellow]: %d credits[/color]%s" % [_colored_name(attacker_id, _peer_names.get(attacker_id, "")), collected, juggle])
 	if is_instance_valid(victim):
-		_drop_loot_at(victim.global_position, peer_id)
+		loot.drop_at(victim.global_position, peer_id)
 	await get_tree().create_timer(RESPAWN_DELAY).timeout
 	if not NetworkManager.peer_teams.has(peer_id):
 		return # player left during the respawn delay

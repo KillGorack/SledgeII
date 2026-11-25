@@ -312,7 +312,7 @@ func _cosmetic_step(delta: float) -> void:
 	# reaches here, rather than visibly flying on into it until the server's
 	# end event arrives a half-RTT later. Ricocheting weapons keep going and
 	# wait for the server's correction instead. (Boosts that add ricochet reach
-	# this peer through the spawn event's overrides - see boost_settings.gd.)
+	# this peer through the spawn event's overrides - see powerup.gd.)
 	if weapon_settings.projectile_ricochet_count == 0:
 		var query := PhysicsRayQueryParameters3D.create(start, end, _world_mask())
 		var hit := get_world_3d().direct_space_state.intersect_ray(query)

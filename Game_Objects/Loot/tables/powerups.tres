@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="LootTable" format=3]
+
+[ext_resource type="Script" path="res://Game_Objects/Loot/_scripts/loot_table.gd" id="1_tbl"]
+[ext_resource type="Script" path="res://Game_Objects/Loot/_scripts/loot_item.gd" id="2_item"]
+[ext_resource type="Resource" path="res://Game_Objects/Loot/items/powerups/weapon/crit_ball.tres" id="i0"]
+[ext_resource type="Resource" path="res://Game_Objects/Loot/items/powerups/weapon/haste.tres" id="i1"]
+[ext_resource type="Resource" path="res://Game_Objects/Loot/items/powerups/weapon/ricochet.tres" id="i2"]
+[ext_resource type="Resource" path="res://Game_Objects/Loot/items/powerups/weapon/seeker.tres" id="i3"]
+[ext_resource type="Resource" path="res://Game_Objects/Loot/items/powerups/weapon/freeze.tres" id="i4"]
+[ext_resource type="Resource" path="res://Game_Objects/Loot/items/powerups/weapon/shockwave.tres" id="i5"]
+[ext_resource type="Resource" path="res://Game_Objects/Loot/items/powerups/weapon/perfect_shot.tres" id="i6"]
+[ext_resource type="Resource" path="res://Game_Objects/Loot/items/powerups/craft/fortitude.tres" id="i7"]
+[ext_resource type="Resource" path="res://Game_Objects/Loot/items/weapons/d20.tres" id="i8"]
+[ext_resource type="Resource" path="res://Game_Objects/Loot/items/powerups/craft/bulwark.tres" id="i9"]
+[ext_resource type="Resource" path="res://Game_Objects/Loot/items/powerups/craft/ravenous.tres" id="i10"]
+
+[resource]
+script = ExtResource("1_tbl")
+items = Array[ExtResource("2_item")]([ExtResource("i0"), ExtResource("i1"), ExtResource("i2"), ExtResource("i3"), ExtResource("i4"), ExtResource("i5"), ExtResource("i6"), ExtResource("i7"), ExtResource("i8"), ExtResource("i9"), ExtResource("i10")])

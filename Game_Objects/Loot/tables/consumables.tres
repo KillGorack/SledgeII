@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="LootTable" format=3]
+
+[ext_resource type="Script" path="res://Game_Objects/Loot/_scripts/loot_table.gd" id="1_tbl"]
+[ext_resource type="Script" path="res://Game_Objects/Loot/_scripts/loot_item.gd" id="2_item"]
+[ext_resource type="Resource" path="res://Game_Objects/Loot/items/consumables/health_pack.tres" id="i0"]
+[ext_resource type="Resource" path="res://Game_Objects/Loot/items/consumables/energy_pack.tres" id="i1"]
+[ext_resource type="Resource" path="res://Game_Objects/Loot/items/consumables/juice_pack.tres" id="i2"]
+
+[resource]
+script = ExtResource("1_tbl")
+items = Array[ExtResource("2_item")]([ExtResource("i0"), ExtResource("i1"), ExtResource("i2")])

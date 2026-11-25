@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="Consumable" format=3]
+
+[ext_resource type="Script" path="res://Game_Objects/Loot/_scripts/consumable.gd" id="1_c"]
+[ext_resource type="PackedScene" path="res://Game_Objects/Powerups/Scenes/juice.tscn" id="2_vis"]
+[ext_resource type="AudioStream" path="res://Game_Objects/Powerups/sounds/bottle.wav" id="3_snd"]
+
+[resource]
+script = ExtResource("1_c")
+item_name = "Juice Vial"
+visual_scene = ExtResource("2_vis")
+color = Color(0.2, 0.3, 1, 1)
+pickup_sound = ExtResource("3_snd")
+drop_weight = 1.0
+requires = 2
+target = 2
+amount = 20.0

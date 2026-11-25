@@ -37,6 +37,8 @@ func _process(delta: float) -> void:
 	# see ReconStation.color_for_team for the string<->enum translation).
 	var weapon_node = body.get_node_or_null("weapon_node")
 	var my_color = ReconStation.color_for_team(weapon_node.team) if weapon_node else ReconStation.StationColor.NONE
+	# Ravenous: powerups speed up how fast a FRIENDLY source charges you (enemy drain is left alone).
+	var gain_factor: float = weapon_node.powerups.factor("power_gain_rate") if weapon_node else 1.0
 	var total_gain := 0.0
 	for recon in get_tree().get_nodes_in_group("Recon"):
 		# Uncolored (never map-tagged, not yet captured) stations are inert
@@ -45,28 +47,28 @@ func _process(delta: float) -> void:
 		# should mean.
 		if recon.captured_color == ReconStation.StationColor.NONE:
 			continue
-		total_gain += _source_rate(recon.global_position, recon.captured_color == my_color, 1.0, delta)
+		total_gain += _source_rate(recon.global_position, recon.captured_color == my_color, 1.0, delta, gain_factor)
 	# Base guns transmit too, weaker than a pad, and stack with it and each
 	# other. Turrets are in their own "Turret" group and don't feed; a recon
 	# station's own gun is skipped because the station already counts above.
 	for gun in get_tree().get_nodes_in_group("BaseGun"):
 		if not (gun is BaseGun) or gun.recon != null or gun.is_dead or gun.team == "":
 			continue
-		total_gain += _source_rate(gun.global_position, ReconStation.color_for_team(gun.team) == my_color, GUN_POWER_SCALE, delta)
+		total_gain += _source_rate(gun.global_position, ReconStation.color_for_team(gun.team) == my_color, GUN_POWER_SCALE, delta, gain_factor)
 	current_power = clamp(current_power + total_gain, 0.0, stats.power_capacity)
 
 
 # Signed power change this frame from one source: positive from a friendly one,
 # negative from an enemy, tapering with distance. strength weakens it relative to
-# a recon pad.
-func _source_rate(source_position: Vector3, friendly: bool, strength: float, delta: float) -> float:
+# a recon pad. gain_factor scales only a friendly (charging) source.
+func _source_rate(source_position: Vector3, friendly: bool, strength: float, delta: float, gain_factor: float = 1.0) -> float:
 	var distance = body.global_position.distance_to(source_position)
 	if distance > stats.max_effect_distance:
 		return 0.0
 	var t: float = distance / stats.max_effect_distance
 	var closeness: float = stats.power_falloff_curve.sample_baked(t) if stats.power_falloff_curve else 1.0 - t
 	var rate: float = stats.power_gain_rate * closeness * strength * delta
-	return rate if friendly else -rate
+	return rate * gain_factor if friendly else -rate
 
 
 func get_power_ratio() -> float:
