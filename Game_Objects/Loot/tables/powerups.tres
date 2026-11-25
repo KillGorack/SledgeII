@@ -11,8 +11,8 @@
 [ext_resource type="Resource" uid="uid://d22y3dji4e8gy" path="res://Game_Objects/Loot/items/powerups/weapon/perfect_shot.tres" id="i6"]
 [ext_resource type="Resource" uid="uid://b2q3qu66tartu" path="res://Game_Objects/Loot/items/powerups/craft/fortitude.tres" id="i7"]
 [ext_resource type="Resource" path="res://Game_Objects/Loot/items/weapons/d20.tres" id="i8"]
-[ext_resource type="Resource" path="res://Game_Objects/Loot/items/powerups/craft/bulwark.tres" id="i9"]
-[ext_resource type="Resource" path="res://Game_Objects/Loot/items/powerups/craft/ravenous.tres" id="i10"]
+[ext_resource type="Resource" uid="uid://be3dafkkdh8lo" path="res://Game_Objects/Loot/items/powerups/craft/bulwark.tres" id="i9"]
+[ext_resource type="Resource" uid="uid://dr3ki5o583ed0" path="res://Game_Objects/Loot/items/powerups/craft/ravenous.tres" id="i10"]
 
 [resource]
 script = ExtResource("1_tbl")

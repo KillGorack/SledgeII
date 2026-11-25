@@ -124,6 +124,28 @@ func _changed_on_server() -> void:
 			_sync.rpc_id(peer_id, paths, left)
 
 
+# Server only. Catch a late joiner up on every craft's running powerups - called from match.gd::_notify_ready.
+static func sync_all_to(tree: SceneTree, peer_id: int) -> void:
+	for craft in tree.get_nodes_in_group("Craft"):
+		var weapon_node := craft.get_node_or_null("weapon_node")
+		if weapon_node != null and weapon_node.get("powerups") != null:
+			weapon_node.powerups.sync_to(peer_id)
+
+
+# Server only. A late joiner is told what this craft already has running (otherwise they'd only find out at the next
+# change - no orbit coins or radar ring until then). Shots were never affected: each one carries its own ops.
+func sync_to(peer_id: int) -> void:
+	if not multiplayer.is_server() or _end_msec.is_empty() or peer_id == 1:
+		return
+	var paths := PackedStringArray()
+	var left := PackedFloat32Array()
+	var now := Time.get_ticks_msec()
+	for path in _end_msec:
+		paths.append(path)
+		left.append(maxf(0.0, (_end_msec[path] - now) / 1000.0))
+	_sync.rpc_id(peer_id, paths, left)
+
+
 @rpc("any_peer", "call_remote", "reliable")
 func _sync(paths: PackedStringArray, left: PackedFloat32Array) -> void:
 	if multiplayer.get_remote_sender_id() != 1:
@@ -139,6 +161,7 @@ func _apply(paths: PackedStringArray, left: PackedFloat32Array) -> void:
 		var powerup := load(paths[i]) as Powerup
 		if powerup == null:
 			continue
+		powerup.check()
 		_active.append(powerup)
 		_end_msec[paths[i]] = now + int(left[i] * 1000.0)
 	_reset_caches()

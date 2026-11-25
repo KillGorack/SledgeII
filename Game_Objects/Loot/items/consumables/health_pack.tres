@@ -1,12 +1,13 @@
-[gd_resource type="Resource" script_class="Consumable" format=3]
+[gd_resource type="Resource" script_class="Consumable" format=3 uid="uid://4rpamgeqhafo"]
 
-[ext_resource type="Script" path="res://Game_Objects/Loot/_scripts/consumable.gd" id="1_c"]
-[ext_resource type="PackedScene" path="res://Game_Objects/Powerups/Scenes/health.tscn" id="2_vis"]
-[ext_resource type="AudioStream" path="res://Game_Objects/Powerups/sounds/bottle.wav" id="3_snd"]
+[ext_resource type="Script" uid="uid://dsgfd6y1uwpem" path="res://Game_Objects/Loot/_scripts/consumable.gd" id="1_c"]
+[ext_resource type="PackedScene" uid="uid://dtipfhxk68hqw" path="res://Game_Objects/Powerups/Scenes/health.tscn" id="2_vis"]
+[ext_resource type="AudioStream" uid="uid://cds8k4oewmn8" path="res://Game_Objects/Powerups/sounds/bottle.wav" id="3_snd"]
 
 [resource]
 script = ExtResource("1_c")
 item_name = "Repair Pack"
+description = "Damn... just in time. You got some more hang time, but watch yourself. Gamble with this commodity, and you're gambling with your... well... life."
 visual_scene = ExtResource("2_vis")
 color = Color(1, 0.2, 0.2, 1)
 pickup_sound = ExtResource("3_snd")

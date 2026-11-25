@@ -19,10 +19,40 @@ class_name Powerup
 @export var refill_shields: bool = false
 @export var changes: Array[StatChange] = []
 
+# Craft stats something actually reads (through PowerupState.factor). A Craft change naming anything else does
+# nothing, so check() warns about it. Add the name here when a new system starts reading one.
+const CRAFT_STATS := ["regeneration_rate", "regeneration_delay", "knockback", "power_gain_rate"]
+
+static var _checked: Dictionary = {} # resource_path -> true, so each powerup is only checked once per run
+
 
 func apply_to(craft: Node) -> bool:
 	var weapon_node := craft.get_node_or_null("weapon_node")
 	return weapon_node != null and weapon_node.powerups.server_grant(self)
+
+
+# Warn (once per run) about changes that would silently do nothing: no value, a weapon stat WeaponSettings doesn't
+# have, a craft stat nothing reads, or a "set" on a craft stat (only multiply is supported there).
+func check() -> void:
+	if _checked.has(resource_path):
+		return
+	_checked[resource_path] = true
+	var weapon_stats: Dictionary = {}
+	for prop in WeaponSettings.new().get_property_list():
+		weapon_stats[prop.name] = true
+	for change in changes:
+		if change == null:
+			continue
+		var where := "Powerup '%s', stat '%s'" % [item_name, change.stat]
+		if change.value == null:
+			push_warning(where + ": no value, it is skipped")
+		if (change.targets & StatChange.WEAPON_BITS) != 0 and not weapon_stats.has(change.stat):
+			push_warning(where + ": not a weapon stat (WeaponSettings has no such property)")
+		if (change.targets & StatChange.CRAFT_BIT) != 0:
+			if not CRAFT_STATS.has(change.stat):
+				push_warning(where + ": no craft system reads this stat (see Powerup.CRAFT_STATS)")
+			if change.mode != StatChange.Mode.MULTIPLY:
+				push_warning(where + ": craft stats only support multiply, this 'set' does nothing")
 
 
 # Does this change anything about a weapon of this kind (a WeaponSettings.WeaponKind)?
@@ -81,7 +111,7 @@ static func craft_factor(powerups: Array, stat: String) -> float:
 		if powerup == null:
 			continue
 		for change in powerup.changes:
-			if change != null and (change.targets & StatChange.CRAFT_BIT) != 0 and change.stat == stat and change.mode == StatChange.Mode.MULTIPLY:
+			if change != null and change.value != null and (change.targets & StatChange.CRAFT_BIT) != 0 and change.stat == stat and change.mode == StatChange.Mode.MULTIPLY:
 				factor = float(change.value)
 	return factor
 

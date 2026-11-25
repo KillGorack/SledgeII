@@ -464,7 +464,7 @@ func _cancel_leave() -> void:
 
 func _update_leave_label(grounded: bool) -> void:
 	if _leave_left > 0.0:
-		_leave_label.text = "Leaving to lobby in %d...  (Esc to cancel)" % ceili(_leave_left)
+		_leave_label.text = "Leaving to lobby in %d...  (Again to cancel)" % ceili(_leave_left)
 	else:
 		_leave_label.text = "Land to leave..." if not grounded else "Leaving..."
 
@@ -841,6 +841,8 @@ func _notify_ready(username: String = "") -> void:
 		var craft = craft_container.get_node_or_null("Craft_%d" % other_peer_id)
 		if is_instance_valid(craft):
 			_grant_visibility(craft, requester_id)
+	# ...and the powerups those crafts already have running. After the grant above, so the crafts are visible to them.
+	PowerupState.sync_all_to(get_tree(), requester_id)
 	# The other direction: everyone already here seeing THIS peer's craft.
 	# _on_player_registered already tried, but only this peer can open its own
 	# root synchronizer, and it was still loading then - see _grant_visibility.

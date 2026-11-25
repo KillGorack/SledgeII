@@ -94,13 +94,18 @@ func _process(delta: float) -> void:
 	_material.set_shader_parameter("pulse", _pulse * PULSE_STRENGTH)
 
 
-# A copy of `src` whose normals are averaged across every vertex at the same position. The shader pushes the shell
-# out along the normal, and a hard-edged mesh has several different normals at one corner, which would tear the
-# shell open at every edge. Averaged, the corner moves as one piece. Only the shell uses this copy.
+# A copy of `src` made to be pushed outward by the shader without tearing. The shader pushes every vertex out along its
+# normal, so vertices that sit at the same spot must share ONE normal, or they move apart and open a crack:
+#  - a hard-edged mesh has several normals at one corner (one per face), and
+#  - a mesh with several surfaces (one per material, like the tank hull) has a separate copy of every vertex on the
+#    border between two surfaces.
+# So the normals are averaged over every vertex at the same position across ALL surfaces. Only the shell uses this
+# copy; the tank's own mesh is untouched.
 static func _smoothed(src: Mesh) -> Mesh:
 	if _smooth_cache.has(src):
 		return _smooth_cache[src]
-	var out := ArrayMesh.new()
+	var sums: Dictionary = {} # quantized position -> summed (area-weighted) face normal, over every surface
+	var surfaces: Array = [] # the arrays of each triangle surface, kept for the second pass
 	for s in src.get_surface_count():
 		if src.surface_get_primitive_type(s) != Mesh.PRIMITIVE_TRIANGLES:
 			continue
@@ -108,7 +113,6 @@ static func _smoothed(src: Mesh) -> Mesh:
 		var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 		var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] if arrays[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
 		var tri_count := indices.size() / 3 if indices.size() > 0 else verts.size() / 3
-		var sums: Dictionary = {} # quantized position -> summed (area-weighted) face normal
 		for t in tri_count:
 			var ia := indices[t * 3] if indices.size() > 0 else t * 3
 			var ib := indices[t * 3 + 1] if indices.size() > 0 else t * 3 + 1
@@ -118,6 +122,10 @@ static func _smoothed(src: Mesh) -> Mesh:
 			for i in [ia, ib, ic]:
 				var key := _key(verts[i])
 				sums[key] = sums.get(key, Vector3.ZERO) + face
+		surfaces.append(arrays)
+	var out := ArrayMesh.new()
+	for arrays in surfaces:
+		var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 		var normals := PackedVector3Array()
 		normals.resize(verts.size())
 		for i in verts.size():
