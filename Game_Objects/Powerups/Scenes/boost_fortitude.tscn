@@ -1,0 +1,142 @@
+[gd_scene format=3 uid="uid://b11j153gh8f6o"]
+
+[ext_resource type="Texture2D" uid="uid://bqrxlwpbvv6l8" path="res://Game_Objects/Powerups/Spritesheets/POWERUPS.png" id="1_sheet"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_qkxic"]
+atlas = ExtResource("1_sheet")
+region = Rect2(0, 2816, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_8uusy"]
+atlas = ExtResource("1_sheet")
+region = Rect2(256, 2816, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_h4v0c"]
+atlas = ExtResource("1_sheet")
+region = Rect2(512, 2816, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_ckbq0"]
+atlas = ExtResource("1_sheet")
+region = Rect2(768, 2816, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_8a6hr"]
+atlas = ExtResource("1_sheet")
+region = Rect2(1024, 2816, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_bchrl"]
+atlas = ExtResource("1_sheet")
+region = Rect2(1280, 2816, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_0wse2"]
+atlas = ExtResource("1_sheet")
+region = Rect2(1536, 2816, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_lkn11"]
+atlas = ExtResource("1_sheet")
+region = Rect2(1792, 2816, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_cmmuh"]
+atlas = ExtResource("1_sheet")
+region = Rect2(2048, 2816, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_3wgmk"]
+atlas = ExtResource("1_sheet")
+region = Rect2(2304, 2816, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_j8nll"]
+atlas = ExtResource("1_sheet")
+region = Rect2(2560, 2816, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_moaun"]
+atlas = ExtResource("1_sheet")
+region = Rect2(2816, 2816, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_budqo"]
+atlas = ExtResource("1_sheet")
+region = Rect2(3072, 2816, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_yjlhj"]
+atlas = ExtResource("1_sheet")
+region = Rect2(3328, 2816, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_1rjgd"]
+atlas = ExtResource("1_sheet")
+region = Rect2(3584, 2816, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_1inag"]
+atlas = ExtResource("1_sheet")
+region = Rect2(3840, 2816, 256, 256)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_1"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_qkxic")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_8uusy")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_h4v0c")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_ckbq0")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_8a6hr")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_bchrl")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_0wse2")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_lkn11")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_cmmuh")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_3wgmk")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_j8nll")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_moaun")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_budqo")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_yjlhj")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_1rjgd")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_1inag")
+}],
+"loop": 1,
+"name": &"default",
+"speed": 17.0
+}]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_trigger"]
+radius = 0.25
+
+[node name="Fortitude" type="Node3D" unique_id=1514073340]
+
+[node name="Sprite3D" type="AnimatedSprite3D" parent="." unique_id=134924550]
+billboard = 2
+sprite_frames = SubResource("SpriteFrames_1")
+autoplay = "default"
+frame_progress = 0.053250916
+
+[node name="OmniLight3D" type="OmniLight3D" parent="." unique_id=812430664]
+light_color = Color(0.85, 0.6, 0.3, 1)
+
+[node name="Area3D" type="Area3D" parent="." unique_id=663444789]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Area3D" unique_id=2113019759]
+shape = SubResource("SphereShape3D_trigger")

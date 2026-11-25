@@ -468,6 +468,11 @@ func effective(base: WeaponSettings) -> WeaponSettings:
 	return _effective_cache[base]
 
 
+# The factor active boosts apply to a CraftStats property (1.0 if none).
+func craft_factor(stat: String) -> float:
+	return BoostSettings.craft_factor(_boosts, stat)
+
+
 # What the active boosts do to THIS weapon (only boosts that affect its kind).
 # Sent with every shot so other peers build the same boosted weapon.
 func boost_ops_for(base: WeaponSettings) -> Dictionary:
@@ -518,6 +523,11 @@ func server_grant_boost(boost: BoostSettings) -> bool:
 	var end := boost_end_after_pickup(now, int(_boost_end_msec.get(boost.resource_path, 0)), boost.duration)
 	_boost_end_msec[boost.resource_path] = end
 	_boosts_changed_on_server()
+	# Boosts that reach other craft systems get their one-time pickup effect (the shield refill).
+	if boost.refill_shields or not boost.craft_multiply_values.is_empty():
+		var health = get_node_or_null("../health_node")
+		if health != null:
+			health.boost_granted(boost)
 	# An earlier pickup's timer may fire first - _expire_boosts only removes what has really run out.
 	get_tree().create_timer((end - now) / 1000.0 + 0.05).timeout.connect(_expire_boosts)
 	return true

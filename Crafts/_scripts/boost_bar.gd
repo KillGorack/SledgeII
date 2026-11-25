@@ -78,14 +78,15 @@ func _refresh() -> void:
 
 func _process(_delta: float) -> void:
 	var now := Time.get_ticks_msec()
-	# Dim a boost that doesn't apply to the weapon you're holding.
+	# Dim a weapon boost that doesn't apply to the weapon you're holding. A boost with no weapon kinds at
+	# all (affects = 0, e.g. Fortitude) works on the craft, so it is never dimmed.
 	var index: int = weapon_node.current_weapon_index
 	var held: WeaponSettings = weapon_node.weapon_settings[index] if index >= 0 and index < weapon_node.weapon_settings.size() else null
 	for i in _active.size():
 		var left := maxf(0.0, (_active[i] - now) / 1000.0)
 		var slot: Dictionary = _slots[i]
 		slot["label"].text = "%d" % ceili(left)
-		var applies: bool = held == null or _shown[i].affects_kind(held.weapon_kind)
+		var applies: bool = held == null or _shown[i].affects == 0 or _shown[i].affects_kind(held.weapon_kind)
 		slot["icon"].self_modulate = Color.WHITE if applies else Color(0.35, 0.35, 0.35, 0.8)
 		# Blink in the last few seconds.
 		slot["icon"].modulate.a = 1.0 if left > WARN_SECONDS or int(left * 4.0) % 2 == 0 else 0.35

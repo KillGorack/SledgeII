@@ -29,6 +29,15 @@ class_name BoostSettings
 @export var set_values: Dictionary = {}
 # WeaponSettings property name -> factor, multiplying the weapon's own.
 @export var multiply_values: Dictionary = {}
+# CraftStats property name -> factor, multiplying the craft's own while this
+# boost runs (e.g. {"regeneration_rate": 5.0} = shields regen 5x faster). Same
+# rules as the weapon values: pure data, no two boosts sharing a key, later
+# wins. A boost with only these should have `affects` = 0 so no weapon is
+# touched. Systems read it through craft_factor(); today only health_node.gd
+# does, for "regeneration_rate".
+@export var craft_multiply_values: Dictionary = {}
+# One-time, on pickup: shields (and only shields) jump to full, skipping regen.
+@export var refill_shields: bool = false
 
 
 # Merge any number of boosts into one ops dictionary: {"set": {...}, "mul": {...}}.
@@ -48,6 +57,15 @@ static func resolve(boosts: Array, kind: int = -1) -> Dictionary:
 	if ops["set"].is_empty() and ops["mul"].is_empty():
 		return {}
 	return ops
+
+
+# The factor the active boosts apply to one CraftStats property (1.0 if none).
+static func craft_factor(boosts: Array, stat: String) -> float:
+	var factor := 1.0
+	for boost in boosts:
+		if boost != null and boost.craft_multiply_values.has(stat):
+			factor = float(boost.craft_multiply_values[stat])
+	return factor
 
 
 func affects_kind(kind: int) -> bool:

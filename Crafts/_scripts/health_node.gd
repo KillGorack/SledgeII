@@ -27,6 +27,8 @@ var armor: float
 var life: float
 
 var _shields_max: float
+# Boosted shield regen speed (1.0 = normal) - see _on_boosts_changed.
+var _regen_factor: float = 1.0
 var _armor_max: float
 var _life_max: float
 
@@ -78,6 +80,10 @@ func _ready() -> void:
 	_shields_max = stats.shields
 	_armor_max = stats.armor
 	_life_max = stats.life
+	# Boosts can speed up shield regen (Fortitude).
+	var weapon_node := get_node_or_null("../weapon_node")
+	if weapon_node != null:
+		weapon_node.boosts_changed.connect(_on_boosts_changed)
 
 	_regeneration_timer = Timer.new()
 	_regeneration_timer.wait_time = stats.regeneration_delay
@@ -122,7 +128,7 @@ func _process(delta: float) -> void:
 	# just .:shields continuously - the one value here that changes on its
 	# own instead of only in response to a discrete, already-broadcast event.
 	if _is_regenerating and shields < _shields_max:
-		shields = min(_shields_max, shields + stats.regeneration_rate * delta)
+		shields = min(_shields_max, shields + stats.regeneration_rate * _regen_factor * delta)
 	_process_station_healing(delta)
 	# _is_destroyed guard matters here specifically: without it, the craft
 	# sits below FALL_DEATH_Y for the entire respawn delay - it doesn't get
@@ -236,6 +242,22 @@ func request_fall_damage(impact_speed: float) -> void:
 		return
 	var excess = impact_speed - stats.fall_damage_safe_speed
 	apply_damage(stats.fall_damage_coefficient * excess * excess, 0, DeathCause.FALL)
+
+
+# Active boosts changed: re-read how much faster shields regenerate (Fortitude). Regen only runs on the live
+# server (see _process), so only its copy of the boosts matters - no network traffic for this.
+func _on_boosts_changed() -> void:
+	var weapon_node := get_node_or_null("../weapon_node")
+	_regen_factor = weapon_node.craft_factor("regeneration_rate") if weapon_node != null else 1.0
+
+
+# Server-only. A boost was just picked up: if it refills shields, they jump straight to max (shields
+# alone, bypassing regeneration and its delay).
+func boost_granted(boost: BoostSettings) -> void:
+	if not multiplayer.is_server() or _is_destroyed:
+		return
+	if boost.refill_shields:
+		shields = _shields_max
 
 
 # Server-only. Restores `amount` in this order: shields, then armor, then life. (Shields

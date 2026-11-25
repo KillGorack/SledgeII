@@ -1241,6 +1241,8 @@ const LOOT_TABLE: Array[LootSettings] = [
 	preload("res://Game_Objects/Powerups/Settings/seeker_pickup.tres"),
 	preload("res://Game_Objects/Powerups/Settings/freeze_pickup.tres"),
 	preload("res://Game_Objects/Powerups/Settings/shockwave_pickup.tres"),
+	preload("res://Game_Objects/Powerups/Settings/perfect_shot_pickup.tres"),
+	preload("res://Game_Objects/Powerups/Settings/fortitude_pickup.tres"),
 ]
 var _next_loot_id := 1
 var _loot: Dictionary = {} # id -> LootPickup, on every peer
