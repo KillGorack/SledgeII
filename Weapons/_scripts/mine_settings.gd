@@ -44,6 +44,13 @@ class_name MineSettings
 @export var explosive_force_distance: float = 8.0
 # Damage at the epicenter. 0 = no damage.
 @export var hit_points: float = 0.0
+# Where hit_points land on a craft's shields / armor / life - see damage_routing.gd. SEQUENTIAL (shields, then
+# armor, then life) ignores the three factors. SPLIT gives each pool hit_points x its factor, and what an
+# empty pool can't take is lost.
+@export var damage_routing: DamageRouting.Mode = DamageRouting.Mode.SEQUENTIAL
+@export var shields_factor: float = 1.0 / 3.0
+@export var armor_factor: float = 1.0 / 3.0
+@export var life_factor: float = 1.0 / 3.0
 # Knockback impulse at the epicenter. 0 = no push.
 @export var explosive_force: float = 0.0
 # Seconds the weapons/movement of everything hit are frozen for. 0 = none.
@@ -56,3 +63,7 @@ class_name MineSettings
 @export var explosion_scale: float = 1.5
 @export var explosion_sound: AudioStream
 @export var lay_sound: AudioStream
+
+# The three SPLIT factors as one value, for DamageRouting.deal().
+func pool_factors() -> Vector3:
+	return Vector3(shields_factor, armor_factor, life_factor)

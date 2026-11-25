@@ -76,6 +76,8 @@ static func build(craft: RigidBody3D, def: CraftDef, team: String) -> void:
 	craft.get_node("health_node").stats = def.stats
 	craft.get_node("power_node").stats = def.stats
 	model.free()
+	# The visible shield skin over the meshes assigned above - see shield_shell.gd.
+	ShieldShell.attach(craft)
 
 
 # How far above a marker's ground point the craft origin must sit to clear it.

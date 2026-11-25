@@ -13,6 +13,13 @@ class_name WeaponSettings
 enum ReloadOn { NEUTRAL, CAPTURED }
 @export var reload_on: ReloadOn = ReloadOn.NEUTRAL
 @export var hit_points: float = 0.0
+# Where hit_points land on a craft's shields / armor / life - see damage_routing.gd. SEQUENTIAL (shields, then
+# armor, then life) ignores the three factors. SPLIT gives each pool hit_points x its factor, and what an
+# empty pool can't take is lost.
+@export var damage_routing: DamageRouting.Mode = DamageRouting.Mode.SEQUENTIAL
+@export var shields_factor: float = 1.0 / 3.0
+@export var armor_factor: float = 1.0 / 3.0
+@export var life_factor: float = 1.0 / 3.0
 @export var crit_chance: float = 0.0
 @export var crit_multiplier: float = 1.0
 @export var cool_down: float = 0.5
@@ -96,3 +103,7 @@ enum WeaponKind { LASER, MISSILE, OBJECT }
 @export var projectile_lifetime: float = 0.0
 @export var friendly_fire: bool = false
 @export var turncoat: String = ""
+
+# The three SPLIT factors as one value, for DamageRouting.deal().
+func pool_factors() -> Vector3:
+	return Vector3(shields_factor, armor_factor, life_factor)

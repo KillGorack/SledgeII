@@ -1,0 +1,20 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://Materials/Shaders/shield_shell.gdshader" id="1_shader"]
+
+[resource]
+shader = ExtResource("1_shader")
+shader_parameter/shield_color = Color(0.82, 0.84, 0.86, 1)
+shader_parameter/inflate = 0.04
+shader_parameter/base_alpha = 0.012
+shader_parameter/rim_alpha = 0.26
+shader_parameter/rim_power = 2.5
+shader_parameter/band_strength = 0.15
+shader_parameter/band_scale = 2.0
+shader_parameter/band_speed = 0.4
+shader_parameter/ripple_strength = 0.9
+shader_parameter/ripple_scale = 4.5
+shader_parameter/ripple_speed = 0.35
+shader_parameter/ripple_reach = 1.2
+shader_parameter/ripple_detail = 0.6
+shader_parameter/ripple_wobble = 0.035

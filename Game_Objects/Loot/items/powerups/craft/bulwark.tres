@@ -1,9 +1,9 @@
-[gd_resource type="Resource" script_class="Powerup" format=3]
+[gd_resource type="Resource" script_class="Powerup" format=3 uid="uid://be3dafkkdh8lo"]
 
-[ext_resource type="Script" path="res://Game_Objects/Loot/_scripts/powerup.gd" id="1_pw"]
-[ext_resource type="Script" path="res://Game_Objects/Loot/_scripts/stat_change.gd" id="2_sc"]
-[ext_resource type="AudioStream" path="res://Game_Objects/Powerups/sounds/ding.ogg" id="3_snd"]
-[ext_resource type="Texture2D" path="res://Game_Objects/Powerups/Spritesheets/PLACEHOLDER.png" id="4_sheet"]
+[ext_resource type="Script" uid="uid://cnjswx5f2jmo8" path="res://Game_Objects/Loot/_scripts/powerup.gd" id="1_pw"]
+[ext_resource type="Script" uid="uid://b870qiqrn23xt" path="res://Game_Objects/Loot/_scripts/stat_change.gd" id="2_sc"]
+[ext_resource type="AudioStream" uid="uid://b5pjnn22xeox0" path="res://Game_Objects/Powerups/sounds/ding.ogg" id="3_snd"]
+[ext_resource type="Texture2D" uid="uid://g3tc8wkkacgy" path="res://Game_Objects/Powerups/Spritesheets/PLACEHOLDER.png" id="4_sheet"]
 
 [sub_resource type="Resource" id="Change_0"]
 script = ExtResource("2_sc")

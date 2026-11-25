@@ -579,7 +579,7 @@ func _apply_damage_to(body: Object, damage: float) -> void:
 	var health_node = body.get_node_or_null("health_node")
 	if health_node and health_node.has_method("apply_damage"):
 		var cause: int = health_node.DeathCause.BASE_GUN if shooter_peer == 0 else health_node.DeathCause.WEAPON
-		health_node.apply_damage(damage, shooter_peer, cause)
+		DamageRouting.deal(health_node, damage, weapon_settings.damage_routing, weapon_settings.pool_factors(), shooter_peer, cause)
 		if _match_node:
 			_match_node.note_weapon_hit(volley_id, shooter_peer, team, weapon_settings.weapon_name, body)
 

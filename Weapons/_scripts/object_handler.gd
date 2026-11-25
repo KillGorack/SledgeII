@@ -253,7 +253,7 @@ func _on_impact(collider: Node, point: Vector3, normal: Vector3, _impact: float)
 		var health_node = collider.get_node_or_null("health_node")
 		if health_node and health_node.has_method("apply_damage"):
 			var cause: int = health_node.DeathCause.BASE_GUN if shooter_peer == 0 else health_node.DeathCause.WEAPON
-			health_node.apply_damage(weapon_settings.hit_points, shooter_peer, cause)
+			DamageRouting.deal(health_node, weapon_settings.hit_points, weapon_settings.damage_routing, weapon_settings.pool_factors(), shooter_peer, cause)
 	if weapon_settings.projectile_force > 0.0 and collider is RigidBody3D:
 		var dir: Vector3 = ((collider as Node3D).global_position - global_position).normalized()
 		var force := weapon_settings.projectile_force * (-1.0 if reverse_force else 1.0)

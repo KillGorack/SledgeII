@@ -168,15 +168,8 @@ func _update_smoke() -> void:
 # explicit broadcast (_broadcast_destroyed) instead, so no peer can ever
 # disagree with the server about whether a craft died.
 func apply_damage(damage: float, attacker_id: int = 0, cause: int = DeathCause.WEAPON) -> void:
-	if not multiplayer.is_server() or _is_destroyed:
+	if not _start_hit(attacker_id, cause):
 		return
-	# A creator who is building takes no damage (falls, base guns, anything); only the void still
-	# counts, or a craft knocked off the map would never come back. Testing is the real thing.
-	if NetworkManager.creative_building and cause != DeathCause.VOID:
-		return
-	note_attacker(attacker_id)
-	_regeneration_timer.start(stats.regeneration_delay * _regen_delay_factor)
-	_is_regenerating = false
 	if shields > 0:
 		shields -= damage
 		if shields <= 0:
@@ -196,6 +189,36 @@ func apply_damage(damage: float, attacker_id: int = 0, cause: int = DeathCause.W
 	if life <= 0:
 		_death_cause = cause
 		_broadcast_destroyed.rpc(NetworkManager.server_time())
+
+
+# Server-only. The other way damage can land (see damage_routing.gd): each pool takes `damage` x its own factor
+# (x shields, y armor, z life), independently. Nothing spills - a pool that is already empty takes nothing, and
+# whatever it couldn't absorb is lost. Starts the hit exactly like apply_damage, so ANY hit pauses shield regen,
+# whether or not a pool actually lost anything.
+func apply_split_damage(damage: float, factors: Vector3, attacker_id: int = 0, cause: int = DeathCause.WEAPON) -> void:
+	if not _start_hit(attacker_id, cause):
+		return
+	shields = maxf(0.0, shields - damage * maxf(factors.x, 0.0))
+	armor = maxf(0.0, armor - damage * maxf(factors.y, 0.0))
+	life -= damage * maxf(factors.z, 0.0)
+	if life <= 0:
+		_death_cause = cause
+		_broadcast_destroyed.rpc(NetworkManager.server_time())
+
+
+# What every hit does before any pool is touched. false = nothing to apply (not the server, already destroyed,
+# or a builder who takes no damage).
+func _start_hit(attacker_id: int, cause: int) -> bool:
+	if not multiplayer.is_server() or _is_destroyed:
+		return false
+	# A creator who is building takes no damage (falls, base guns, anything); only the void still
+	# counts, or a craft knocked off the map would never come back. Testing is the real thing.
+	if NetworkManager.creative_building and cause != DeathCause.VOID:
+		return false
+	note_attacker(attacker_id)
+	_regeneration_timer.start(stats.regeneration_delay * _regen_delay_factor)
+	_is_regenerating = false
+	return true
 
 
 # Server-only. 0 (base guns, falls) and the craft's own owner never count.
@@ -591,6 +614,8 @@ func _set_frost(on: bool, instant: bool = false) -> void:
 		_frost_tween = null
 	if on:
 		for mesh in body.find_children("*", "MeshInstance3D", true, false):
+			if mesh.is_in_group(ShieldShell.GROUP):
+				continue # the shield skin is not part of the tank that freezes
 			if not _saved_overlays.has(mesh):
 				_saved_overlays[mesh] = mesh.material_overlay
 			mesh.material_overlay = _frost_mat()

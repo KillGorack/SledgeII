@@ -143,7 +143,7 @@ func _apply_blast(mine: Mine) -> void:
 			health_node.note_attacker(mine.owner_peer)
 			health_node.apply_impulse.rpc(direction.normalized() * s.explosive_force * falloff)
 		if s.hit_points > 0.0:
-			health_node.apply_damage(s.hit_points * falloff, mine.owner_peer, HealthNode.DeathCause.MINE)
+			DamageRouting.deal(health_node, s.hit_points * falloff, s.damage_routing, s.pool_factors(), mine.owner_peer, HealthNode.DeathCause.MINE)
 	if caught:
 		_match.credit_stat(mine.owner_peer, "mine", s.mine_name, 0, 1)
 
