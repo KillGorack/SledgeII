@@ -21,7 +21,8 @@ const SPIN_FPS := 17.0
 #   RECONS  recons can be captured (the host's Recon Capture rule)
 #   DAMAGE  a weapon in the loadout does damage
 #   MISSILE a missile weapon is in the loadout
-enum Requires { ALWAYS, POWER, RECONS, DAMAGE, MISSILE }
+#   SHIELDS the host's Shields rule is on (crafts have shields at all)
+enum Requires { ALWAYS, POWER, RECONS, DAMAGE, MISSILE, SHIELDS }
 
 @export var item_name: String = "Loot"
 # Short player-facing text: what it does, in a line.
@@ -29,22 +30,23 @@ enum Requires { ALWAYS, POWER, RECONS, DAMAGE, MISSILE }
 
 @export_group("Look")
 # Which row of the sheet (16 frames of 256 px, row N is y = N * 256) is this item's spinning coin.
-# -1 = no sheet art: use visual_scene, or the plain orb.
+# This one row is the item's whole look: the spinning pickup on the ground, its HUD icon, the orbit coins and the
+# host screen's icon. -1 = no sheet art: a plain glowing orb in `color`.
 @export var sheet_row: int = -1
 # Leave empty to use POWERUPS.png. A separate image (e.g. a single-row placeholder, row 0) goes here.
 @export var sheet: Texture2D
+# How fast the coin spins: frames per second through its row.
+@export var spin_fps: float = SPIN_FPS
 # Overrides the sheet's first frame as the HUD icon.
 @export var icon: Texture2D
-# A hand-made look for the pickup (a Node3D; any Area3D inside is its trigger). Wins over sheet_row.
-@export var visual_scene: PackedScene
 # Pickup light, projectile tint (powerups) and the orb fallback.
 @export_color_no_alpha var color: Color = Color(0.2, 1.0, 0.3)
 @export var pickup_sound: AudioStream
 # Size of the pickup relative to the art as drawn at scale 1 (a 256 px frame is 2.56 m there), so 0.125 is a
 # 0.32 m coin. It is kept resting on the floor at any size.
 @export var visual_scale: float = 0.125
-# Trigger sphere, used when the visual scene has no Area3D of its own. The craft is about 0.74 m wide and
-# 1.62 m long, so it has to roll right up to the coin.
+# Trigger sphere around the coin's centre. The craft is about 0.74 m wide and 1.62 m long, so it has to roll right
+# up to the coin.
 @export var pickup_radius: float = 0.25
 
 @export_group("Drop")
@@ -55,7 +57,7 @@ enum Requires { ALWAYS, POWER, RECONS, DAMAGE, MISSILE }
 @export var lifetime: float = 25.0
 
 static var _icon_cache: Dictionary = {} # sheet + row -> AtlasTexture
-static var _frames_cache: Dictionary = {} # sheet + row -> SpriteFrames
+static var _frames_cache: Dictionary = {} # sheet + row + speed -> SpriteFrames
 
 
 # Server only. Try to give this item to `craft`. false = it could not be used (full health, already
@@ -80,10 +82,10 @@ func get_icon() -> Texture2D:
 func sprite_frames() -> SpriteFrames:
 	if sheet_row < 0:
 		return null
-	var key := _cache_key()
+	var key := "%s@%s" % [_cache_key(), spin_fps]
 	if not _frames_cache.has(key):
 		var frames := SpriteFrames.new()
-		frames.set_animation_speed(&"default", SPIN_FPS)
+		frames.set_animation_speed(&"default", spin_fps)
 		frames.set_animation_loop(&"default", true)
 		for i in FRAME_COUNT:
 			frames.add_frame(&"default", _frame(i))
@@ -106,8 +108,8 @@ func _frame(index: int) -> AtlasTexture:
 
 # The facts about a match that `requires` is checked against. `weapons` is the loadout everyone shares
 # (WeaponSettings); mines are deliberately not part of it.
-static func match_facts(weapons: Array, recon_capture: bool) -> Dictionary:
-	var facts := {"power": false, "recons": recon_capture, "damage": false, "missile": false}
+static func match_facts(weapons: Array, recon_capture: bool, shields: bool = true) -> Dictionary:
+	var facts := {"power": false, "recons": recon_capture, "damage": false, "missile": false, "shields": shields}
 	for entry in weapons:
 		var w := entry as WeaponSettings
 		if w == null:
@@ -128,4 +130,6 @@ func is_available(facts: Dictionary) -> bool:
 			return facts.get("damage", true)
 		Requires.MISSILE:
 			return facts.get("missile", true)
+		Requires.SHIELDS:
+			return facts.get("shields", true)
 	return true

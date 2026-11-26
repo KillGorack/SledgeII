@@ -76,18 +76,27 @@ func _draw() -> void:
 	# that origin out to the control's actual center and stretches Y only,
 	# so X (the radius numbers as measured) is completely untouched.
 	draw_set_transform(size / 2, 0.0, Vector2(1.0, vertical_stretch))
+	# A pool the host switched off doesn't exist this match: no ring, no number (NetworkManager.shields_enabled/armor_enabled).
 	_draw_ring(life_radius, _life_ratio)
-	_draw_ring(armor_radius, _armor_ratio)
-	_draw_ring(shields_radius, _shields_ratio)
+	if NetworkManager.armor_enabled:
+		_draw_ring(armor_radius, _armor_ratio)
+	if NetworkManager.shields_enabled:
+		_draw_ring(shields_radius, _shields_ratio)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	if show_readout:
 		_draw_readout()
 
 
 func _draw_readout() -> void:
-	_draw_value(_shields_value, _shields_ratio, -readout_line_gap)
-	_draw_value(_armor_value, _armor_ratio, 0.0)
-	_draw_value(_life_value, _life_ratio, readout_line_gap)
+	# Only the pools this match has, kept centred on the ring: three lines, two, or just life.
+	var lines: Array = []
+	if NetworkManager.shields_enabled:
+		lines.append([_shields_value, _shields_ratio])
+	if NetworkManager.armor_enabled:
+		lines.append([_armor_value, _armor_ratio])
+	lines.append([_life_value, _life_ratio])
+	for i in lines.size():
+		_draw_value(lines[i][0], lines[i][1], (i - (lines.size() - 1) / 2.0) * readout_line_gap)
 
 
 # One centered number, `y_offset` px above/below the ring center. Not stretched like the rings (this is

@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://cnjswx5f2jmo8" path="res://Game_Objects/Loot/_scripts/powerup.gd" id="1_pw"]
 [ext_resource type="Script" uid="uid://b870qiqrn23xt" path="res://Game_Objects/Loot/_scripts/stat_change.gd" id="2_sc"]
 [ext_resource type="AudioStream" uid="uid://b5pjnn22xeox0" path="res://Game_Objects/Powerups/sounds/ding.ogg" id="3_snd"]
+[ext_resource type="Texture2D" uid="uid://bqrxlwpbvv6l8" path="res://Game_Objects/Powerups/Spritesheets/POWERUPS.png" id="4_nftsv"]
 
 [sub_resource type="Resource" id="Change_0"]
 script = ExtResource("2_sc")
@@ -15,7 +16,8 @@ script = ExtResource("1_pw")
 changes = Array[ExtResource("2_sc")]([SubResource("Change_0")])
 item_name = "Perfect Shot"
 description = "You wreak havok on enemies, and friends alike. If carefulness is an option, this gets you by.. for now.."
-sheet_row = 10
+sheet_row = 9
+sheet = ExtResource("4_nftsv")
 color = Color(1, 0, 1, 1)
 pickup_sound = ExtResource("3_snd")
 drop_weight = 1.0

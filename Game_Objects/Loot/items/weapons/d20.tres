@@ -1,7 +1,7 @@
 [gd_resource type="Resource" script_class="WeaponPickup" format=3 uid="uid://bxf344tufmllk"]
 
 [ext_resource type="Script" uid="uid://chgnb1fye1hq2" path="res://Game_Objects/Loot/_scripts/weapon_pickup.gd" id="1_w"]
-[ext_resource type="PackedScene" uid="uid://dl8q2g821qbdf" path="res://Game_Objects/Powerups/Scenes/D20_Plaything.tscn" id="2_vis"]
+[ext_resource type="Texture2D" uid="uid://bqrxlwpbvv6l8" path="res://Game_Objects/Powerups/Spritesheets/POWERUPS.png" id="3_e0lj5"]
 [ext_resource type="AudioStream" uid="uid://b5pjnn22xeox0" path="res://Game_Objects/Powerups/sounds/ding.ogg" id="3_snd"]
 [ext_resource type="Resource" uid="uid://wwdw5mdsil3o" path="res://Weapons/settings_object/D20.tres" id="4_wpn"]
 
@@ -10,7 +10,8 @@ script = ExtResource("1_w")
 weapon = ExtResource("4_wpn")
 item_name = "D20"
 description = "Need to solve a problem? Roll the damned dice.. Literally.."
-visual_scene = ExtResource("2_vis")
-color = Color(1, 1, 0, 1)
+sheet_row = 14
+sheet = ExtResource("3_e0lj5")
+color = Color(0.8039216, 0.49803922, 0.19607843, 1)
 pickup_sound = ExtResource("3_snd")
 drop_weight = 1.0

@@ -15,6 +15,15 @@ class_name DamageRouting
 enum Mode { SEQUENTIAL, SPLIT }
 
 
+# Whether a weapon's (or mine's) damage can land on anything when the host has switched pools off. Sequential always
+# finds a pool (life is always there); Split only lands on the pools it has a factor for. Something that does no
+# damage at all (a pure shove like the Repulsor) is still useful.
+static func lands(mode: Mode, factors: Vector3, hit_points: float, shields_on: bool, armor_on: bool) -> bool:
+	if hit_points <= 0.0 or mode == Mode.SEQUENTIAL:
+		return true
+	return (factors.x > 0.0 and shields_on) or (factors.y > 0.0 and armor_on) or factors.z > 0.0
+
+
 # Hand `damage` to `target` (a craft's health_node, or a base gun's / sentry's stand-in, which only has one
 # pool and so always takes it as plain damage). Server only, like every damage call.
 static func deal(target: Node, damage: float, mode: Mode, factors: Vector3, attacker_id: int, cause: int) -> void:

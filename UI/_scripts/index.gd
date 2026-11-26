@@ -57,20 +57,28 @@ const TEAM_COLORS := {
 # in the top bar switch it.
 @onready var load_game_tabs: TabContainer = $"Layout/Stage/Load Game"
 @onready var game_list_poll_timer := Timer.new()
-@onready var mine_checklist: Container = %MineChecklist
 @onready var rockets_check: BaseButton = %RocketsCheck
 @onready var bot_count_picker: OptionButton = %BotCountPicker
 @onready var bot_skill_picker: OptionButton = %BotSkillPicker
 @onready var drops_picker: OptionButton = %DropsPicker
+# The right-hand card's three tabs and the pages they show, in the same order.
+@onready var setup_tabs: Array[Button] = [%TabRules, %TabLoadout, %TabDrops]
+@onready var setup_pages: Array[Control] = [%RulesPage, %LoadoutPage, %DropsPage]
+@onready var drops_list: CheckList = %DropsList
+@onready var preset_picker: OptionButton = %PresetPicker
+@onready var preset_name_edit: LineEdit = %PresetName
 @onready var recon_capture_check: BaseButton = %ReconCaptureCheck
 @onready var day_night_check: BaseButton = %DayNightCheck
+@onready var shields_check: BaseButton = %ShieldsCheck
+@onready var armor_check: BaseButton = %ArmorCheck
 @onready var public_game_check: BaseButton = %PublicGameCheck
 
 # Set by NetworkManager.port_forward_failed, read by _on_host_started - see
 # _on_host_pressed's comment for why this can't just be a set_ui_feedback()
 # call at the point it fires.
 var _pending_port_forward_warning: String = ""
-@onready var weapon_checklist: Container = %WeaponChecklist
+# Weapons, specials and vehicles, one grouped list (check_list.gd); its groups are made by the _build_* below.
+@onready var loadout_list: CheckList = %LoadoutList
 @onready var host_team_picker: OptionButton = %HostTeamPicker
 @onready var team_select_group: Control = $"Layout/Stage/Team Select"
 @onready var host_vehicle_row: Control = %HostVehicleRow
@@ -140,8 +148,6 @@ const HOST_SETTINGS_PATH := "user://host_settings.cfg"
 var selected_game_row = null
 @onready var _host_picker: OptionButton = %HostVehiclePicker
 @onready var _join_picker: OptionButton = %JoinVehiclePicker
-@onready var _craft_checklist: Container = %CraftChecklist
-@onready var _craft_section: Control = %CraftSection
 
 
 
@@ -181,6 +187,8 @@ func _ready() -> void:
 		host_team_picker.add_item(team.trim_prefix("team_").capitalize())
 	_setup_vehicle_pickers()
 	_build_craft_checklist()
+	_setup_setup_tabs()
+	_build_drops_checklist()
 	NetworkManager.ruleset_received.connect(_refresh_join_picker)
 	_fill_bot_count_picker(NetworkManager.BOTS_PER_TEAM_USUAL)
 	for skill in BotBrain.SKILLS:
@@ -195,6 +203,10 @@ func _ready() -> void:
 		bot_skill_picker.disabled = index == 0)
 	NetworkManager.map_teams_received.connect(_build_team_roster)
 	_load_host_settings()
+	_refresh_drop_availability()
+	_setup_presets()
+	# Long tooltips wrap to one width across the menus (the lists build their own cards - see tooltip_card.gd).
+	TooltipCard.wrap_all(self)
 	_refresh_host_picker()
 	login_timer.connect("timeout", Callable(self, "_on_cooldown_finished"))
 	http_request.connect("request_completed", Callable(self, "_on_request_completed"))
@@ -533,6 +545,7 @@ func _refresh_host_summary() -> void:
 		["ARENA", selected_map_title],
 		["TEAM", host_team_picker.get_item_text(host_team_picker.selected) if host_team_picker.selected >= 0 else "-"],
 		["GAME", "Public" if public_game_check.button_pressed else "LAN only"],
+		["DROPS", _drops_summary()],
 	]:
 		parts.append("[color=#8099b8][font_size=14]%s[/font_size][/color]  [b]%s[/b]" % [pair[0], str(pair[1]).replace("[", "[lb]")])
 	host_summary.text = "        ".join(parts)
@@ -634,15 +647,6 @@ func _show_game_details(row: TreeItem) -> void:
 
 
 # One entry of the weapon / special / vehicle lists: a tick box drawn as a tag (ChipCheck in the theme).
-func _make_chip(text: String, tooltip: String = "") -> CheckBox:
-	var chip := CheckBox.new()
-	chip.theme_type_variation = &"ChipCheck"
-	chip.focus_mode = Control.FOCUS_NONE
-	chip.text = text
-	chip.tooltip_text = tooltip
-	return chip
-
-
 # Built once from disk, not maintained by hand - drop a new .tres in any of
 # WEAPON_CATALOG_DIRS and it shows up here with no other changes needed.
 # default_available (see weapon_settings.gd) seeds each checkbox's starting
@@ -660,8 +664,6 @@ func _make_chip(text: String, tooltip: String = "") -> CheckBox:
 # craft.tscn, the order weapons cycle in a match); anything on disk the craft
 # doesn't carry goes after, in folder order.
 func _build_weapon_checklist() -> void:
-	for child in weapon_checklist.get_children():
-		child.queue_free()
 	var weapon_paths := _craft_weapon_order()
 	for dir_path in WEAPON_CATALOG_DIRS:
 		for file_name in ResourceLoader.list_directory(dir_path):
@@ -670,15 +672,11 @@ func _build_weapon_checklist() -> void:
 			var weapon_path := dir_path.path_join(file_name)
 			if not weapon_paths.has(weapon_path):
 				weapon_paths.append(weapon_path)
+	var group := loadout_list.add_group("WEAPONS")
 	for weapon_path in weapon_paths:
 		var settings: WeaponSettings = load(weapon_path)
 		if settings:
-			var check := _make_chip(settings.weapon_name)
-			check.button_pressed = settings.default_available
-			check.set_meta("weapon_path", weapon_path)
-			weapon_checklist.add_child(check)
-
-
+			loadout_list.add_entry(group, settings.weapon_name, "weapon_path", weapon_path, "", settings.weapon_icon, settings.default_available)
 # Read off craft.tscn's saved state rather than instantiating a whole craft in the menu.
 func _craft_weapon_order() -> Array[String]:
 	var paths: Array[String] = []
@@ -699,46 +697,168 @@ func _craft_weapon_order() -> Array[String]:
 # built-in specials (SpecialCatalog) follow the mines in the same list, tagged
 # "special_id" instead of "mine_path", and start unticked.
 func _build_mine_checklist() -> void:
-	for child in mine_checklist.get_children():
-		child.queue_free()
+	var group := loadout_list.add_group("SPECIALS")
 	for file_name in ResourceLoader.list_directory(MINE_CATALOG_DIR):
 		if file_name.ends_with("/") or not file_name.ends_with(".tres"):
 			continue
 		var mine_path := MINE_CATALOG_DIR.path_join(file_name)
 		var settings: MineSettings = load(mine_path)
 		if settings:
-			var check := _make_chip(settings.mine_name, settings.mine_lore)
-			check.button_pressed = settings.default_available
-			check.set_meta("mine_path", mine_path)
-			mine_checklist.add_child(check)
+			loadout_list.add_entry(group, settings.mine_name, "mine_path", mine_path, settings.mine_lore, null, settings.default_available)
 	for id in SpecialCatalog.ids():
-		var check := _make_chip(SpecialCatalog.display_name(id), SpecialCatalog.description(id))
-		check.set_meta("special_id", id)
-		mine_checklist.add_child(check)
-
-
+		loadout_list.add_entry(group, SpecialCatalog.display_name(id), "special_id", id, SpecialCatalog.description(id), null, false)
 func _get_checked_mine_paths() -> Array[String]:
 	var paths: Array[String] = []
-	for child in mine_checklist.get_children():
-		if child is CheckBox and child.button_pressed and child.has_meta("mine_path"):
-			paths.append(child.get_meta("mine_path"))
+	paths.assign(loadout_list.values("mine_path", true, false))
 	return paths
-
-
 func _get_checked_specials() -> Array[StringName]:
 	var ids: Array[StringName] = []
-	for child in mine_checklist.get_children():
-		if child is CheckBox and child.button_pressed and child.has_meta("special_id"):
-			ids.append(child.get_meta("special_id"))
+	ids.assign(loadout_list.values("special_id"))
 	return ids
-
-
 func _get_checked_weapon_paths() -> Array[String]:
 	var paths: Array[String] = []
-	for child in weapon_checklist.get_children():
-		if child is CheckBox and child.button_pressed:
-			paths.append(child.get_meta("weapon_path"))
+	paths.assign(loadout_list.values("weapon_path", true, false))
 	return paths
+# --- Match setup card: RULES / LOADOUT / DROPS tabs ----------------------------
+func _setup_setup_tabs() -> void:
+	var group := ButtonGroup.new()
+	for i in setup_tabs.size():
+		setup_tabs[i].button_group = group
+		setup_tabs[i].pressed.connect(_show_setup_page.bind(i))
+	_show_setup_page(0)
+
+
+func _show_setup_page(index: int) -> void:
+	for i in setup_pages.size():
+		setup_pages[i].visible = i == index
+	setup_tabs[index].set_pressed_no_signal(true)
+	# Just a quick fade on the page - the whole-stage slide (_animate_in) is for changing screens.
+	var page := setup_pages[index]
+	page.modulate.a = 0.0
+	create_tween().tween_property(page, "modulate:a", 1.0, 0.18)
+
+
+# What can drop, grouped the way the loot system thinks of it. Built from the LootManager's own tables, so a new
+# item dropped into a table shows up here with nothing else to change. Every item starts ticked.
+const DROP_GROUPS := ["CONSUMABLES", "WEAPON POWERUPS", "CRAFT POWERUPS", "WEAPON PICKUPS"]
+const DROP_ICON_SIZE := 18
+
+
+func _build_drops_checklist() -> void:
+	var manager: LootManager = (load("res://Game_Objects/Loot/Scenes/loot_manager.tscn") as PackedScene).instantiate()
+	var grouped: Dictionary = {}
+	for group in DROP_GROUPS:
+		grouped[group] = []
+	if manager.consumables:
+		grouped["CONSUMABLES"].append_array(manager.consumables.items)
+	if manager.powerups:
+		for item in manager.powerups.items:
+			if item is WeaponPickup:
+				grouped["WEAPON PICKUPS"].append(item)
+			elif item is Powerup and item.has_weapon_changes():
+				grouped["WEAPON POWERUPS"].append(item)
+			elif item != null:
+				grouped["CRAFT POWERUPS"].append(item)
+	manager.free()
+	for group_name in DROP_GROUPS:
+		if grouped[group_name].is_empty():
+			continue
+		var group := drops_list.add_group(group_name)
+		for item in grouped[group_name]:
+			if item == null or item.resource_path.is_empty():
+				continue
+			var entry := drops_list.add_entry(group, item.item_name, "loot_path", item.resource_path, item.description, item.get_icon())
+			entry.set_meta("loot_item", item)
+	drops_list.changed.connect(_refresh_host_summary)
+	%btn_drops_all.pressed.connect(func(): drops_list.set_all(true))
+	%btn_drops_none.pressed.connect(func(): drops_list.set_all(false))
+	# What can drop depends on the loadout and the rules (LootItem.requires), and None turns drops off altogether.
+	loadout_list.changed.connect(_refresh_drop_availability)
+	recon_capture_check.toggled.connect(func(_on): _refresh_drop_availability())
+	shields_check.toggled.connect(func(_on): _refresh_drop_availability())
+	armor_check.toggled.connect(func(_on): _refresh_drop_availability())
+	drops_picker.item_selected.connect(func(_index): _refresh_drop_availability())
+func _checked_loot_paths() -> Array[String]:
+	var paths: Array[String] = []
+	paths.assign(drops_list.values("loot_path"))
+	return paths
+# What can't drop with this setup leaves the list (its tick is kept, so it comes back as it was when the reason goes
+# away), and a note under the list says what's missing and why. Drops set to None hides the list altogether.
+const DROP_UNAVAILABLE_REASON := {
+	LootItem.Requires.POWER: "no weapon in the loadout uses power",
+	LootItem.Requires.RECONS: "recon capture is off",
+	LootItem.Requires.DAMAGE: "no weapon in the loadout does damage",
+	LootItem.Requires.MISSILE: "no missile weapon in the loadout",
+	LootItem.Requires.SHIELDS: "shields are off",
+}
+var _drops_note: Label
+
+
+func _refresh_drop_availability() -> void:
+	_refresh_loadout_availability() # first: what drops depends on the weapons the game really gets
+	if _drops_note == null:
+		_drops_note = Label.new()
+		_drops_note.theme_type_variation = &"DimLabel"
+		_drops_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		drops_list.add_sibling(_drops_note)
+	var weapons: Array = []
+	for path in _get_checked_weapon_paths():
+		weapons.append(load(path))
+	var facts := LootItem.match_facts(weapons, recon_capture_check.button_pressed, shields_check.button_pressed)
+	var drops_off := drops_picker.selected == 0
+	drops_list.visible = not drops_off
+	%btn_drops_all.get_parent().visible = not drops_off
+	var missing: Dictionary = {} # reason -> [item names]
+	for entry in drops_list.entries("loot_path"):
+		var item: LootItem = entry.get_meta("loot_item")
+		var available := item.is_available(facts)
+		drops_list.set_entry_hidden(entry, not available)
+		if not available:
+			var why: String = DROP_UNAVAILABLE_REASON.get(item.requires, "not available")
+			if not missing.has(why):
+				missing[why] = []
+			missing[why].append(item.item_name)
+	var lines: Array[String] = []
+	if drops_off:
+		lines.append("Drops are set to None: nothing drops in this game.")
+	else:
+		for why in missing:
+			lines.append("Not dropping (%s): %s." % [why, ", ".join(missing[why])])
+	_drops_note.text = "\n".join(lines)
+	_drops_note.visible = not lines.is_empty()
+	_refresh_host_summary()
+
+
+# Weapons and mines whose damage only lands on pools the host switched off (Plasma with Shields off) leave the
+# Loadout list the same way drops do: hidden with their tick kept, and named in a note under the list.
+var _loadout_note: Label
+
+
+func _refresh_loadout_availability() -> void:
+	if _loadout_note == null:
+		_loadout_note = Label.new()
+		_loadout_note.theme_type_variation = &"DimLabel"
+		_loadout_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		loadout_list.add_sibling(_loadout_note)
+	var shields_on := shields_check.button_pressed
+	var armor_on := armor_check.button_pressed
+	var gone: Array[String] = []
+	for key in ["weapon_path", "mine_path"]:
+		for entry in loadout_list.entries(key):
+			var settings = load(entry.get_meta(key))
+			var lands: bool = settings == null or DamageRouting.lands(settings.damage_routing, settings.pool_factors(), settings.hit_points, shields_on, armor_on)
+			loadout_list.set_entry_hidden(entry, not lands)
+			if not lands:
+				gone.append(entry.get_text(0))
+	_loadout_note.text = "" if gone.is_empty() else "Not in this game (only damages what's switched off): %s." % ", ".join(gone)
+	_loadout_note.visible = not gone.is_empty()
+
+
+# "Absolute madness - 12 of 14", or just "None".
+func _drops_summary() -> String:
+	if drops_picker.selected <= 0:
+		return "None"
+	return "%s - %d of %d" % [drops_picker.get_item_text(drops_picker.selected), _checked_loot_paths().size(), drops_list.entries("loot_path").size()]
 
 
 func _on_host_pressed():
@@ -771,32 +891,94 @@ func _on_host_pressed():
 		_checked_craft_ids(),
 		bot_count_picker.selected,
 		bot_skill_picker.selected,
-		drops_picker.selected
+		drops_picker.selected,
+		_checked_loot_paths(),
+		shields_check.button_pressed,
+		armor_check.button_pressed
 	)
 
 
-# Weapons and mines are saved as "every one the screen listed" plus "the ticked
-# ones", so one added to the game later still starts at its own default instead
-# of reading as unticked.
+# --- The match setup as data: last-used settings and presets -------------------------------------------------
+# Everything on the three tabs as one dictionary (the shape match_presets.gd documents). Lists are saved as "every
+# one the screen listed" plus "the ticked ones", so an item added to the game later starts at its own default
+# instead of reading as unticked.
+func _capture_setup() -> Dictionary:
+	return {
+		"team": host_team_picker.selected,
+		"public_game": public_game_check.button_pressed,
+		"rockets": rockets_check.button_pressed,
+		"recon_capture": recon_capture_check.button_pressed,
+		"day_night": day_night_check.button_pressed,
+		"shields": shields_check.button_pressed,
+		"armor": armor_check.button_pressed,
+		"bots_per_team": bot_count_picker.selected,
+		"bot_skill": bot_skill_picker.selected,
+		"drops_level": drops_picker.selected,
+		"weapons_listed": loadout_list.values("weapon_path", false),
+		"weapons_checked": loadout_list.values("weapon_path"),
+		"mines_listed": loadout_list.values("mine_path", false),
+		"mines_checked": loadout_list.values("mine_path"),
+		"specials_listed": loadout_list.values("special_id", false),
+		"specials_checked": loadout_list.values("special_id"),
+		"crafts_listed": loadout_list.values("craft_id", false),
+		"crafts_checked": loadout_list.values("craft_id"),
+		"loot_listed": drops_list.values("loot_path", false),
+		"loot_checked": drops_list.values("loot_path"),
+	}
+
+
+# The reverse. A rule key that's missing leaves that control alone; a list with no keys goes back to defaults.
+func _apply_setup(setup: Dictionary) -> void:
+	_applying_setup = true
+	var team: int = setup.get("team", -1)
+	if team >= 0 and team < host_team_picker.item_count:
+		host_team_picker.select(team)
+	if setup.has("public_game"):
+		public_game_check.button_pressed = setup.public_game
+	if setup.has("rockets"):
+		rockets_check.button_pressed = setup.rockets
+	if setup.has("recon_capture"):
+		recon_capture_check.button_pressed = setup.recon_capture
+	if setup.has("day_night"):
+		day_night_check.button_pressed = setup.day_night
+	# Missing (a preset or settings from before these rules existed) = on, as they always were.
+	shields_check.button_pressed = setup.get("shields", true)
+	armor_check.button_pressed = setup.get("armor", true)
+	if setup.has("bots_per_team"):
+		_wanted_bots = clampi(int(setup.bots_per_team), 0, NetworkManager.MAX_BOTS_PER_TEAM)
+		_fill_bot_count_picker(bot_count_picker.item_count - 1)
+	if setup.has("bot_skill"):
+		bot_skill_picker.select(clampi(int(setup.bot_skill), 0, BotBrain.SKILLS.size() - 1))
+	bot_skill_picker.disabled = bot_count_picker.selected == 0
+	if setup.has("drops_level"):
+		drops_picker.select(clampi(int(setup.drops_level), 0, drops_picker.item_count - 1))
+	_apply_ticks(loadout_list, "weapon_path", setup, "weapons")
+	_apply_ticks(loadout_list, "mine_path", setup, "mines")
+	_apply_ticks(loadout_list, "special_id", setup, "specials")
+	_apply_ticks(loadout_list, "craft_id", setup, "crafts")
+	if _checked_craft_ids().is_empty(): # a stale file or preset: never start with no vehicle
+		loadout_list.apply_ticks("craft_id", loadout_list.values("craft_id", false))
+	_apply_ticks(drops_list, "loot_path", setup, "loot")
+	_applying_setup = false
+	_refresh_drop_availability()
+	_refresh_host_picker()
+	_on_setup_changed()
+
+
+func _apply_ticks(list: CheckList, key: String, setup: Dictionary, list_name: String) -> void:
+	if setup.has(list_name + "_checked"):
+		list.apply_ticks(key, setup[list_name + "_checked"], setup.get(list_name + "_listed", null))
+	else:
+		list.reset_defaults(key)
+
+
 func _save_host_settings() -> void:
 	var cfg := ConfigFile.new()
 	cfg.set_value("host", "map_file_id", selected_map_file_id)
-	cfg.set_value("host", "team", host_team_picker.selected)
-	cfg.set_value("host", "public_game", public_game_check.button_pressed)
-	cfg.set_value("host", "rockets", rockets_check.button_pressed)
-	cfg.set_value("host", "recon_capture", recon_capture_check.button_pressed)
-	cfg.set_value("host", "day_night", day_night_check.button_pressed)
-	cfg.set_value("host", "bots_per_team", bot_count_picker.selected)
-	cfg.set_value("host", "bot_skill", bot_skill_picker.selected)
-	cfg.set_value("host", "drops_level", drops_picker.selected)
-	cfg.set_value("host", "weapons_listed", _listed_paths(weapon_checklist, "weapon_path"))
-	cfg.set_value("host", "weapons_checked", _get_checked_weapon_paths())
-	cfg.set_value("host", "mines_listed", _listed_paths(mine_checklist, "mine_path"))
-	cfg.set_value("host", "mines_checked", _get_checked_mine_paths())
-	cfg.set_value("host", "specials_listed", _listed_paths(mine_checklist, "special_id"))
-	cfg.set_value("host", "specials_checked", _get_checked_specials())
-	cfg.set_value("host", "crafts_listed", _listed_paths(_craft_checklist, "craft_id"))
-	cfg.set_value("host", "crafts_checked", _checked_craft_ids())
+	cfg.set_value("host", "preset", _preset_name)
+	var setup := _capture_setup()
+	for key in setup:
+		cfg.set_value("host", key, setup[key])
 	var err := cfg.save(HOST_SETTINGS_PATH)
 	if err != OK:
 		push_warning("Couldn't save host settings (%s)" % error_string(err))
@@ -809,41 +991,208 @@ func _load_host_settings() -> void:
 		return
 	if _last_selected_map_file_id == -1:
 		_last_selected_map_file_id = cfg.get_value("host", "map_file_id", -1)
-	var team: int = cfg.get_value("host", "team", host_team_picker.selected)
-	if team >= 0 and team < host_team_picker.item_count:
-		host_team_picker.select(team)
-	public_game_check.button_pressed = cfg.get_value("host", "public_game", public_game_check.button_pressed)
-	rockets_check.button_pressed = cfg.get_value("host", "rockets", rockets_check.button_pressed)
-	recon_capture_check.button_pressed = cfg.get_value("host", "recon_capture", recon_capture_check.button_pressed)
-	day_night_check.button_pressed = cfg.get_value("host", "day_night", day_night_check.button_pressed)
-	_wanted_bots = clampi(int(cfg.get_value("host", "bots_per_team", 0)), 0, NetworkManager.MAX_BOTS_PER_TEAM)
-	_fill_bot_count_picker(bot_count_picker.item_count - 1)
-	bot_skill_picker.select(clampi(int(cfg.get_value("host", "bot_skill", 1)), 0, BotBrain.SKILLS.size() - 1))
-	bot_skill_picker.disabled = bot_count_picker.selected == 0
-	drops_picker.select(clampi(int(cfg.get_value("host", "drops_level", LootManager.DEFAULT_LEVEL)), 0, drops_picker.item_count - 1))
-	_restore_checklist(weapon_checklist, "weapon_path", cfg.get_value("host", "weapons_listed", []), cfg.get_value("host", "weapons_checked", []))
-	_restore_checklist(mine_checklist, "mine_path", cfg.get_value("host", "mines_listed", []), cfg.get_value("host", "mines_checked", []))
-	_restore_checklist(mine_checklist, "special_id", cfg.get_value("host", "specials_listed", []), cfg.get_value("host", "specials_checked", []))
-	_restore_checklist(_craft_checklist, "craft_id", cfg.get_value("host", "crafts_listed", []), cfg.get_value("host", "crafts_checked", []))
-	if _checked_craft_ids().is_empty(): # a hand-edited or stale file: never start with no vehicle
-		for child in _craft_checklist.get_children():
-			if child is CheckBox:
-				child.button_pressed = true
+	_preset_name = cfg.get_value("host", "preset", "")
+	var setup := {}
+	for key in cfg.get_section_keys("host"):
+		if key != "map_file_id" and key != "preset":
+			setup[key] = cfg.get_value("host", key)
+	_apply_setup(setup)
 
 
-# Only the checkboxes carrying `meta` - the specials list mixes mines and built-ins.
-func _listed_paths(checklist: Container, meta: String) -> Array:
-	var paths: Array = []
-	for child in checklist.get_children():
-		if child is CheckBox and child.has_meta(meta):
-			paths.append(child.get_meta(meta))
-	return paths
+# --- Presets (match_presets.gd): the preset picker and its buttons above the tabs --------------------------------------------------
+# The picker loads one (all three tabs; your team stays) and marks it "Name *" once anything is changed. NEW saves the
+# tabs as a new preset (asks for a name), SAVE writes them over the loaded one, DELETE removes it (two clicks).
+# While a name is being typed, the clicked button reads OK and the next one CANCEL. Every button has a fixed width,
+# so changing labels never moves the screen.
+
+var _applying_setup := false
+var _preset_name := "" # the preset last loaded or saved; "" = none
+var _preset_snapshot := {} # the setup as that preset left it, to tell when it has been changed since
+var _naming_preset := false
+var _delete_armed := false
 
 
-func _restore_checklist(checklist: Container, meta: String, listed: Array, checked: Array) -> void:
-	for child in checklist.get_children():
-		if child is CheckBox and child.has_meta(meta) and listed.has(child.get_meta(meta)):
-			child.button_pressed = checked.has(child.get_meta(meta))
+func _setup_presets() -> void:
+	# The screen opens on a preset, exactly as saved: the one used last time if it still exists, otherwise the first in
+	# the list. (Your team and the last map still come from the remembered settings - presets don't hold those.)
+	if not MatchPresets.exists(_preset_name):
+		var all_presets := MatchPresets.names()
+		_preset_name = all_presets[0] if not all_presets.is_empty() else ""
+	if _preset_name != "":
+		_apply_setup(MatchPresets.get_setup(_preset_name))
+		_preset_snapshot = _preset_view()
+	# The three share their row equally: the same minimum width (fits any of their labels) keeps the thirds equal.
+	for button in [%btn_preset_new, %btn_preset_save, %btn_preset_delete]:
+		_fix_width(button, ["NEW", "SAVE", "DELETE", "OK", "CANCEL", "SURE?"])
+	# The name field takes the picker's place: same height, so the row doesn't grow or shrink either.
+	var row_height := maxf(preset_picker.get_combined_minimum_size().y, preset_name_edit.get_combined_minimum_size().y)
+	preset_picker.custom_minimum_size.y = row_height
+	preset_name_edit.custom_minimum_size.y = row_height
+	_fill_preset_picker()
+	preset_picker.item_selected.connect(_on_preset_selected)
+	%btn_preset_new.pressed.connect(func(): _on_preset_button(%btn_preset_new))
+	%btn_preset_save.pressed.connect(func(): _on_preset_button(%btn_preset_save))
+	%btn_preset_delete.pressed.connect(_on_preset_delete)
+	preset_name_edit.text_submitted.connect(_finish_preset_naming)
+	preset_name_edit.gui_input.connect(func(event: InputEvent) -> void:
+		if event.is_action_pressed("ui_cancel"):
+			_end_preset_naming()
+			preset_name_edit.accept_event())
+	loadout_list.changed.connect(_on_setup_changed)
+	drops_list.changed.connect(_on_setup_changed)
+	for toggle in [public_game_check, rockets_check, recon_capture_check, day_night_check, shields_check, armor_check]:
+		toggle.toggled.connect(func(_on): _on_setup_changed())
+	for picker in [bot_count_picker, bot_skill_picker, drops_picker]:
+		picker.item_selected.connect(func(_index): _on_setup_changed())
+	_refresh_preset_marker()
+
+
+# Wide enough for the widest of `labels`, whichever it is showing.
+func _fix_width(button: Button, labels: Array) -> void:
+	var font := button.get_theme_font("font")
+	var font_size := button.get_theme_font_size("font_size")
+	var widest := 0.0
+	for label in labels:
+		widest = maxf(widest, font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x)
+	button.custom_minimum_size.x = ceilf(widest + button.get_theme_stylebox("normal").get_minimum_size().x)
+
+
+func _fill_preset_picker() -> void:
+	preset_picker.clear()
+	if _preset_name == "":
+		preset_picker.add_item("Custom")
+		preset_picker.set_item_metadata(0, "")
+	for preset_name in MatchPresets.names():
+		preset_picker.add_item(preset_name)
+		preset_picker.set_item_metadata(preset_picker.item_count - 1, preset_name)
+	for i in preset_picker.item_count:
+		if preset_picker.get_item_metadata(i) == _preset_name:
+			preset_picker.select(i)
+	_refresh_preset_marker()
+
+
+func _on_preset_selected(index: int) -> void:
+	var preset_name: String = preset_picker.get_item_metadata(index)
+	if preset_name == "":
+		return
+	_apply_setup(MatchPresets.get_setup(preset_name))
+	_preset_name = preset_name
+	_preset_snapshot = _preset_view()
+	_fill_preset_picker()
+
+
+# What a preset covers: the setup without your team.
+func _preset_view() -> Dictionary:
+	var view := _capture_setup()
+	view.erase("team")
+	return view
+
+
+func _on_setup_changed() -> void:
+	if _applying_setup:
+		return
+	_refresh_preset_marker()
+	_refresh_host_summary()
+
+
+func _refresh_preset_marker() -> void:
+	for i in preset_picker.item_count:
+		var preset_name = preset_picker.get_item_metadata(i)
+		if preset_name is String and preset_name != "" and preset_name == _preset_name:
+			var changed := _preset_view() != _preset_snapshot
+			preset_picker.set_item_text(i, preset_name + (" *" if changed else ""))
+	if not _naming_preset:
+		%btn_preset_delete.disabled = _preset_name == ""
+
+
+# NEW and SAVE. While naming, the button that started it is OK and the one after it is CANCEL.
+var _naming_ok: Button
+
+
+func _on_preset_button(button: Button) -> void:
+	if _naming_preset:
+		if button == _naming_ok:
+			_finish_preset_naming(preset_name_edit.text)
+		else:
+			_end_preset_naming()
+		return
+	if button == %btn_preset_save and _preset_name != "":
+		_save_preset(_preset_name)
+		return
+	_begin_preset_naming(button)
+
+
+func _begin_preset_naming(ok_button: Button) -> void:
+	_naming_preset = true
+	_naming_ok = ok_button
+	preset_picker.visible = false
+	preset_name_edit.visible = true
+	preset_name_edit.text = ""
+	preset_name_edit.grab_focus()
+	ok_button.text = "OK"
+	# CANCEL goes on the button right after OK.
+	if ok_button == %btn_preset_new:
+		%btn_preset_save.text = "CANCEL"
+		%btn_preset_delete.disabled = true
+	else:
+		%btn_preset_new.disabled = true
+		%btn_preset_delete.text = "CANCEL"
+		%btn_preset_delete.disabled = false
+
+
+func _finish_preset_naming(text: String) -> void:
+	var preset_name := text.strip_edges()
+	if preset_name == "":
+		_end_preset_naming()
+		return
+	if MatchPresets.exists(preset_name):
+		set_ui_feedback("There is already a preset called \"%s\" - load it and SAVE to change it." % preset_name, "COK")
+		return
+	_save_preset(preset_name)
+
+
+func _save_preset(preset_name: String) -> void:
+	var err := MatchPresets.save(preset_name, _capture_setup())
+	if err != OK:
+		set_ui_feedback("Couldn't save the preset (%s)." % error_string(err), "NOK")
+		return
+	_preset_name = preset_name
+	_preset_snapshot = _preset_view()
+	_end_preset_naming()
+	set_ui_feedback("Preset \"%s\" saved." % preset_name, "OK")
+
+
+func _end_preset_naming() -> void:
+	_naming_preset = false
+	preset_name_edit.visible = false
+	preset_picker.visible = true
+	%btn_preset_new.text = "NEW"
+	%btn_preset_save.text = "SAVE"
+	%btn_preset_delete.text = "DELETE"
+	%btn_preset_new.disabled = false
+	_fill_preset_picker()
+
+
+func _on_preset_delete() -> void:
+	if _naming_preset:
+		_end_preset_naming() # it's CANCEL while SAVE is naming a preset
+		return
+	if _preset_name == "":
+		return
+	if not _delete_armed:
+		_delete_armed = true
+		%btn_preset_delete.text = "SURE?"
+		get_tree().create_timer(3.0).timeout.connect(func() -> void:
+			_delete_armed = false
+			%btn_preset_delete.text = "DELETE")
+		return
+	_delete_armed = false
+	%btn_preset_delete.text = "DELETE"
+	var gone := _preset_name
+	MatchPresets.delete(gone)
+	_preset_name = ""
+	_fill_preset_picker()
+	set_ui_feedback("Preset \"%s\" deleted." % gone, "INFO")
 
 
 func _on_host_started(address: String) -> void:
@@ -951,27 +1300,22 @@ func _refresh_join_picker() -> void:
 # ticked: unticking the last one puts the tick straight back.
 
 func _build_craft_checklist() -> void:
-	for def in CraftCatalog.DEFS:
-		var check := _make_chip(def.display_name, def.description)
-		check.button_pressed = true
-		check.set_meta("craft_id", String(def.id))
-		check.toggled.connect(func(on: bool) -> void:
-			if not on and _checked_craft_ids().is_empty():
-				check.set_pressed_no_signal(true)
-			_refresh_host_picker())
-		_craft_checklist.add_child(check)
 	# Nothing to choose between with a single craft in the game.
-	_craft_section.visible = CraftCatalog.DEFS.size() > 1
-
-
+	if CraftCatalog.DEFS.size() <= 1:
+		return
+	var group := loadout_list.add_group("VEHICLES ALLOWED", true)
+	for def in CraftCatalog.DEFS:
+		loadout_list.add_entry(group, def.display_name, "craft_id", String(def.id), def.description)
+	loadout_list.changed.connect(_refresh_host_picker)
 func _checked_craft_ids() -> Array[StringName]:
 	var ids: Array[StringName] = []
-	for child in _craft_checklist.get_children():
-		if child is CheckBox and child.button_pressed:
-			ids.append(StringName(child.get_meta("craft_id")))
+	for id in loadout_list.values("craft_id"):
+		ids.append(StringName(id))
+	# A single craft in the game has no list at all: it is always allowed.
+	if ids.is_empty() and CraftCatalog.DEFS.size() <= 1:
+		for def in CraftCatalog.DEFS:
+			ids.append(def.id)
 	return ids
-
-
 # The host's own picker offers only the crafts ticked for the game.
 func _refresh_host_picker() -> void:
 	var defs: Array = []

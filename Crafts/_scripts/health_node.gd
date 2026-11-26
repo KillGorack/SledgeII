@@ -76,12 +76,14 @@ func _ready() -> void:
 	# stats is a shared template resource (same values for every Lightning) -
 	# current HP has to be per-instance mutable state, so it starts as a copy
 	# of the template rather than mutating the shared resource directly.
-	shields = stats.shields
-	armor = stats.armor
-	life = stats.life
-	_shields_max = stats.shields
-	_armor_max = stats.armor
+	# The host can switch shields and/or armor off for the match (NetworkManager): that pool then doesn't exist -
+	# a max of 0, so damage passes it by, regen and heals never fill it, and the HUD leaves it out.
+	_shields_max = stats.shields if NetworkManager.shields_enabled else 0.0
+	_armor_max = stats.armor if NetworkManager.armor_enabled else 0.0
 	_life_max = stats.life
+	shields = _shields_max
+	armor = _armor_max
+	life = _life_max
 	# Powerups can speed up shield regen (Fortitude).
 	var weapon_node := get_node_or_null("../weapon_node")
 	if weapon_node != null:

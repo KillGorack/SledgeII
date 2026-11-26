@@ -1,7 +1,7 @@
 [gd_resource type="Resource" script_class="Consumable" format=3 uid="uid://bld72ytrfxtw3"]
 
 [ext_resource type="Script" uid="uid://dsgfd6y1uwpem" path="res://Game_Objects/Loot/_scripts/consumable.gd" id="1_c"]
-[ext_resource type="PackedScene" uid="uid://rjyc1vw6dsdh" path="res://Game_Objects/Powerups/Scenes/energy.tscn" id="2_vis"]
+[ext_resource type="Texture2D" uid="uid://bqrxlwpbvv6l8" path="res://Game_Objects/Powerups/Spritesheets/POWERUPS.png" id="3_ls5k3"]
 [ext_resource type="AudioStream" uid="uid://cds8k4oewmn8" path="res://Game_Objects/Powerups/sounds/bottle.wav" id="3_snd"]
 
 [resource]
@@ -10,7 +10,8 @@ target = 1
 amount = 40.0
 item_name = "Energy Cell"
 description = "A sip of the good stuf.. Your reserves of directed energy just got a little bigger."
-visual_scene = ExtResource("2_vis")
+sheet_row = 1
+sheet = ExtResource("3_ls5k3")
 color = Color(1, 1, 0, 1)
 pickup_sound = ExtResource("3_snd")
 drop_weight = 1.0

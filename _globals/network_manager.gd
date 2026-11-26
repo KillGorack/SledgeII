@@ -116,6 +116,13 @@ var bots_per_team: int = 0
 var bot_skill: int = 1
 # Host only: the "Drops" setting, an index into LootManager.LOOT_LEVELS (0 None, 1 Normal ... 4 Absolute madness).
 var loot_level: int = LootManager.DEFAULT_LEVEL
+# Host only: which loot items may drop (their resource paths, from the host screen's Drops tab), or null for
+# every item (builder/test games). Read by LootManager when it rolls a drop; nothing about it is sent to clients.
+var allowed_loot = null
+# The host's Shields / Armor rules. Off = that pool doesn't exist on any craft (its max is 0 - see health_node.gd).
+# Every peer needs them (HUD rings, the shield skin), so they travel in the ruleset like rockets do.
+var shields_enabled: bool = true
+var armor_enabled: bool = true
 
 # Site stats (usr.game_score / game_vanquishes / game_falls, gameAPI addUserStats).
 # Each player posts only their OWN gains - only their client has their session
@@ -401,7 +408,7 @@ func _clock_pong(client_time: float, server_clock: float) -> void:
 	_clock_synced = _clock_samples.size() >= 3
 
 
-func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] = [], day_night: bool = true, host_address_override: String = "", host_team: String = "team_red", port: int = DEFAULT_PORT, max_players: int = 20, public_game: bool = false, base_gun_respawn: float = BASE_GUN_RESPAWN_SECONDS, mines: bool = true, mine_paths: Array[String] = [], rockets: bool = true, recon_capture: bool = true, specials: Array[StringName] = [], craft_ids: Array[StringName] = [], bots: int = 0, bot_skill_level: int = 1, drops: int = 0) -> Error:
+func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] = [], day_night: bool = true, host_address_override: String = "", host_team: String = "team_red", port: int = DEFAULT_PORT, max_players: int = 20, public_game: bool = false, base_gun_respawn: float = BASE_GUN_RESPAWN_SECONDS, mines: bool = true, mine_paths: Array[String] = [], rockets: bool = true, recon_capture: bool = true, specials: Array[StringName] = [], craft_ids: Array[StringName] = [], bots: int = 0, bot_skill_level: int = 1, drops: int = 0, loot_paths = null, shields: bool = true, armor: bool = true) -> Error:
 	peer = ENetMultiplayerPeer.new()
 	var err = peer.create_server(port, max_players)
 	if err != OK:
@@ -427,6 +434,9 @@ func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] 
 	bots_per_team = clampi(bots, 0, MAX_BOTS_PER_TEAM)
 	bot_skill = bot_skill_level
 	loot_level = drops
+	allowed_loot = loot_paths
+	shields_enabled = shields
+	armor_enabled = armor
 	# _get_local_ip() just takes whatever address the OS happens to list
 	# first, which isn't stable if there's more than one active adapter (a
 	# VPN, a virtual bridge, Wi-Fi and Ethernet both up) - that's picked a
@@ -501,6 +511,9 @@ func start_creative_session(level_data: Dictionary, editing: bool, team: String 
 	day_night_enabled = false
 	bots_per_team = 0
 	loot_level = LootManager.DEFAULT_LEVEL
+	allowed_loot = null
+	shields_enabled = true
+	armor_enabled = true
 	mines_enabled = true
 	rockets_enabled = true
 	recon_capture_enabled = true
@@ -592,7 +605,7 @@ func _send_initial_state(peer_id: int) -> void:
 	# One match-wide ruleset, not per-peer, so this is a single targeted send
 	# rather than the backfill loop below - there's nothing to backfill, the
 	# host is the only one who ever sets it.
-	_assign_ruleset.rpc_id(peer_id, allowed_weapon_paths, day_night_enabled, mines_enabled, allowed_mine_paths, rockets_enabled, recon_capture_enabled, allowed_specials, allowed_craft_ids)
+	_assign_ruleset.rpc_id(peer_id, allowed_weapon_paths, day_night_enabled, mines_enabled, allowed_mine_paths, rockets_enabled, recon_capture_enabled, allowed_specials, allowed_craft_ids, shields_enabled, armor_enabled)
 	_sync_map_teams.rpc_id(peer_id, map_teams)
 	# Backfill the roster so the newly joined peer sees everyone already
 	# assigned before picking their own - no auto-assignment anymore, the new
@@ -694,7 +707,7 @@ func _reject_team_request(reason: String) -> void:
 
 
 @rpc("authority", "call_local", "reliable")
-func _assign_ruleset(weapon_paths: Array, day_night: bool, mines: bool, mine_paths: Array, rockets: bool, recon_capture: bool, specials: Array, craft_ids: Array = []) -> void:
+func _assign_ruleset(weapon_paths: Array, day_night: bool, mines: bool, mine_paths: Array, rockets: bool, recon_capture: bool, specials: Array, craft_ids: Array = [], shields: bool = true, armor: bool = true) -> void:
 	allowed_weapon_paths.assign(weapon_paths)
 	day_night_enabled = day_night
 	mines_enabled = mines
@@ -703,6 +716,8 @@ func _assign_ruleset(weapon_paths: Array, day_night: bool, mines: bool, mine_pat
 	recon_capture_enabled = recon_capture
 	allowed_specials.assign(specials)
 	allowed_craft_ids.assign(craft_ids)
+	shields_enabled = shields
+	armor_enabled = armor
 	local_craft_id = allowed_craft_for(local_craft_id)
 	ruleset_received.emit()
 

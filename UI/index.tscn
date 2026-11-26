@@ -9,6 +9,7 @@
 [ext_resource type="Script" uid="uid://debyhb0ptjyoc" path="res://Creative/my_creations.gd" id="my_creations_script"]
 [ext_resource type="Shader" uid="uid://cjjgnvw1sdf84" path="res://UI/shaders/logo_sheen.gdshader" id="sheen_shader"]
 [ext_resource type="Theme" uid="uid://dmlpyqe111b7r" path="res://UI/theme/sledge_theme.tres" id="sledge_theme"]
+[ext_resource type="Script" path="res://UI/_scripts/check_list.gd" id="check_list"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_backdrop"]
 shader = ExtResource("backdrop_shader")
@@ -599,8 +600,34 @@ layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 16
 
+[node name="PresetsCard" type="PanelContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn"]
+layout_mode = 2
+script = ExtResource("hud_card")
+
+[node name="Body" type="VBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Head" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Index" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body/Head"]
+layout_mode = 2
+theme_type_variation = &"IndexLabel"
+text = "02"
+
+[node name="Title" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body/Head"]
+layout_mode = 2
+theme_type_variation = &"HeaderLabel"
+text = "PRESETS"
+
+[node name="Rule" type="HSeparator" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body"]
+layout_mode = 2
+
 [node name="RulesCard" type="PanelContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn" unique_id=250335412]
 layout_mode = 2
+size_flags_vertical = 3
 script = ExtResource("hud_card")
 
 [node name="Body" type="VBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard" unique_id=926696008]
@@ -614,48 +641,158 @@ theme_override_constants/separation = 10
 [node name="Index" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Head" unique_id=1090760501]
 layout_mode = 2
 theme_type_variation = &"IndexLabel"
-text = "02"
+text = "03"
 
 [node name="Title" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Head" unique_id=364249533]
 layout_mode = 2
 theme_type_variation = &"HeaderLabel"
-text = "MATCH RULES"
+text = "MATCH SETUP"
+
+[node name="PresetRow" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PresetPicker" type="OptionButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body/PresetRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+focus_mode = 0
+fit_to_longest_item = false
+clip_text = true
+text_overrun_behavior = 3
+tooltip_text = "Load a saved game design: everything on the Rules, Loadout and Drops tabs. Your team stays as it is."
+
+[node name="PresetName" type="LineEdit" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body/PresetRow"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Preset name"
+max_length = 32
+
+[node name="PresetButtons" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="btn_preset_new" type="Button" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body/PresetButtons"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+focus_mode = 0
+theme_type_variation = &"GhostButton"
+tooltip_text = "Save everything on the three tabs as a new preset, under a new name."
+text = "NEW"
+
+[node name="btn_preset_save" type="Button" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body/PresetButtons"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+focus_mode = 0
+theme_type_variation = &"GhostButton"
+tooltip_text = "Save the three tabs over the preset you have loaded. With none loaded, asks for a name."
+text = "SAVE"
+
+[node name="btn_preset_delete" type="Button" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body/PresetButtons"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+focus_mode = 0
+theme_type_variation = &"GhostDangerButton"
+tooltip_text = "Delete the loaded preset (click twice). Delete them all and the starting presets come back."
+text = "DELETE"
 
 [node name="Rule" type="HSeparator" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body" unique_id=358840282]
 layout_mode = 2
 
-[node name="TeamRow" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body" unique_id=1927968336]
+[node name="Tabs" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="TabRules" type="Button" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Tabs"]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"NavButton"
+toggle_mode = true
+button_pressed = true
+text = "RULES"
+
+[node name="TabLoadout" type="Button" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Tabs"]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"NavButton"
+toggle_mode = true
+text = "LOADOUT"
+
+[node name="TabDrops" type="Button" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Tabs"]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"NavButton"
+toggle_mode = true
+text = "DROPS"
+
+[node name="TabGap" type="Control" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body"]
+custom_minimum_size = Vector2(0, 6)
 layout_mode = 2
 
-[node name="TeamLabel" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/TeamRow" unique_id=1728121588]
+[node name="Pages" type="VBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="RulesPage" type="VBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 4
+
+[node name="LoadoutPage" type="VBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 8
+
+[node name="DropsPage" type="VBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 8
+
+[node name="TeamRow" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/RulesPage" unique_id=1927968336]
+layout_mode = 2
+
+[node name="TeamLabel" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/RulesPage/TeamRow" unique_id=1728121588]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Your team"
 
-[node name="HostTeamPicker" type="OptionButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/TeamRow" unique_id=2140131976]
+[node name="HostTeamPicker" type="OptionButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/RulesPage/TeamRow" unique_id=2140131976]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(170, 0)
 layout_mode = 2
 
-[node name="HostVehicleRow" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body" unique_id=1707077289]
+[node name="HostVehicleRow" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/RulesPage" unique_id=1707077289]
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="VehicleLabel" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/HostVehicleRow" unique_id=2111528891]
+[node name="VehicleLabel" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/RulesPage/HostVehicleRow" unique_id=2111528891]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Your vehicle"
 
-[node name="HostVehiclePicker" type="OptionButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/HostVehicleRow" unique_id=432227888]
+[node name="HostVehiclePicker" type="OptionButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/RulesPage/HostVehicleRow" unique_id=432227888]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(170, 0)
 layout_mode = 2
 
-[node name="PickerGap" type="Control" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body" unique_id=1075408764]
+[node name="PickerGap" type="Control" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/RulesPage" unique_id=1075408764]
 custom_minimum_size = Vector2(0, 4)
 layout_mode = 2
 
-[node name="PublicGameCheck" type="CheckButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body" unique_id=1433985368]
+[node name="PublicGameCheck" type="CheckButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/RulesPage" unique_id=1433985368]
 unique_name_in_owner = true
 layout_mode = 2
 tooltip_text = "Lists the game so people outside your network can join (the port is forwarded automatically where possible). Turn off for a LAN-only game."
@@ -663,7 +800,7 @@ focus_mode = 0
 button_pressed = true
 text = "Public game"
 
-[node name="RocketsCheck" type="CheckButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body" unique_id=1045965186]
+[node name="RocketsCheck" type="CheckButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/RulesPage" unique_id=1045965186]
 unique_name_in_owner = true
 layout_mode = 2
 tooltip_text = "Rockets (R) lift your craft. Off: nobody can use them. Flipping an overturned craft back over always works."
@@ -671,7 +808,7 @@ focus_mode = 0
 button_pressed = true
 text = "Rockets"
 
-[node name="ReconCaptureCheck" type="CheckButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body" unique_id=128899067]
+[node name="ReconCaptureCheck" type="CheckButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/RulesPage" unique_id=128899067]
 unique_name_in_owner = true
 layout_mode = 2
 tooltip_text = "Lets players capture recons. Off: recons stay as the map set them; they still heal and resupply."
@@ -679,144 +816,108 @@ focus_mode = 0
 button_pressed = true
 text = "Recon capture"
 
-[node name="DayNightCheck" type="CheckButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body" unique_id=1841491236]
+[node name="DayNightCheck" type="CheckButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/RulesPage" unique_id=1841491236]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
 text = "Day / night cycle"
 
-[node name="BotCountRow" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body" unique_id=1904417731]
+[node name="ShieldsCheck" type="CheckButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/RulesPage"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Crafts have shields. Off: no craft has any - every hit goes to armor and life, and shield-only weapons and powerups leave the game."
+focus_mode = 0
+button_pressed = true
+text = "Shields"
+
+[node name="ArmorCheck" type="CheckButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/RulesPage"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Crafts have armor. Off: no craft has any - what gets past the shields goes straight to life."
+focus_mode = 0
+button_pressed = true
+text = "Armor"
+
+[node name="BotCountRow" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/RulesPage" unique_id=1904417731]
 layout_mode = 2
 tooltip_text = "Computer-driven crafts added to every team, in a random mix of the crafts this game allows. They never take a player's place on a team."
 
-[node name="BotCountLabel" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/BotCountRow" unique_id=1904417732]
+[node name="BotCountLabel" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/RulesPage/BotCountRow" unique_id=1904417732]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Bots"
 
-[node name="BotCountPicker" type="OptionButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/BotCountRow" unique_id=1904417733]
+[node name="BotCountPicker" type="OptionButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/RulesPage/BotCountRow" unique_id=1904417733]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(170, 0)
 layout_mode = 2
 focus_mode = 0
 
-[node name="BotSkillRow" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body" unique_id=1904417734]
+[node name="BotSkillRow" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/RulesPage" unique_id=1904417734]
 layout_mode = 2
 tooltip_text = "How well the bots aim and how quickly they react. Hard bots barely miss."
 
-[node name="BotSkillLabel" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/BotSkillRow" unique_id=1904417735]
+[node name="BotSkillLabel" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/RulesPage/BotSkillRow" unique_id=1904417735]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Bot skill"
 
-[node name="BotSkillPicker" type="OptionButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/BotSkillRow" unique_id=1904417736]
+[node name="BotSkillPicker" type="OptionButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/RulesPage/BotSkillRow" unique_id=1904417736]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(170, 0)
 layout_mode = 2
 focus_mode = 0
 
-[node name="DropsRow" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body" unique_id=1904417737]
+[node name="DropsRow" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/DropsPage" unique_id=1904417737]
 layout_mode = 2
 tooltip_text = "How much loot destroyed crafts, base guns, sentries and barrels leave behind."
 
-[node name="DropsLabel" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/DropsRow" unique_id=1904417738]
+[node name="DropsLabel" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/DropsPage/DropsRow" unique_id=1904417738]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Drops"
 
-[node name="DropsPicker" type="OptionButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/DropsRow" unique_id=1904417739]
+[node name="DropsPicker" type="OptionButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/DropsPage/DropsRow" unique_id=1904417739]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(170, 0)
 layout_mode = 2
 focus_mode = 0
 
-[node name="LoadoutCard" type="PanelContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn" unique_id=2075873942]
+[node name="DropsList" type="Tree" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/DropsPage"]
+unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
-script = ExtResource("hud_card")
+script = ExtResource("check_list")
 
-[node name="Body" type="VBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard" unique_id=1233832515]
+[node name="DropsBulk" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/DropsPage"]
 layout_mode = 2
-theme_override_constants/separation = 8
+alignment = 2
+theme_override_constants/separation = 6
 
-[node name="Head" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body" unique_id=1953198797]
+[node name="btn_drops_all" type="Button" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/DropsPage/DropsBulk"]
+unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/separation = 10
+focus_mode = 0
+theme_type_variation = &"NavButton"
+text = "ALL"
 
-[node name="Index" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body/Head" unique_id=1031209073]
+[node name="btn_drops_none" type="Button" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/DropsPage/DropsBulk"]
+unique_name_in_owner = true
 layout_mode = 2
-theme_type_variation = &"IndexLabel"
-text = "03"
+focus_mode = 0
+theme_type_variation = &"NavButton"
+text = "NONE"
 
-[node name="Title" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body/Head" unique_id=1915118816]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_type_variation = &"HeaderLabel"
-text = "LOADOUT"
-
-[node name="Note" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body/Head" unique_id=882743485]
+[node name="Note" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/LoadoutPage" unique_id=882743485]
 layout_mode = 2
 theme_type_variation = &"DimLabel"
 text = "The same for every player"
 
-[node name="Rule" type="HSeparator" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body" unique_id=1402155505]
-layout_mode = 2
-
-[node name="Scroll" type="ScrollContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body" unique_id=317139404]
+[node name="LoadoutList" type="Tree" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/LoadoutPage"]
+unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
-horizontal_scroll_mode = 0
-
-[node name="Sections" type="VBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body/Scroll" unique_id=1753607820]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 8
-
-[node name="WeaponsLabel" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body/Scroll/Sections" unique_id=1698789222]
-layout_mode = 2
-theme_type_variation = &"CapsLabel"
-text = "WEAPONS"
-
-[node name="WeaponChecklist" type="HFlowContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body/Scroll/Sections" unique_id=1629630144]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/h_separation = 8
-theme_override_constants/v_separation = 8
-
-[node name="SpecialsGap" type="Control" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body/Scroll/Sections" unique_id=493660901]
-custom_minimum_size = Vector2(0, 4)
-layout_mode = 2
-
-[node name="SpecialsLabel" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body/Scroll/Sections" unique_id=651284811]
-layout_mode = 2
-theme_type_variation = &"CapsLabel"
-text = "SPECIALS"
-
-[node name="MineChecklist" type="HFlowContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body/Scroll/Sections" unique_id=544079739]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/h_separation = 8
-theme_override_constants/v_separation = 8
-
-[node name="CraftSection" type="VBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body/Scroll/Sections" unique_id=1338775572]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="CraftGap" type="Control" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body/Scroll/Sections/CraftSection" unique_id=996939664]
-custom_minimum_size = Vector2(0, 4)
-layout_mode = 2
-
-[node name="CraftLabel" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body/Scroll/Sections/CraftSection" unique_id=2091978112]
-layout_mode = 2
-theme_type_variation = &"CapsLabel"
-text = "VEHICLES ALLOWED"
-
-[node name="CraftChecklist" type="HFlowContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/LoadoutCard/Body/Scroll/Sections/CraftSection" unique_id=734591991]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/h_separation = 8
-theme_override_constants/v_separation = 8
+script = ExtResource("check_list")
 
 [node name="Footer" type="PanelContainer" parent="Layout/Stage/Load Game/Create Game" unique_id=2043998472]
 layout_mode = 2

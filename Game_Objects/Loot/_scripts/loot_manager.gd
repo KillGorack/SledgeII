@@ -58,7 +58,7 @@ func _facts() -> Dictionary:
 	for craft in get_tree().get_nodes_in_group("Craft"):
 		var weapon_node := craft.get_node_or_null("weapon_node")
 		if weapon_node:
-			return LootItem.match_facts(weapon_node.weapon_settings, NetworkManager.recon_capture_enabled)
+			return LootItem.match_facts(weapon_node.weapon_settings, NetworkManager.recon_capture_enabled, NetworkManager.shields_enabled)
 	return {}
 
 
@@ -79,7 +79,7 @@ func _pick(table: LootTable, facts: Dictionary) -> LootItem:
 	var pool: Array[LootItem] = []
 	var total := 0.0
 	for entry in table.items:
-		if entry != null and entry.is_available(facts):
+		if entry != null and entry.is_available(facts) and _allowed(entry):
 			pool.append(entry)
 			total += maxf(entry.drop_weight, 0.0)
 	if total <= 0.0:
@@ -90,6 +90,12 @@ func _pick(table: LootTable, facts: Dictionary) -> LootItem:
 		if roll < 0.0:
 			return entry
 	return pool.back()
+
+
+# The host's pick from the Drops tab (NetworkManager.allowed_loot); null = everything.
+func _allowed(item: LootItem) -> bool:
+	var allowed = NetworkManager.allowed_loot
+	return allowed == null or allowed.has(item.resource_path)
 
 
 func _level() -> Dictionary:
