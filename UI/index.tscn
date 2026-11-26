@@ -4,12 +4,12 @@
 [ext_resource type="Texture2D" uid="uid://chy7majjyx0r6" path="res://UI/backgrounds/starfield.png" id="5_q1cq1"]
 [ext_resource type="Texture2D" uid="uid://d0wltocm8ynx0" path="res://UI/images/SledgeTitle.png" id="12_nqws8"]
 [ext_resource type="Shader" uid="uid://qvwn58xdi1op" path="res://UI/shaders/menu_backdrop.gdshader" id="backdrop_shader"]
+[ext_resource type="Script" uid="uid://6o1mi31qspyp" path="res://UI/_scripts/check_list.gd" id="check_list"]
 [ext_resource type="Script" uid="uid://dyeor4xjf63j4" path="res://UI/_scripts/hud_card.gd" id="hud_card"]
 [ext_resource type="Shader" uid="uid://dge5ni8gu6je2" path="res://UI/shaders/intel_frame.gdshader" id="intel_shader"]
 [ext_resource type="Script" uid="uid://debyhb0ptjyoc" path="res://Creative/my_creations.gd" id="my_creations_script"]
 [ext_resource type="Shader" uid="uid://cjjgnvw1sdf84" path="res://UI/shaders/logo_sheen.gdshader" id="sheen_shader"]
 [ext_resource type="Theme" uid="uid://dmlpyqe111b7r" path="res://UI/theme/sledge_theme.tres" id="sledge_theme"]
-[ext_resource type="Script" path="res://UI/_scripts/check_list.gd" id="check_list"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_backdrop"]
 shader = ExtResource("backdrop_shader")
@@ -600,30 +600,83 @@ layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 16
 
-[node name="PresetsCard" type="PanelContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn"]
+[node name="PresetsCard" type="PanelContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn" unique_id=100792934]
 layout_mode = 2
 script = ExtResource("hud_card")
 
-[node name="Body" type="VBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard"]
+[node name="Body" type="VBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard" unique_id=1672142526]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="Head" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body"]
+[node name="Head" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body" unique_id=2120928181]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="Index" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body/Head"]
+[node name="Index" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body/Head" unique_id=1700392336]
 layout_mode = 2
 theme_type_variation = &"IndexLabel"
 text = "02"
 
-[node name="Title" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body/Head"]
+[node name="Title" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body/Head" unique_id=499254525]
 layout_mode = 2
 theme_type_variation = &"HeaderLabel"
 text = "PRESETS"
 
-[node name="Rule" type="HSeparator" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body"]
+[node name="Rule" type="HSeparator" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body" unique_id=1810248988]
 layout_mode = 2
+
+[node name="PresetRow" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body" unique_id=1207938166]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PresetPicker" type="OptionButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body/PresetRow" unique_id=1316930192]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+tooltip_text = "Load a saved game design: everything on the Rules, Loadout and Drops tabs. Your team stays as it is."
+focus_mode = 0
+text_overrun_behavior = 3
+clip_text = true
+fit_to_longest_item = false
+
+[node name="PresetName" type="LineEdit" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body/PresetRow" unique_id=831368776]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Preset name"
+max_length = 32
+
+[node name="PresetButtons" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body" unique_id=1006225430]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="btn_preset_new" type="Button" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body/PresetButtons" unique_id=2056837541]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+tooltip_text = "Save everything on the three tabs as a new preset, under a new name."
+focus_mode = 0
+theme_type_variation = &"GhostButton"
+text = "NEW"
+
+[node name="btn_preset_save" type="Button" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body/PresetButtons" unique_id=1648748767]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+tooltip_text = "Save the three tabs over the preset you have loaded. With none loaded, asks for a name."
+focus_mode = 0
+theme_type_variation = &"GhostButton"
+text = "SAVE"
+
+[node name="btn_preset_delete" type="Button" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body/PresetButtons" unique_id=538899349]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+tooltip_text = "Delete the loaded preset (click twice). Delete them all and the starting presets come back."
+focus_mode = 0
+theme_type_variation = &"GhostDangerButton"
+text = "DELETE"
 
 [node name="RulesCard" type="PanelContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn" unique_id=250335412]
 layout_mode = 2
@@ -648,67 +701,14 @@ layout_mode = 2
 theme_type_variation = &"HeaderLabel"
 text = "MATCH SETUP"
 
-[node name="PresetRow" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="PresetPicker" type="OptionButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body/PresetRow"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-focus_mode = 0
-fit_to_longest_item = false
-clip_text = true
-text_overrun_behavior = 3
-tooltip_text = "Load a saved game design: everything on the Rules, Loadout and Drops tabs. Your team stays as it is."
-
-[node name="PresetName" type="LineEdit" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body/PresetRow"]
-unique_name_in_owner = true
-visible = false
-layout_mode = 2
-size_flags_horizontal = 3
-placeholder_text = "Preset name"
-max_length = 32
-
-[node name="PresetButtons" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="btn_preset_new" type="Button" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body/PresetButtons"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-focus_mode = 0
-theme_type_variation = &"GhostButton"
-tooltip_text = "Save everything on the three tabs as a new preset, under a new name."
-text = "NEW"
-
-[node name="btn_preset_save" type="Button" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body/PresetButtons"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-focus_mode = 0
-theme_type_variation = &"GhostButton"
-tooltip_text = "Save the three tabs over the preset you have loaded. With none loaded, asks for a name."
-text = "SAVE"
-
-[node name="btn_preset_delete" type="Button" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/PresetsCard/Body/PresetButtons"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-focus_mode = 0
-theme_type_variation = &"GhostDangerButton"
-tooltip_text = "Delete the loaded preset (click twice). Delete them all and the starting presets come back."
-text = "DELETE"
-
 [node name="Rule" type="HSeparator" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body" unique_id=358840282]
 layout_mode = 2
 
-[node name="Tabs" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body"]
+[node name="Tabs" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body" unique_id=1667747102]
 layout_mode = 2
 theme_override_constants/separation = 0
 
-[node name="TabRules" type="Button" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Tabs"]
+[node name="TabRules" type="Button" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Tabs" unique_id=1316777455]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -717,7 +717,7 @@ toggle_mode = true
 button_pressed = true
 text = "RULES"
 
-[node name="TabLoadout" type="Button" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Tabs"]
+[node name="TabLoadout" type="Button" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Tabs" unique_id=2104835100]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -725,7 +725,7 @@ theme_type_variation = &"NavButton"
 toggle_mode = true
 text = "LOADOUT"
 
-[node name="TabDrops" type="Button" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Tabs"]
+[node name="TabDrops" type="Button" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Tabs" unique_id=1320267989]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -733,33 +733,19 @@ theme_type_variation = &"NavButton"
 toggle_mode = true
 text = "DROPS"
 
-[node name="TabGap" type="Control" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body"]
+[node name="TabGap" type="Control" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body" unique_id=255426701]
 custom_minimum_size = Vector2(0, 6)
 layout_mode = 2
 
-[node name="Pages" type="VBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body"]
+[node name="Pages" type="VBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body" unique_id=535307205]
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="RulesPage" type="VBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages"]
+[node name="RulesPage" type="VBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages" unique_id=809408700]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/separation = 4
-
-[node name="LoadoutPage" type="VBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages"]
-unique_name_in_owner = true
-visible = false
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_constants/separation = 8
-
-[node name="DropsPage" type="VBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages"]
-unique_name_in_owner = true
-visible = false
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_constants/separation = 8
 
 [node name="TeamRow" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/RulesPage" unique_id=1927968336]
 layout_mode = 2
@@ -822,7 +808,7 @@ layout_mode = 2
 focus_mode = 0
 text = "Day / night cycle"
 
-[node name="ShieldsCheck" type="CheckButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/RulesPage"]
+[node name="ShieldsCheck" type="CheckButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/RulesPage" unique_id=1965380247]
 unique_name_in_owner = true
 layout_mode = 2
 tooltip_text = "Crafts have shields. Off: no craft has any - every hit goes to armor and life, and shield-only weapons and powerups leave the game."
@@ -830,7 +816,7 @@ focus_mode = 0
 button_pressed = true
 text = "Shields"
 
-[node name="ArmorCheck" type="CheckButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/RulesPage"]
+[node name="ArmorCheck" type="CheckButton" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/RulesPage" unique_id=1245346830]
 unique_name_in_owner = true
 layout_mode = 2
 tooltip_text = "Crafts have armor. Off: no craft has any - what gets past the shields goes straight to life."
@@ -868,6 +854,31 @@ custom_minimum_size = Vector2(170, 0)
 layout_mode = 2
 focus_mode = 0
 
+[node name="LoadoutPage" type="VBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages" unique_id=1983266895]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 8
+
+[node name="Note" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/LoadoutPage" unique_id=882743485]
+layout_mode = 2
+theme_type_variation = &"DimLabel"
+text = "The same for every player"
+
+[node name="LoadoutList" type="Tree" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/LoadoutPage" unique_id=1948563240]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+script = ExtResource("check_list")
+
+[node name="DropsPage" type="VBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages" unique_id=757790476]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 8
+
 [node name="DropsRow" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/DropsPage" unique_id=1904417737]
 layout_mode = 2
 tooltip_text = "How much loot destroyed crafts, base guns, sentries and barrels leave behind."
@@ -883,41 +894,30 @@ custom_minimum_size = Vector2(170, 0)
 layout_mode = 2
 focus_mode = 0
 
-[node name="DropsList" type="Tree" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/DropsPage"]
+[node name="DropsList" type="Tree" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/DropsPage" unique_id=2036024110]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
 script = ExtResource("check_list")
 
-[node name="DropsBulk" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/DropsPage"]
+[node name="DropsBulk" type="HBoxContainer" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/DropsPage" unique_id=557704421]
 layout_mode = 2
-alignment = 2
 theme_override_constants/separation = 6
+alignment = 2
 
-[node name="btn_drops_all" type="Button" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/DropsPage/DropsBulk"]
+[node name="btn_drops_all" type="Button" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/DropsPage/DropsBulk" unique_id=839489782]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
 theme_type_variation = &"NavButton"
 text = "ALL"
 
-[node name="btn_drops_none" type="Button" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/DropsPage/DropsBulk"]
+[node name="btn_drops_none" type="Button" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/DropsPage/DropsBulk" unique_id=1399221734]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
 theme_type_variation = &"NavButton"
 text = "NONE"
-
-[node name="Note" type="Label" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/LoadoutPage" unique_id=882743485]
-layout_mode = 2
-theme_type_variation = &"DimLabel"
-text = "The same for every player"
-
-[node name="LoadoutList" type="Tree" parent="Layout/Stage/Load Game/Create Game/Columns/SetupColumn/RulesCard/Body/Pages/LoadoutPage"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_vertical = 3
-script = ExtResource("check_list")
 
 [node name="Footer" type="PanelContainer" parent="Layout/Stage/Load Game/Create Game" unique_id=2043998472]
 layout_mode = 2

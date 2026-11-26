@@ -27,6 +27,8 @@ const SECTIONS := [
 	["Match", [
 		["F5", "Capture the recon station you are on"],
 		["Z", "Radar zoom"],
+		["[", "Highlight next teammate on the radar"],
+		["]", "Highlight next enemy on the radar"],
 		["/", "Chat"],
 		["F4", "Player list"],
 		["F12", "Screenshot"],

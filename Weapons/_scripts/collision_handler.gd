@@ -30,6 +30,8 @@ var collision_point: Vector3
 var collision_normal: Vector3
 var damage_one_off: bool = false
 var aoe_damage_one_off: bool = false
+var heal_one_off: bool = false
+var aoe_heal_one_off: bool = false
 var current_direction: Vector3
 var ricochet_count: int = 0
 var bullet_hole_one_off: bool = false
@@ -448,6 +450,11 @@ func handle_collision() -> void:
 		if weapon_settings.hit_points > 0 and not aoe_damage_one_off:
 			apply_direct_damage(weapon_settings.hit_points)
 
+		# Same idea for healing: a blast that already healed this target covers the direct hit.
+		if weapon_settings.heal_points > 0.0 and not aoe_heal_one_off and not heal_one_off:
+			_apply_heal_to(collided_object, weapon_settings.heal_points)
+			heal_one_off = true
+
 		if weapon_settings.projectile_force > 0:
 			apply_hit_force(-weapon_settings.projectile_force if reverse_force else weapon_settings.projectile_force)
 
@@ -474,7 +481,8 @@ func handle_collision() -> void:
 # detonates instead of just vanishing - e.g. a seeker stuck orbiting its
 # target still gets its push off at the end.
 func _apply_area_effects() -> void:
-	if not ((weapon_settings.explosive_force > 0 and weapon_settings.explosive_force_distance > 0) or weapon_settings.unfreeze):
+	var heals_area: bool = weapon_settings.heal_points > 0.0 and weapon_settings.explosive_force_distance > 0.0
+	if not ((weapon_settings.explosive_force > 0 and weapon_settings.explosive_force_distance > 0) or weapon_settings.unfreeze or heals_area):
 		return
 	var dist = weapon_settings.explosive_force_distance if weapon_settings.explosive_force_distance > 0 else weapon_settings.target_system_scan_radius
 	var scope_targets: Array = Utilities.GROUP_LAYER_SCOPE[allegiance_group]["target_groups"].duplicate() if Utilities.GROUP_LAYER_SCOPE.has(allegiance_group) else []
@@ -495,6 +503,9 @@ func _apply_area_effects() -> void:
 		apply_explosive_forces(result)
 		if weapon_settings.hit_points > 0:
 			apply_aoe_damage(result)
+
+	if heals_area:
+		apply_aoe_heal(result)
 
 	if weapon_settings.unfreeze:
 		unfreeze_targets(result)
@@ -567,6 +578,32 @@ func apply_aoe_damage(bodies) -> void:
 				play_crit_sound()
 			_apply_damage_to(body, varied_damage)
 	aoe_damage_one_off = true
+
+
+# Healing counterpart of apply_aoe_damage: full heal_points at the blast centre, fading to nothing at the edge.
+func apply_aoe_heal(bodies) -> void:
+	if aoe_heal_one_off:
+		return
+	for item in bodies:
+		var body = item.collider
+		if body == self:
+			continue
+		var distance = global_transform.origin.distance_to(body.global_transform.origin)
+		if distance < weapon_settings.explosive_force_distance:
+			_apply_heal_to(body, weapon_settings.heal_points * (1.0 - (distance / weapon_settings.explosive_force_distance)))
+	aoe_heal_one_off = true
+
+
+# Server-only, like _apply_damage_to. Goes straight to health_node.heal(), not through apply_damage(), so it never
+# pauses shield regen or credits the shooter. Nodes without heal() (base guns, sentries) are skipped.
+func _apply_heal_to(body: Object, amount: float) -> void:
+	if not is_instance_valid(body) or not (body is Node):
+		return
+	if weapon_settings.heal_allies_only and not (body as Node).is_in_group(team):
+		return
+	var health_node = body.get_node_or_null("health_node")
+	if health_node and health_node.has_method("heal"):
+		health_node.heal(amount)
 
 
 # Damage is only ever decided here, on the server (this whole script only
@@ -654,6 +691,8 @@ func _reset_one_offs() -> void:
 	bullet_hole_one_off = false
 	damage_one_off = false
 	aoe_damage_one_off = false
+	heal_one_off = false
+	aoe_heal_one_off = false
 
 
 # Crits are rolled on the server only, so the sound can't just play here -

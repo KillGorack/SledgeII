@@ -5,6 +5,8 @@
 [ext_resource type="Resource" uid="uid://uq7h7gd0ea86" path="res://Crafts/Settings/aegis_stats.tres" id="3_stats"]
 [ext_resource type="ArrayMesh" uid="uid://b15krk75hxfrm" path="res://Crafts/Models/Aegis/aegis_collider.obj" id="9_collider"]
 
+[ext_resource type="Texture2D" path="res://Crafts/icons/aegis.png" id="icon_tex"]
+
 [resource]
 script = ExtResource("1_def")
 id = &"aegis"
@@ -13,3 +15,4 @@ description = "Balanced, with extra armor."
 model = ExtResource("2_model")
 collider = ExtResource("9_collider")
 stats = ExtResource("3_stats")
+icon = ExtResource("icon_tex")

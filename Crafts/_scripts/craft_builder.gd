@@ -72,6 +72,8 @@ static func build(craft: RigidBody3D, def: CraftDef, team: String) -> void:
 	craft.mass = maxf(def.stats.mass, 0.1)
 	craft.get_node("DamageSmoke").position = Vector3(centre.x, top, body_box.end.z - body_box.size.z * 0.2)
 
+	# Which craft this is, readable on every peer (the target info tile shows its icon).
+	craft.set_meta(&"craft_id", def.id)
 	craft.get_node("movement_node").stats = def.stats
 	craft.get_node("health_node").stats = def.stats
 	craft.get_node("power_node").stats = def.stats

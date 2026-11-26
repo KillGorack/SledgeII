@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="WeaponSettings" format=3 uid="uid://bpjf7ixlq4m2p"]
+
+[ext_resource type="PackedScene" uid="uid://galytbjmlf8u" path="res://Weapons/Scenes/hitmarks/cracked.tscn" id="1_hjxx8"]
+[ext_resource type="Script" uid="uid://defwrtblkx02f" path="res://Weapons/_scripts/weapon_settings.gd" id="1_poc6v"]
+[ext_resource type="PackedScene" uid="uid://ccxhqgq7uepr2" path="res://Weapons/Scenes/projectiles/trail_smoke.tscn" id="2_pp823"]
+[ext_resource type="PackedScene" uid="uid://dqu4r8p4yt5jp" path="res://Weapons/Scenes/explosions/sparks.tscn" id="3_ydbuq"]
+[ext_resource type="AudioStream" uid="uid://og5melx5djbj" path="res://Game_Objects/Sounds/up.mp3" id="4_gi2k3"]
+[ext_resource type="AudioStream" uid="uid://okwlv5f3uhgb" path="res://Weapons/Sounds/Launch.mp3" id="5_jmyuy"]
+[ext_resource type="PackedScene" uid="uid://byxqkihhw08gb" path="res://Weapons/Scenes/projectiles/rocket.tscn" id="6_e8f1c"]
+[ext_resource type="Texture2D" uid="uid://c4f4umlg3diaj" path="res://Weapons/icons/missile.png" id="8_pp823"]
+
+[resource]
+script = ExtResource("1_poc6v")
+weapon_name = "Cleric Missile"
+weapon_icon = ExtResource("8_pp823")
+reload_on = 1
+heal_points = 10.0
+heal_allies_only = true
+projectile_prefab = ExtResource("6_e8f1c")
+exhaust_color = Color(0, 1, 0, 1)
+projectile_color = Color(0, 1, 0, 1)
+explosion_prefab = ExtResource("3_ydbuq")
+bullet_hole_prefab = ExtResource("1_hjxx8")
+exhaust_prefab = ExtResource("2_pp823")
+launch_sound = ExtResource("5_jmyuy")
+hit_sound = ExtResource("4_gi2k3")
+projectile_count_capacity = 999
+projectile_count_actual = 999
+metadata/_custom_type_script = "uid://defwrtblkx02f"

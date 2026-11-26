@@ -15,7 +15,7 @@ class_name CheckList
 
 signal changed
 
-const ICON_SIZE := 18
+const ICON_SIZE := 20
 const ROW_SPACING := 3
 # Ticked rows: a band in the screen's accent color (index.gd ACCENT) and bright text. Unticked: the chips' dim text.
 const ON_BAND := Color(0.56, 0.85, 0.91, 0.22)
@@ -63,7 +63,7 @@ func add_group(title: String, keep_one: bool = false) -> TreeItem:
 	return group
 
 
-func add_entry(group: TreeItem, text: String, key: String, value: Variant, tooltip: String = "", icon: Texture2D = null, checked: bool = true) -> TreeItem:
+func add_entry(group: TreeItem, text: String, key: String, value: Variant, tooltip: String = "", icon: Texture2D = null, checked: bool = true, icon_tint: Color = Color.WHITE) -> TreeItem:
 	var entry := create_item(group)
 	entry.set_cell_mode(0, TreeItem.CELL_MODE_CHECK)
 	entry.set_editable(0, true)
@@ -71,13 +71,62 @@ func add_entry(group: TreeItem, text: String, key: String, value: Variant, toolt
 	entry.set_checked(0, checked)
 	entry.set_tooltip_text(0, tooltip)
 	if icon != null:
-		entry.set_icon(0, icon)
+		entry.set_icon(0, _crisp_icon(icon))
 		entry.set_icon_max_width(0, ICON_SIZE)
+		entry.set_icon_modulate(0, icon_tint)
 	entry.set_meta(key, value)
 	entry.set_meta("default", checked)
 	_style(entry)
 	_refresh_group(group)
 	return entry
+
+
+# The Tree draws icons with plain bilinear filtering, which skips pixels when a 64px icon is squeezed into a 20px
+# row and mangles thin line art. Downscaling once with Lanczos, to the exact size it is shown at, keeps it clean.
+# Cached per texture, since every menu rebuild re-adds the same icons.
+var _icon_cache: Dictionary = {}
+# Decompressed spritesheets, so the drops list's many frames of one sheet only decode it once.
+var _sheet_cache: Dictionary = {}
+
+
+func _crisp_icon(icon: Texture2D) -> Texture2D:
+	if _icon_cache.has(icon):
+		return _icon_cache[icon]
+	var result: Texture2D = icon
+	var image := _icon_image(icon)
+	if image != null and not image.is_empty() and image.get_width() > ICON_SIZE:
+		# Stops the invisible pixels' color from bleeding dark fringes into the edges when blending.
+		image.fix_alpha_edges()
+		var height := maxi(1, roundi(float(image.get_height()) * ICON_SIZE / image.get_width()))
+		image.resize(ICON_SIZE, height, Image.INTERPOLATE_LANCZOS)
+		# A blank result means the source couldn't be read as pixels: keep the original rather than lose the icon.
+		if not image.is_invisible():
+			result = ImageTexture.create_from_image(image)
+	_icon_cache[icon] = result
+	return result
+
+
+# The icon's pixels as a plain uncompressed image (a copy, safe to edit), or null if they can't be read. An
+# AtlasTexture (the drops list's frames of the powerup sheet) is its region of the decompressed sheet.
+func _icon_image(icon: Texture2D) -> Image:
+	if icon is AtlasTexture and (icon as AtlasTexture).atlas != null:
+		var atlas := (icon as AtlasTexture).atlas
+		if not _sheet_cache.has(atlas):
+			_sheet_cache[atlas] = _plain_image(atlas.get_image())
+		var sheet: Image = _sheet_cache[atlas]
+		if sheet == null:
+			return null
+		return sheet.get_region(Rect2i((icon as AtlasTexture).region))
+	return _plain_image(icon.get_image())
+
+
+func _plain_image(image: Image) -> Image:
+	if image == null or image.is_empty():
+		return null
+	if image.is_compressed() and image.decompress() != OK:
+		return null
+	image.clear_mipmaps()
+	return image
 
 
 func remove_group(group: TreeItem) -> void:

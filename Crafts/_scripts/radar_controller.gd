@@ -1,6 +1,7 @@
 extends Control
 
 const BOOST_RING := preload("res://Crafts/_scripts/radar_boost_ring.gd")
+const SELECT_MARK := preload("res://Crafts/_scripts/radar_select_mark.gd")
 
 
 @export var target_defs: Array[RadarTargetDef] = []
@@ -128,6 +129,7 @@ func _update_blip(target: Node3D, color: Color, target_def: RadarTargetDef, orig
 	blip.size = target_def.size
 	blip.position = flat * (size / (2.0 * effective_range)) + size / 2.0 - target_def.size / 2.0
 	_update_boost_ring(blip, target)
+	_update_select_mark(blip, target)
 
 
 # A ring on the blip of any craft running weapon boosts (not your own, which
@@ -144,3 +146,31 @@ func _update_boost_ring(blip: Control, target: Node) -> void:
 		blip.add_child(ring)
 	elif not boosted and ring != null:
 		ring.queue_free()
+
+
+# Corner brackets on the blip of the craft selected with cycle_teamies / cycle_enemies (target_selector.gd).
+func _update_select_mark(blip: Control, target: Node) -> void:
+	var selector = _craft.get_node_or_null("Hud_InGame/TargetSelector")
+	var picked: bool = selector != null and selector.selected == target
+	var mark := blip.get_node_or_null("SelectMark")
+	if picked and mark == null:
+		mark = SELECT_MARK.new()
+		mark.name = "SelectMark"
+		mark.mouse_filter = MOUSE_FILTER_IGNORE
+		mark.size = blip.size
+		blip.add_child(mark)
+	elif not picked and mark != null:
+		mark.queue_free()
+
+
+# Crafts the radar is showing right now (in range at the current zoom), your own team's or everyone else's.
+# target_selector.gd cycles through these.
+func crafts_in_range(teammates: bool) -> Array:
+	var my_team := _team_of(_craft)
+	var found: Array = []
+	for target in _blips.keys():
+		if not is_instance_valid(target) or not target.is_in_group("Craft"):
+			continue
+		if (_team_of(target) == my_team) == teammates:
+			found.append(target)
+	return found

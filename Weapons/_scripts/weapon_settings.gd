@@ -20,6 +20,14 @@ enum ReloadOn { NEUTRAL, CAPTURED }
 @export var shields_factor: float = 1.0 / 3.0
 @export var armor_factor: float = 1.0 / 3.0
 @export var life_factor: float = 1.0 / 3.0
+# Healing instead of (or as well as) damage: a hit restores this much to the craft it lands on, shields first, then
+# armor, then life (health_node.gd::heal). Not a negative hit_points - that never reaches a craft (every damage path
+# requires hit_points > 0) and apply_damage() can't take it. No crits, no damage spread, and it never pauses shield
+# regen or credits the shooter. Direct hits heal the full amount; with an explosion (explosive_force_distance > 0) it
+# falls off with distance like damage does. Whom it can land on still follows friendly_fire (on = any craft).
+@export var heal_points: float = 0.0
+# Only heal the shooter's own team (the shooter included); enemies in reach are left alone.
+@export var heal_allies_only: bool = false
 @export var crit_chance: float = 0.0
 @export var crit_multiplier: float = 1.0
 @export var cool_down: float = 0.5

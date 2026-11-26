@@ -676,7 +676,7 @@ func _build_weapon_checklist() -> void:
 	for weapon_path in weapon_paths:
 		var settings: WeaponSettings = load(weapon_path)
 		if settings:
-			loadout_list.add_entry(group, settings.weapon_name, "weapon_path", weapon_path, "", settings.weapon_icon, settings.default_available)
+			loadout_list.add_entry(group, settings.weapon_name, "weapon_path", weapon_path, "", settings.weapon_icon, settings.default_available, settings.projectile_color)
 # Read off craft.tscn's saved state rather than instantiating a whole craft in the menu.
 func _craft_weapon_order() -> Array[String]:
 	var paths: Array[String] = []
@@ -704,9 +704,9 @@ func _build_mine_checklist() -> void:
 		var mine_path := MINE_CATALOG_DIR.path_join(file_name)
 		var settings: MineSettings = load(mine_path)
 		if settings:
-			loadout_list.add_entry(group, settings.mine_name, "mine_path", mine_path, settings.mine_lore, null, settings.default_available)
+			loadout_list.add_entry(group, settings.mine_name, "mine_path", mine_path, settings.mine_lore, settings.mine_icon, settings.default_available, settings.mine_color)
 	for id in SpecialCatalog.ids():
-		loadout_list.add_entry(group, SpecialCatalog.display_name(id), "special_id", id, SpecialCatalog.description(id), null, false)
+		loadout_list.add_entry(group, SpecialCatalog.display_name(id), "special_id", id, SpecialCatalog.description(id), SpecialCatalog.icon(id), false)
 func _get_checked_mine_paths() -> Array[String]:
 	var paths: Array[String] = []
 	paths.assign(loadout_list.values("mine_path", true, false))

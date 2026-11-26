@@ -1,0 +1,35 @@
+Potions (All three)
+ - ME
+
+Feather (Agility)
+ - https://www.svgrepo.com/svg/313920/feather-alt-solid
+
+Anchor (Balwark)
+ - https://www.svgrepo.com/svg/402953/anchor
+
+Blast (Crit)
+ - ME
+
+Shield (Fortitude)
+ - https://www.svgrepo.com/svg/506556/shield
+
+Snowflake (Freeze)
+ - https://publicdomainvectors.org/en/free-clipart/Snow-vector-weather-icon/1030.html
+
+Wing (Haste)
+ - ME
+
+Diamond (Perfect shot)
+ - https://www.svgrepo.com/svg/509082/diamond
+
+Ligntning (Ravenous)
+ - https://www.svgrepo.com/svg/510043/lightning
+
+Eye (Seeker)
+ - ME
+
+Arrows (Shockwave)
+ - https://www.svgrepo.com/svg/449991/arrows
+
+D20 Die
+ - Claude generated

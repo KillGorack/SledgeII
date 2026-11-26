@@ -19,6 +19,7 @@
 [ext_resource type="Resource" uid="uid://bryidariyxws7" path="res://Weapons/settings/plasma.tres" id="16_8hncv"]
 [ext_resource type="Script" uid="uid://ccjvxuanm2neh" path="res://Crafts/_scripts/speedometer.gd" id="16_speedo"]
 [ext_resource type="Texture2D" uid="uid://davch07lrofb0" path="res://Crafts/Images/hud_bezel_resize.png" id="17_jva1l"]
+[ext_resource type="Resource" uid="uid://bpjf7ixlq4m2p" path="res://Weapons/settings/Cleric.tres" id="18_v8gve"]
 [ext_resource type="Texture2D" uid="uid://clajwwr25kbxg" path="res://Crafts/Images/speedo_hole_fill_resize.png" id="19_jva1l"]
 [ext_resource type="Script" uid="uid://byqfsxl7qfit0" path="res://Crafts/_scripts/resourcemeter.gd" id="20_pax5p"]
 [ext_resource type="Script" uid="uid://mu2kfxlynak5" path="res://Crafts/_scripts/health_rings.gd" id="20_rings"]
@@ -37,6 +38,7 @@
 [ext_resource type="Resource" uid="uid://dt2vjt1ugnwss" path="res://Crafts/Settings/blip_recon.tres" id="38_8eb0h"]
 [ext_resource type="Resource" uid="uid://devapspir3vbm" path="res://Crafts/Settings/blip_projectile.tres" id="39_iyhmj"]
 [ext_resource type="PackedScene" uid="uid://cyca6s4fhq6ra" path="res://Weapons/Scenes/explosions/damage_smoke.tscn" id="damage_smoke_scene"]
+[ext_resource type="Theme" path="res://UI/theme/hud_theme.tres" id="hud_theme"]
 [ext_resource type="Script" uid="uid://dmp6mofyfrsod" path="res://Crafts/_scripts/mine_counter.gd" id="mine_counter_script"]
 [ext_resource type="Resource" uid="uid://b8h0f655falxi" path="res://Weapons/settings_mines/mine_force.tres" id="mine_force_res"]
 [ext_resource type="Resource" uid="uid://c7vrxci754dlu" path="res://Weapons/settings_mines/mine_detno.tres" id="mine_settings_res"]
@@ -159,7 +161,7 @@ public_visibility = false
 
 [node name="weapon_node" type="Node3D" parent="." unique_id=1782664371]
 script = ExtResource("7_weapon")
-weapon_settings = Array[ExtResource("10_4qjx5")]([ExtResource("15_xayyq"), ExtResource("11_twnxb"), ExtResource("12_8eb0h"), ExtResource("15_mkiv"), ExtResource("12_cannon"), ExtResource("14_detno"), ExtResource("13_repulsor"), ExtResource("16_8hncv")])
+weapon_settings = Array[ExtResource("10_4qjx5")]([ExtResource("15_xayyq"), ExtResource("11_twnxb"), ExtResource("12_8eb0h"), ExtResource("15_mkiv"), ExtResource("12_cannon"), ExtResource("14_detno"), ExtResource("13_repulsor"), ExtResource("16_8hncv"), ExtResource("18_v8gve")])
 mine_settings = Array[ExtResource("mine_settings_script")]([ExtResource("mine_settings_res"), ExtResource("mine_force_res")])
 
 [node name="Hud_InGame" type="Control" parent="." unique_id=1814334772]
@@ -169,6 +171,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+theme = ExtResource("hud_theme")
 script = ExtResource("8_hud")
 
 [node name="Reticle" type="CenterContainer" parent="Hud_InGame" unique_id=858538656]
@@ -307,7 +310,7 @@ anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
 offset_left = -226.5
-offset_top = -45.0
+offset_top = -43.0
 offset_right = -110.0
 offset_bottom = -22.0
 grow_horizontal = 2
@@ -322,7 +325,7 @@ anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
 offset_left = 115.0
-offset_top = -45.0
+offset_top = -43.0
 offset_right = 225.0
 offset_bottom = -22.0
 grow_horizontal = 2

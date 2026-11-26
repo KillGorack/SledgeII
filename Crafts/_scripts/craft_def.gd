@@ -9,6 +9,8 @@ class_name CraftDef
 @export var id: StringName
 @export var display_name: String
 @export_multiline var description: String
+# Top-down silhouette, white/grayscale: the target info tile (target_tile.gd) tints it with the craft's team color.
+@export var icon: Texture2D
 # glb with Body / Turret / Barrel meshes, origin at the turret pivot, nose on -Z
 @export var model: PackedScene
 # Simplified hull mesh (convex-hulled) used for physics instead of the visual body/turret

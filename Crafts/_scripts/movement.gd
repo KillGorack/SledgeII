@@ -25,7 +25,7 @@ const UNTURTLE_LIFT_RATIO := 0.5 # of thruster_force: just enough to take weight
 const THRUST_LOCK_MAX_MSEC := 4000
 # A shove that never lifts the craft off the ground frees the thrusters again after this long.
 const THRUST_LOCK_GROUNDED_MSEC := 500
-# After being shoved (Repulsor and friends - see apply_knockback_grace) a
+# After being shoved off the ground (Repulsor and friends - see apply_knockback_grace) a
 # landing this soon does no fall damage, so a craft thrown at a ramp keeps
 # flying instead of being killed by the impact speed. Tune freely.
 const KNOCKBACK_FALL_IMMUNITY := 0.5
@@ -303,7 +303,11 @@ func _touching_world() -> bool:
 func apply_knockback_grace(duration: float = 1.5) -> void:
 	_thrust_locked = true
 	_thrust_lock_msec = Time.get_ticks_msec()
-	_fall_immune_until_msec = max(_fall_immune_until_msec, Time.get_ticks_msec() + int(KNOCKBACK_FALL_IMMUNITY * 1000.0))
+	# Only a shove that launches a craft off the ground earns the fall immunity (thrown at a ramp, it keeps flying).
+	# A shove while it is already in the air must not start or extend it: a guided missile chasing a craft would
+	# keep the timer running, and the slam back into the ground, which should finish it, would do nothing.
+	if _has_world_contact():
+		_fall_immune_until_msec = max(_fall_immune_until_msec, Time.get_ticks_msec() + int(KNOCKBACK_FALL_IMMUNITY * 1000.0))
 	_knockback_until_msec = max(_knockback_until_msec, Time.get_ticks_msec() + int(duration * 1000.0))
 
 
