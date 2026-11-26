@@ -1561,6 +1561,7 @@ func _add_bots(per_team: int) -> void:
 			var bot_id := NetworkManager.add_bot(team, def.id)
 			var bot_name := "BOT %s" % names[made % names.size()]
 			if made >= names.size():
+				@warning_ignore("integer_division")
 				bot_name += " %d" % (made / names.size() + 1)
 			made += 1
 			_peer_names[bot_id] = bot_name

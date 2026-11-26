@@ -112,6 +112,7 @@ static func _smoothed(src: Mesh) -> Mesh:
 		var arrays := src.surface_get_arrays(s)
 		var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 		var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] if arrays[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
+		@warning_ignore("integer_division")
 		var tri_count := indices.size() / 3 if indices.size() > 0 else verts.size() / 3
 		for t in tri_count:
 			var ia := indices[t * 3] if indices.size() > 0 else t * 3

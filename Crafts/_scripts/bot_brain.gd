@@ -478,7 +478,7 @@ func _choose_weapon(distance: float) -> int:
 
 # Turret on the enemy (where it will be when the shot gets there, and allowing for drop on a shell), give or take
 # the aiming error; trigger held once it has been seen for a moment and the turret is on the mark.
-func _aim_at_enemy(distance: float) -> void:
+func _aim_at_enemy(_distance: float) -> void:
 	var settings: WeaponSettings = null
 	if weapon_index >= 0:
 		settings = _weapon.effective(_weapon.weapon_settings[weapon_index])

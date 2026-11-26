@@ -192,9 +192,9 @@ func set_all(on: bool) -> void:
 
 # Out of the list (and out of the group's tick-all) but its tick is kept, so it comes back as it was. A group header
 # hides too once all of its rows are hidden.
-func set_entry_hidden(entry: TreeItem, hidden: bool) -> void:
-	entry.visible = not hidden
-	entry.set_editable(0, not hidden)
+func set_entry_hidden(entry: TreeItem, hide_entry: bool) -> void:
+	entry.visible = not hide_entry
+	entry.set_editable(0, not hide_entry)
 	var group := entry.get_parent()
 	var any_shown := false
 	for sibling in group.get_children():
@@ -312,7 +312,9 @@ func _indeterminate_icon() -> Texture2D:
 	var w := image.get_width()
 	var h := image.get_height()
 	var bar := get_theme_color("font_color", ART_FROM)
+	@warning_ignore("integer_division")
 	var thickness := maxi(2, h / 7)
+	@warning_ignore("integer_division")
 	for y in range(h / 2 - thickness / 2, h / 2 - thickness / 2 + thickness):
 		for x in range(int(w * 0.28), int(w * 0.72)):
 			image.set_pixel(x, y, bar)
