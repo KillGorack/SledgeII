@@ -1,0 +1,31 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://cfjfjoxo7heu0"]
+
+[sub_resource type="FastNoiseLite" id="noise_a"]
+noise_type = 3
+frequency = 0.035
+
+[sub_resource type="NoiseTexture2D" id="albedo_tex"]
+noise = SubResource("noise_a")
+seamless = true
+
+[sub_resource type="FastNoiseLite" id="noise_b"]
+noise_type = 2
+frequency = 0.06
+fractal_octaves = 4
+
+[sub_resource type="NoiseTexture2D" id="normal_tex"]
+noise = SubResource("noise_b")
+seamless = true
+as_normal_map = true
+bump_strength = 6.0
+
+[resource]
+resource_name = "Rune Stone"
+albedo_color = Color(0.62, 0.6, 0.57, 1)
+albedo_texture = SubResource("albedo_tex")
+roughness = 0.92
+normal_enabled = true
+normal_scale = 1.2
+normal_texture = SubResource("normal_tex")
+uv1_scale = Vector3(0.6, 0.6, 0.6)
+uv1_triplanar = true

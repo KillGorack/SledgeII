@@ -10,10 +10,11 @@
 [ext_resource type="Resource" uid="uid://bnvqkujdmk2aj" path="res://Game_Objects/Loot/items/powerups/weapon/shockwave.tres" id="i5"]
 [ext_resource type="Resource" uid="uid://d22y3dji4e8gy" path="res://Game_Objects/Loot/items/powerups/weapon/perfect_shot.tres" id="i6"]
 [ext_resource type="Resource" uid="uid://b2q3qu66tartu" path="res://Game_Objects/Loot/items/powerups/craft/fortitude.tres" id="i7"]
-[ext_resource type="Resource" path="res://Game_Objects/Loot/items/weapons/d20.tres" id="i8"]
+[ext_resource type="Resource" uid="uid://bxf344tufmllk" path="res://Game_Objects/Loot/items/weapons/d20.tres" id="i8"]
 [ext_resource type="Resource" uid="uid://be3dafkkdh8lo" path="res://Game_Objects/Loot/items/powerups/craft/bulwark.tres" id="i9"]
-[ext_resource type="Resource" uid="uid://dr3ki5o583ed0" path="res://Game_Objects/Loot/items/powerups/craft/ravenous.tres" id="i10"]
+[ext_resource type="Resource" uid="uid://dr3ki5o583ed0" path="res://Game_Objects/Loot/items/powerups/craft/power_boost.tres" id="i10"]
+[ext_resource type="Resource" path="res://Game_Objects/Loot/items/weapons/rune.tres" id="i11"]
 
 [resource]
 script = ExtResource("1_tbl")
-items = Array[ExtResource("2_item")]([ExtResource("i0"), ExtResource("i1"), ExtResource("i2"), ExtResource("i3"), ExtResource("i4"), ExtResource("i5"), ExtResource("i6"), ExtResource("i7"), ExtResource("i8"), ExtResource("i9"), ExtResource("i10")])
+items = Array[ExtResource("2_item")]([ExtResource("i0"), ExtResource("i1"), ExtResource("i2"), ExtResource("i3"), ExtResource("i4"), ExtResource("i5"), ExtResource("i6"), ExtResource("i7"), ExtResource("i8"), ExtResource("i9"), ExtResource("i10"), ExtResource("i11")])

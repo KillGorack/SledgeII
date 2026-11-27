@@ -1,0 +1,19 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://Weapons/_scripts/rune_handler.gd" id="1_rune"]
+
+[sub_resource type="PhysicsMaterial" id="PhysicsMaterial_rune"]
+friction = 0.8
+bounce = 0.25
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_rune"]
+size = Vector3(0.4, 0.4, 0.125)
+
+[node name="Rune" type="RigidBody3D"]
+mass = 8.0
+physics_material_override = SubResource("PhysicsMaterial_rune")
+script = ExtResource("1_rune")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+visible = false
+shape = SubResource("BoxShape3D_rune")

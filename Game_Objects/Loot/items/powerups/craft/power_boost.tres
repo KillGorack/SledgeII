@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="Powerup" format=3 uid="uid://dr3ki5o583ed0"]
+
+[ext_resource type="Script" uid="uid://b870qiqrn23xt" path="res://Game_Objects/Loot/_scripts/stat_change.gd" id="1_1sjsl"]
+[ext_resource type="AudioStream" uid="uid://b5pjnn22xeox0" path="res://Game_Objects/Powerups/sounds/ding.ogg" id="2_u16i2"]
+[ext_resource type="Script" uid="uid://cnjswx5f2jmo8" path="res://Game_Objects/Loot/_scripts/powerup.gd" id="3_241vy"]
+[ext_resource type="Texture2D" uid="uid://bqrxlwpbvv6l8" path="res://Game_Objects/Powerups/Spritesheets/POWERUPS.png" id="4_kf7ag"]
+
+[sub_resource type="Resource" id="Change_0"]
+script = ExtResource("1_1sjsl")
+targets = 8
+stat = "power_gain_rate"
+mode = 1
+value = 4.0
+
+[resource]
+script = ExtResource("3_241vy")
+tint_projectiles = false
+changes = Array[ExtResource("1_1sjsl")]([SubResource("Change_0")])
+item_name = "Ravenous"
+description = "Your appetite just got the upgrade it needed."
+sheet_row = 10
+sheet = ExtResource("4_kf7ag")
+color = Color(1, 0.85, 0.1, 1)
+pickup_sound = ExtResource("2_u16i2")
+drop_weight = 1.0

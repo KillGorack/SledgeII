@@ -26,7 +26,10 @@ var weapon_settings: WeaponSettings
 var weapon_settings_path: String = ""
 var shooter_peer: int = 0
 var reverse_force: bool = false
-var net_id: int = -1
+var net_id: int = -1:
+	set(value):
+		net_id = value
+		_net_id_assigned()
 # Shared by every projectile of one trigger pull - see collision_handler.gd.
 var volley_id: int = -1
 
@@ -93,6 +96,11 @@ static func _bits_for_layers(layers: Array) -> int:
 	for layer in layers:
 		bits |= 1 << (int(layer) - 1)
 	return bits
+
+
+# Hook for subclasses that derive something from the net id (rune_handler.gd).
+func _net_id_assigned() -> void:
+	pass
 
 
 func _gravity() -> Vector3:
