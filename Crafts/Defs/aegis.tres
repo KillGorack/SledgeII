@@ -4,15 +4,14 @@
 [ext_resource type="PackedScene" uid="uid://c0n8sf47cc2ol" path="res://Crafts/Models/Aegis/Aegis.glb" id="2_model"]
 [ext_resource type="Resource" uid="uid://uq7h7gd0ea86" path="res://Crafts/Settings/aegis_stats.tres" id="3_stats"]
 [ext_resource type="ArrayMesh" uid="uid://b15krk75hxfrm" path="res://Crafts/Models/Aegis/aegis_collider.obj" id="9_collider"]
-
-[ext_resource type="Texture2D" path="res://Crafts/icons/aegis.png" id="icon_tex"]
+[ext_resource type="Texture2D" uid="uid://72bu80do5dd7" path="res://Crafts/icons/aegis.png" id="icon_tex"]
 
 [resource]
 script = ExtResource("1_def")
 id = &"aegis"
 display_name = "Aegis"
 description = "Balanced, with extra armor."
+icon = ExtResource("icon_tex")
 model = ExtResource("2_model")
 collider = ExtResource("9_collider")
 stats = ExtResource("3_stats")
-icon = ExtResource("icon_tex")

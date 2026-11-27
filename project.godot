@@ -27,6 +27,7 @@ UserData="*res://_globals/user_data.gd"
 Utilities="*uid://bkiql7527jxk1"
 NetworkManager="*res://_globals/network_manager.gd"
 ScreenCapture="*res://_globals/screen_capture.gd"
+Presence="*res://_globals/presence.gd"
 
 [display]
 

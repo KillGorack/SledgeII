@@ -21,6 +21,7 @@ const ASSETS := [
 	{"what": "Engine hum: \"SpaceShip_Engine_Large_Loop_00\" (edited to loop)", "who": "LittleRobotSoundFactory, Freesound.org", "license": "CC BY 4.0", "url": "https://freesound.org/people/LittleRobotSoundFactory/sounds/270539"},
 	{"what": "Menu music: \"Break The Line\" (Uppbeat license code HYHE2XELUFQRVHCC)", "who": "Abbynoise, Uppbeat", "license": "Uppbeat free license", "url": "https://uppbeat.io/c/abbynoise"},
 	{"what": "Powerup icons (adapted into 3D medallions): feather, anchor, shield, diamond, lightning, arrows", "who": "SVG Repo: Icons8, joypixels, primefaces, Orchid, zest, ShopWare", "license": "MIT", "url": "https://www.svgrepo.com"},
+	{"what": "Discord Rich Presence addon", "who": "SlayHorizon", "license": "MIT", "url": "https://github.com/SlayHorizon/discord-rich-presence-godot"},
 	{"what": "Map rating icons: thumbs-up, thumbs-down", "who": "Lucide Contributors", "license": "ISC", "url": "https://lucide.dev"},
 	{"what": "Menu font: Orbitron", "who": "The Orbitron Project Authors", "license": "SIL OFL 1.1", "url": "https://github.com/theleagueof/orbitron"},
 	{"what": "Menu font: Rajdhani", "who": "Indian Type Foundry", "license": "SIL OFL 1.1", "url": "https://fonts.google.com/specimen/Rajdhani"},
