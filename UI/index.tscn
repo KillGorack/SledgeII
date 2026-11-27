@@ -7,9 +7,12 @@
 [ext_resource type="Script" uid="uid://6o1mi31qspyp" path="res://UI/_scripts/check_list.gd" id="check_list"]
 [ext_resource type="Script" uid="uid://dyeor4xjf63j4" path="res://UI/_scripts/hud_card.gd" id="hud_card"]
 [ext_resource type="Shader" uid="uid://dge5ni8gu6je2" path="res://UI/shaders/intel_frame.gdshader" id="intel_shader"]
+[ext_resource type="Script" uid="uid://bsnccu8ekbcmf" path="res://UI/_scripts/keybind_panel.gd" id="keybind_panel"]
 [ext_resource type="Script" uid="uid://debyhb0ptjyoc" path="res://Creative/my_creations.gd" id="my_creations_script"]
 [ext_resource type="Shader" uid="uid://cjjgnvw1sdf84" path="res://UI/shaders/logo_sheen.gdshader" id="sheen_shader"]
 [ext_resource type="Theme" uid="uid://dmlpyqe111b7r" path="res://UI/theme/sledge_theme.tres" id="sledge_theme"]
+[ext_resource type="Script" uid="uid://bg7rj45odwhv2" path="res://UI/_scripts/sound_panel.gd" id="sound_panel"]
+[ext_resource type="Script" uid="uid://chkk7i1c2auin" path="res://UI/_scripts/video_panel.gd" id="video_panel"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_backdrop"]
 shader = ExtResource("backdrop_shader")
@@ -364,13 +367,12 @@ theme_override_constants/margin_left = 20
 theme_override_constants/margin_top = 20
 theme_override_constants/margin_right = 20
 theme_override_constants/margin_bottom = 20
+script = ExtResource("sound_panel")
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 20
 metadata/_tab_index = 0
-
-[node name="Placeholder" type="Label" parent="Layout/Stage/Settings/Body/Tabs/Sounds" unique_id=453716563]
-layout_mode = 2
-size_flags_vertical = 0
-theme_type_variation = &"DimLabel"
-text = "Sound settings are coming soon."
 
 [node name="Video" type="MarginContainer" parent="Layout/Stage/Settings/Body/Tabs" unique_id=1838845534]
 visible = false
@@ -379,13 +381,12 @@ theme_override_constants/margin_left = 20
 theme_override_constants/margin_top = 20
 theme_override_constants/margin_right = 20
 theme_override_constants/margin_bottom = 20
+script = ExtResource("video_panel")
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 20
 metadata/_tab_index = 1
-
-[node name="Placeholder" type="Label" parent="Layout/Stage/Settings/Body/Tabs/Video" unique_id=410326992]
-layout_mode = 2
-size_flags_vertical = 0
-theme_type_variation = &"DimLabel"
-text = "Video settings are coming soon."
 
 [node name="Inputs" type="MarginContainer" parent="Layout/Stage/Settings/Body/Tabs" unique_id=729349995]
 visible = false
@@ -394,13 +395,12 @@ theme_override_constants/margin_left = 20
 theme_override_constants/margin_top = 20
 theme_override_constants/margin_right = 20
 theme_override_constants/margin_bottom = 20
+script = ExtResource("keybind_panel")
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 20
 metadata/_tab_index = 2
-
-[node name="Placeholder" type="Label" parent="Layout/Stage/Settings/Body/Tabs/Inputs" unique_id=78300954]
-layout_mode = 2
-size_flags_vertical = 0
-theme_type_variation = &"DimLabel"
-text = "Input settings are coming soon."
 
 [node name="Credits" type="PanelContainer" parent="Layout/Stage" unique_id=145186606]
 unique_name_in_owner = true

@@ -7,43 +7,38 @@ extends CenterContainer
 const KEY_COLOR := Color(1.0, 0.8, 0.3)
 const KEY_WIDTH := 150.0
 
+# A row's key is either text, or an array of actions whose current keys are shown (Keybinds, rebindable in
+# Settings > Inputs).
 const SECTIONS := [
 	["Driving", [
-		["Up / Down", "Drive forward / back"],
-		["Left / Right", "Turn"],
-		["R", "Rockets: thrust (when the host allows them)"],
+		[["ui_up", "ui_down"], "Drive forward / back"],
+		[["ui_left", "ui_right"], "Turn"],
+		[["rockets"], "Rockets: thrust (when the host allows them)"],
 		["", "An upside-down craft rights itself"]]],
 	["Aiming and firing", [
-		["W A S D", "Turn the turret / tilt the barrel"],
-		["Shift", "Hold while aiming for fine aim"],
-		["X", "Recentre the turret"],
-		["Space", "Fire"],
-		["Shift + Space", "Fire reversed: pulls where it would push"],
-		["Tab", "Next weapon"]]],
+		[["camera_left", "camera_up", "camera_right", "camera_down"], "Turn the turret / tilt the barrel"],
+		[["ui_shift"], "Hold while aiming for fine aim"],
+		[["ui_recenter"], "Recentre the turret"],
+		[["fire_weapon"], "Fire"],
+		[["reverso", "fire_weapon"], "Fire reversed: pulls where it would push", " + "],
+		[["weapon_change"], "Next weapon"]]],
 	["Specials", [
-		["Shift + Tab", "Next special (mines, Controller)"],
-		["M", "Use it: lay a mine / call a base gun to you"],
-		["Shift + M", "Blow your mines / send your base guns home"]]],
+		[["change_specials"], "Next special (mines, Controller)"],
+		[["lay_mine"], "Use it: lay a mine / call a base gun to you"],
+		[["blow_mines"], "Blow your mines / send your base guns home"]]],
 	["Match", [
-		["F5", "Capture the recon station you are on"],
-		["Z", "Radar zoom"],
-		["[", "Highlight next teammate on the radar"],
-		["]", "Highlight next enemy on the radar"],
-		["/", "Chat"],
-		["F4", "Player list"],
-		["F12", "Screenshot"],
-		["Alt + Q", "Leave to the main menu"],
-		["F1", "Show / hide this help"]]],
+		[["capture_recon"], "Capture the recon station you are on"],
+		[["zoom_radar"], "Radar zoom"],
+		[["cycle_teamies"], "Highlight next teammate on the radar"],
+		[["cycle_enemies"], "Highlight next enemy on the radar"],
+		[["start_chat"], "Chat"],
+		[["player_list"], "Player list"],
+		[["screen_capture"], "Screenshot"],
+		[["exit_main"], "Leave to the main menu"],
+		[["show_help"], "Show / hide this help"]]],
 ]
 
-
 func _ready() -> void:
-	# Registered here rather than in project.godot's Input Map, same as the player list's F4.
-	if not InputMap.has_action("show_help"):
-		InputMap.add_action("show_help")
-		var key := InputEventKey.new()
-		key.physical_keycode = KEY_F1
-		InputMap.action_add_event("show_help", key)
 	visible = false
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -73,7 +68,7 @@ func _ready() -> void:
 			line.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			line.add_theme_constant_override("separation", 16)
 			var key_label := Label.new()
-			key_label.text = row[0]
+			key_label.text = _row_text(row)
 			key_label.custom_minimum_size = Vector2(KEY_WIDTH, 0)
 			key_label.add_theme_color_override("font_color", KEY_COLOR)
 			line.add_child(key_label)
@@ -85,6 +80,14 @@ func _ready() -> void:
 		gap.custom_minimum_size = Vector2(0, 6)
 		gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		column.add_child(gap)
+
+
+# A row's third entry, when it has one, is what goes between the keys (default " / ").
+func _row_text(row: Array) -> String:
+	var key = row[0]
+	if key is Array:
+		return (row[2] if row.size() > 2 else " / ").join(key.map(Keybinds.key_text))
+	return key
 
 
 func _unhandled_input(event: InputEvent) -> void:

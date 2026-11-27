@@ -21,7 +21,8 @@ class_name Powerup
 
 # Craft stats something actually reads (through PowerupState.factor). A Craft change naming anything else does
 # nothing, so check() warns about it. Add the name here when a new system starts reading one.
-const CRAFT_STATS := ["regeneration_rate", "regeneration_delay", "knockback", "power_gain_rate"]
+const CRAFT_STATS := ["regeneration_rate", "regeneration_delay", "knockback", "power_gain_rate",
+		"max_speed", "acceleration", "deceleration", "turn_speed", "turn_acceleration", "turn_deceleration"]
 
 static var _checked: Dictionary = {} # resource_path -> true, so each powerup is only checked once per run
 

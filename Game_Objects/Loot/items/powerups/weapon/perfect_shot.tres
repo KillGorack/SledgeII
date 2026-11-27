@@ -20,5 +20,5 @@ sheet_row = 9
 sheet = ExtResource("4_nftsv")
 color = Color(1, 0, 1, 1)
 pickup_sound = ExtResource("3_snd")
-drop_weight = 1.0
+drop_weight = 0.5
 requires = 4

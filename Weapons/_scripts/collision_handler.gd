@@ -633,9 +633,26 @@ func _apply_damage_to(body: Object, damage: float) -> void:
 	var health_node = body.get_node_or_null("health_node")
 	if health_node and health_node.has_method("apply_damage"):
 		var cause: int = health_node.DeathCause.BASE_GUN if shooter_peer == 0 else health_node.DeathCause.WEAPON
+		var before: float = health_node.pool_total() if weapon_settings.lifesteal > 0.0 and health_node.has_method("pool_total") else -1.0
 		DamageRouting.deal(health_node, damage, weapon_settings.damage_routing, weapon_settings.pool_factors(), shooter_peer, cause)
+		if before >= 0.0:
+			_steal_life(body, before - health_node.pool_total())
 		if _match_node:
 			_match_node.note_weapon_hit(volley_id, shooter_peer, team, weapon_settings.weapon_name, body)
+
+
+# Server-only. Life steal (weapon_settings.lifesteal): the shooter's craft gets a fraction of the damage that really
+# landed on an enemy craft, through health_node.heal() - so it is the server's own number, replicated like any other
+# heal, and never touches shield regen. Base guns (peer 0), your own team and yourself don't count.
+func _steal_life(target: Object, dealt: float) -> void:
+	if dealt <= 0.0 or shooter_peer <= 0 or not (target is Node) or (target as Node).is_in_group(team):
+		return
+	for craft in get_tree().get_nodes_in_group("Craft"):
+		if Utilities.craft_owner_id(craft) == shooter_peer:
+			var shooter_health := craft.get_node_or_null("health_node")
+			if shooter_health != null and shooter_health.has_method("heal"):
+				shooter_health.heal(dealt * weapon_settings.lifesteal)
+			return
 
 
 # Routed through the target's health_node instead of being applied straight

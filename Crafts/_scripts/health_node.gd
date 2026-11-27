@@ -288,6 +288,12 @@ func powerup_granted(powerup: Powerup) -> void:
 		shields = _shields_max
 
 
+# What is left across all three pools (a negative life counts as 0). The difference before and after a hit is the
+# damage that really landed - see collision_handler.gd::_apply_damage_to (life steal).
+func pool_total() -> float:
+	return shields + armor + maxf(life, 0.0)
+
+
 # Server-only. Restores `amount` in this order: shields, then armor, then life. (Shields
 # also regenerate on their own; station healing below doesn't touch them.) Returns whether anything was restored, so
 # a pickup can be left alone by a craft that's already full.

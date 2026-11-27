@@ -28,6 +28,9 @@ Utilities="*uid://bkiql7527jxk1"
 NetworkManager="*res://_globals/network_manager.gd"
 ScreenCapture="*res://_globals/screen_capture.gd"
 Presence="*res://_globals/presence.gd"
+Keybinds="*res://_globals/keybinds.gd"
+VideoSettings="*res://_globals/video_settings.gd"
+AudioSettings="*res://_globals/audio_settings.gd"
 
 [display]
 

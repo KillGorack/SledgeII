@@ -153,7 +153,7 @@ var selected_game_row = null
 
 
 # The Settings screen is built but left out of the menu for now; set this to true to bring its button back.
-const SHOW_SETTINGS := false
+const SHOW_SETTINGS := true
 
 # Menu music: "Break The Line" by Abbynoise (Uppbeat, credited in credits.gd). It lives on this scene, so it
 # stops by itself when a match loads and starts again when the player comes back to the menu.

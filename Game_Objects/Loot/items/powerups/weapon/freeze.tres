@@ -26,5 +26,5 @@ sheet_row = 7
 sheet = ExtResource("4_kmlwm")
 color = Color(0.7427274, 0.8670796, 1, 1)
 pickup_sound = ExtResource("3_snd")
-drop_weight = 1.0
+drop_weight = 0.25
 requires = 4

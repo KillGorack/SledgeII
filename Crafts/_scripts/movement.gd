@@ -224,7 +224,7 @@ func setFreezeState(frozen: bool) -> void:
 func get_speed_ratio() -> float:
 	if body == null or stats == null or stats.max_speed <= 0.0:
 		return 0.0
-	return clamp(body.linear_velocity.length() / stats.max_speed, 0.0, 1.0)
+	return clamp(body.linear_velocity.length() / _stat("max_speed"), 0.0, 1.0)
 
 
 
@@ -524,10 +524,10 @@ func recenter_turret_barrel():
 func adjust_rotation(turn_input, delta):
 	if stop_forces:
 		return
-	var rate = stats.turn_acceleration if turn_input != 0 else stats.turn_deceleration
+	var rate = _stat("turn_acceleration") if turn_input != 0 else _stat("turn_deceleration")
 	current_turn_speed = move_toward(
 		current_turn_speed,
-		turn_input * stats.turn_speed,
+		turn_input * _stat("turn_speed"),
 		rate * delta
 	)
 	var angular_velocity = body.angular_velocity
@@ -543,11 +543,11 @@ func move_player(forward_input):
 		return
 	var direction = body.transform.basis.z
 	if forward_input != 0:
-		var force = direction * forward_input * stats.acceleration * _weight_scale()
+		var force = direction * forward_input * _stat("acceleration") * _weight_scale()
 		body.apply_central_force(force)
 	else:
 		var current_velocity = body.get_linear_velocity()
-		var deceleration_force = -current_velocity * stats.deceleration * _weight_scale()
+		var deceleration_force = -current_velocity * _stat("deceleration") * _weight_scale()
 		body.apply_central_force(deceleration_force)
 	if isGrounded and not _is_knockback_active():
 		# Top speed limits how fast the craft travels ALONG the ground. The part of its velocity toward or
@@ -556,7 +556,7 @@ func move_player(forward_input):
 		var up := body.global_basis.y
 		var velocity := body.linear_velocity
 		var off_ground := up * velocity.dot(up)
-		body.linear_velocity = off_ground + (velocity - off_ground).limit_length(stats.max_speed)
+		body.linear_velocity = off_ground + (velocity - off_ground).limit_length(_stat("max_speed"))
 
 
 
@@ -566,8 +566,12 @@ func update_engine_sound():
 	if engine_audio:
 		var speed : float = body.get_linear_velocity().length()
 		if isGrounded:
-			target_pitch = clamp(2.0 + speed / max(stats.max_speed, 1.0) * 2.0, 2.0, 4.0) * ui_pitch * stats.engine_pitch
-			target_volume = clamp(-20 + 10 * (speed / max(stats.max_speed, 1.0)), -60.0, -20.0)
+			# Measured against the craft's normal top speed, and the ceiling rises with a speed powerup (Agility),
+			# so going faster than you ever could sounds faster instead of topping out at the same note.
+			var ratio: float = speed / max(stats.max_speed, 1.0)
+			var ceiling: float = 2.0 + 2.0 * maxf(_stat("max_speed") / stats.max_speed, 1.0)
+			target_pitch = clamp(2.0 + ratio * 2.0, 2.0, ceiling) * ui_pitch * stats.engine_pitch
+			target_volume = clamp(-20 + 10 * ratio, -60.0, -20.0)
 		else:
 			target_pitch = 2.0 * ui_pitch * stats.engine_pitch
 			target_volume = -20.0
@@ -677,6 +681,13 @@ func activate_thrusters(delta):
 
 
 # How much heavier than the tuning weight this craft is. Its own pushes are multiplied by this so it drives as tuned.
+# A driving stat with any running powerup applied (Agility scales all of them, see Powerup.CRAFT_STATS).
+func _stat(stat_name: String) -> float:
+	var value: float = stats.get(stat_name)
+	var weapon_node := get_node_or_null("../weapon_node")
+	return value * weapon_node.powerups.factor(stat_name) if weapon_node != null else value
+
+
 func _weight_scale() -> float:
 	return (stats.mass if stats else REFERENCE_MASS) / REFERENCE_MASS
 

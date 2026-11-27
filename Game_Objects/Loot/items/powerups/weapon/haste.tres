@@ -20,4 +20,4 @@ sheet_row = 8
 sheet = ExtResource("4_mes5h")
 color = Color(0.2, 0.9, 0.7, 1)
 pickup_sound = ExtResource("3_snd")
-drop_weight = 1.0
+drop_weight = 0.25

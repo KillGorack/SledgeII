@@ -14,13 +14,6 @@ var _columns: Dictionary = {}
 
 
 func _ready() -> void:
-	# Registered here rather than in project.godot's Input Map; a binding added
-	# there later wins, since this only fills it in when it's missing.
-	if not InputMap.has_action("player_list"):
-		InputMap.add_action("player_list")
-		var key := InputEventKey.new()
-		key.physical_keycode = KEY_F4
-		InputMap.action_add_event("player_list", key)
 	visible = false
 	# Full-screen, centering the panel in the middle of the screen.
 	mouse_filter = Control.MOUSE_FILTER_IGNORE

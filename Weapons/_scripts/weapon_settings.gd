@@ -28,6 +28,11 @@ enum ReloadOn { NEUTRAL, CAPTURED }
 @export var heal_points: float = 0.0
 # Only heal the shooter's own team (the shooter included); enemies in reach are left alone.
 @export var heal_allies_only: bool = false
+# Life steal: the SHOOTER is healed this fraction of the damage this weapon really takes off an enemy craft (0.1 = 10%),
+# shields first, then armor, then life. The target takes exactly what it would have anyway. Only damage that landed
+# counts (an empty pool, a dead target or a builder's immunity give nothing back), and hits on your own team or
+# yourself never heal. Set by a powerup (Defence Drain), see collision_handler.gd::_apply_damage_to.
+@export var lifesteal: float = 0.0
 @export var crit_chance: float = 0.0
 @export var crit_multiplier: float = 1.0
 @export var cool_down: float = 0.5

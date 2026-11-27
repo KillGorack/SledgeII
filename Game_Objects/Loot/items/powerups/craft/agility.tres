@@ -1,0 +1,60 @@
+[gd_resource type="Resource" script_class="Powerup" format=3]
+
+[ext_resource type="Script" path="res://Game_Objects/Loot/_scripts/powerup.gd" id="1_pw"]
+[ext_resource type="Script" path="res://Game_Objects/Loot/_scripts/stat_change.gd" id="2_sc"]
+[ext_resource type="AudioStream" uid="uid://b5pjnn22xeox0" path="res://Game_Objects/Powerups/sounds/ding.ogg" id="3_snd"]
+[ext_resource type="Texture2D" uid="uid://bqrxlwpbvv6l8" path="res://Game_Objects/Powerups/Spritesheets/POWERUPS.png" id="4_sheet"]
+
+[sub_resource type="Resource" id="Change_0"]
+script = ExtResource("2_sc")
+targets = 8
+stat = "max_speed"
+mode = 1
+value = 1.4
+
+[sub_resource type="Resource" id="Change_1"]
+script = ExtResource("2_sc")
+targets = 8
+stat = "acceleration"
+mode = 1
+value = 1.6
+
+[sub_resource type="Resource" id="Change_2"]
+script = ExtResource("2_sc")
+targets = 8
+stat = "deceleration"
+mode = 1
+value = 1.6
+
+[sub_resource type="Resource" id="Change_3"]
+script = ExtResource("2_sc")
+targets = 8
+stat = "turn_speed"
+mode = 1
+value = 1.3
+
+[sub_resource type="Resource" id="Change_4"]
+script = ExtResource("2_sc")
+targets = 8
+stat = "turn_acceleration"
+mode = 1
+value = 1.6
+
+[sub_resource type="Resource" id="Change_5"]
+script = ExtResource("2_sc")
+targets = 8
+stat = "turn_deceleration"
+mode = 1
+value = 1.6
+
+[resource]
+script = ExtResource("1_pw")
+tint_projectiles = false
+changes = Array[ExtResource("2_sc")]([SubResource("Change_0"), SubResource("Change_1"), SubResource("Change_2"), SubResource("Change_3"), SubResource("Change_4"), SubResource("Change_5")])
+item_name = "Agility"
+description = "Light on your treads: a higher top speed, quicker take-off, sharper turns, and you stop on a dime."
+sheet_row = 3
+sheet = ExtResource("4_sheet")
+color = Color(0.3, 0.55, 1, 1)
+pickup_sound = ExtResource("3_snd")
+drop_weight = 0.25

@@ -32,5 +32,5 @@ sheet_row = 13
 sheet = ExtResource("4_lugch")
 color = Color(0.8, 0.3, 0.8, 1)
 pickup_sound = ExtResource("3_snd")
-drop_weight = 1.0
+drop_weight = 0.25
 requires = 4

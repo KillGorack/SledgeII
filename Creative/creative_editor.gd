@@ -134,40 +134,47 @@ func _process(delta: float) -> void:
 func _unhandled_key_input(event: InputEvent) -> void:
 	if not event is InputEventKey or not event.pressed or event.echo:
 		return
-	var key: Key = event.physical_keycode
-	if key == KEY_B:
+	# Exact match: Shift+Tab is "previous tool", not "next tool with Shift held". Keys are the player's own
+	# (Settings > Inputs, see Keybinds.REGISTRY).
+	if _pressed(event, "build_toggle"):
 		_toggle_building()
-	elif key == KEY_F1:
+	elif _pressed(event, "build_help"):
 		_help.visible = not _help.visible
-	elif key == KEY_F5:
+	elif _pressed(event, "build_save"):
 		_save()
 	elif not NetworkManager.creative_building:
 		return
-	elif key == KEY_Z and event.ctrl_pressed:
+	elif _pressed(event, "build_undo"):
 		_undo_last()
-	elif key == KEY_TAB:
-		_select_tool(posmod(_tool + (-1 if event.shift_pressed else 1), _tools.size()))
-	elif key == KEY_SPACE:
+	elif _pressed(event, "build_tool_prev"):
+		_select_tool(posmod(_tool - 1, _tools.size()))
+	elif _pressed(event, "build_tool_next"):
+		_select_tool(posmod(_tool + 1, _tools.size()))
+	elif _pressed(event, "build_use"):
 		_use_tool()
-	elif key == KEY_F:
+	elif _pressed(event, "build_remove"):
 		_remove()
-	elif key == KEY_I:
+	elif _pressed(event, "build_rotate_x"):
 		_rotate(Vector3.RIGHT)
-	elif key == KEY_J:
+	elif _pressed(event, "build_rotate_y"):
 		_rotate(Vector3.UP)
-	elif key == KEY_K:
+	elif _pressed(event, "build_rotate_z"):
 		_rotate(Vector3.BACK)
-	elif key == KEY_BRACKETLEFT:
+	elif _pressed(event, "build_narrower"):
 		_resize(-1.0, 0.0)
-	elif key == KEY_BRACKETRIGHT:
+	elif _pressed(event, "build_wider"):
 		_resize(1.0, 0.0)
-	elif key == KEY_MINUS:
+	elif _pressed(event, "build_shorter"):
 		_resize(0.0, -1.0)
-	elif key == KEY_EQUAL:
+	elif _pressed(event, "build_taller"):
 		_resize(0.0, 1.0)
 	else:
 		return
 	get_viewport().set_input_as_handled()
+
+
+func _pressed(event: InputEvent, action: String) -> bool:
+	return event.is_action_pressed(action, false, true)
 
 
 # --- actions ---------------------------------------------------------------
@@ -706,21 +713,22 @@ func _build_help() -> Control:
 	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.add_theme_constant_override("separation", 4)
 	margin.add_child(column)
+	var k := Keybinds
 	var sections := [
 		["Anywhere", [
-			["B", "Switch between building and testing"],
-			["F5", "Save (it also saves itself every 30 seconds)"],
-			["F1", "Show / hide this help"]]],
+			[k.key_text("build_toggle"), "Switch between building and testing"],
+			[k.key_text("build_save"), "Save (it also saves itself every 30 seconds)"],
+			[k.key_text("build_help"), "Show / hide this help"]]],
 		["Building", [
-			["Tab / Shift+Tab", "Next / previous tool (or click one on the left)"],
-			["Space", "Use the tool: place, paint or remove what you are aiming at"],
-			["F", "Remove what you are aiming at, whatever tool you hold"],
-			["Ctrl+Z", "Undo the last place, paint or remove (one step)"],
-			["I   J   K", "Turn 90 degrees about X, Y or Z"],
-			["[   ]", "Surface: narrower / wider"],
-			["-   =", "Surface: shorter / taller"]]],
+			[k.keys_text(["build_tool_next", "build_tool_prev"]), "Next / previous tool (or click one on the left)"],
+			[k.key_text("build_use"), "Use the tool: place, paint or remove what you are aiming at"],
+			[k.key_text("build_remove"), "Remove what you are aiming at, whatever tool you hold"],
+			[k.key_text("build_undo"), "Undo the last place, paint or remove (one step)"],
+			[k.keys_text(["build_rotate_x", "build_rotate_y", "build_rotate_z"]), "Turn 90 degrees about X, Y or Z"],
+			[k.keys_text(["build_narrower", "build_wider"]), "Surface: narrower / wider"],
+			[k.keys_text(["build_shorter", "build_taller"]), "Surface: shorter / taller"]]],
 		["Notes", [
-			["Paint", "Pick a texture on the right (also shown for surfaces and ramps), then aim and press Space"],
+			["Paint", "Pick a texture on the right (also shown for surfaces and ramps), then aim and press " + k.key_text("build_use")],
 			["Team", "Pads, turrets and recons take the team colour you pick"],
 			["Environment", "Sliders for the look of the level; nothing is placed"]]],
 	]
