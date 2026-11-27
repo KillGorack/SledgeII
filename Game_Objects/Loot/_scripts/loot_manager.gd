@@ -95,7 +95,7 @@ func _pick(table: LootTable, facts: Dictionary) -> LootItem:
 # The host's pick from the Drops tab (NetworkManager.allowed_loot); null = everything.
 func _allowed(item: LootItem) -> bool:
 	var allowed = NetworkManager.allowed_loot
-	return allowed == null or allowed.has(item.resource_path)
+	return item.easter_egg or allowed == null or allowed.has(item.resource_path)
 
 
 func _level() -> Dictionary:

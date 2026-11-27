@@ -53,6 +53,8 @@ enum Requires { ALWAYS, POWER, RECONS, DAMAGE, MISSILE, SHIELDS }
 # Relative weight inside its table - only meaningful next to the others.
 @export var drop_weight: float = 10.0
 @export var requires: Requires = Requires.ALWAYS
+# Easter egg: hidden from the host's Drops list and exempt from its picks - always in the table, whatever the host chose.
+@export var easter_egg: bool = false
 # Seconds it sits on the floor before vanishing (blinks for the last few).
 @export var lifetime: float = 25.0
 

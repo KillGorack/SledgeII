@@ -98,6 +98,7 @@ func _ready() -> void:
 	# Every projectile can strike a thrown object (see handle_collision).
 	if is_multiplayer_authority():
 		collision_mask |= OBJECT_LAYER_BIT
+		_enable_ally_contact()
 	if not is_multiplayer_authority():
 		# Cosmetic copy - see the header comment. Frozen so the physics engine
 		# never moves it (_cosmetic_step does), and collision-free so it can't
@@ -114,6 +115,20 @@ func _ready() -> void:
 	if weapon_settings:
 		_apply_projectile_color(weapon_settings.projectile_color)
 		_spawn_exhaust()
+
+
+# Ally-healing shots (Cleric): the team's projectile mask only lists ENEMY craft layers, so without this they fly
+# straight through teammates. Adds the team's own craft layer and exempts the shooter's own craft, so it can't
+# strike the craft that launched it.
+func _enable_ally_contact() -> void:
+	if weapon_settings == null or weapon_settings.heal_points <= 0.0 or not weapon_settings.heal_allies_only:
+		return
+	if not Utilities.GROUP_LAYER_SCOPE.has(team):
+		return
+	collision_mask |= 1 << (int(Utilities.GROUP_LAYER_SCOPE[team]["layer"]) - 1)
+	for craft in get_tree().get_nodes_in_group(team):
+		if craft is PhysicsBody3D and Utilities.craft_owner_id(craft) == shooter_peer:
+			add_collision_exception_with(craft)
 
 
 func _gravity() -> Vector3:
@@ -450,13 +465,15 @@ func handle_collision() -> void:
 		if weapon_settings.hit_points > 0 and not aoe_damage_one_off:
 			apply_direct_damage(weapon_settings.hit_points)
 
-		# Same idea for healing: a blast that already healed this target covers the direct hit.
-		if weapon_settings.heal_points > 0.0 and not aoe_heal_one_off and not heal_one_off:
-			_apply_heal_to(collided_object, weapon_settings.heal_points)
-			heal_one_off = true
-
 		if weapon_settings.projectile_force > 0:
 			apply_hit_force(-weapon_settings.projectile_force if reverse_force else weapon_settings.projectile_force)
+
+	# Healing: a blast that already healed this target covers the direct hit. Outside the targeted_group check
+	# above on purpose - that is only true for enemies, and a heal's whole point is landing on teammates.
+	# _apply_heal_to applies heal_allies_only.
+	if weapon_settings.heal_points > 0.0 and not aoe_heal_one_off and not heal_one_off:
+		_apply_heal_to(collided_object, weapon_settings.heal_points)
+		heal_one_off = true
 
 	# Shooting a thrown object (object_handler.gd): no team to damage, but it
 	# should still get shoved. Uses the weapon's projectile_force, or a

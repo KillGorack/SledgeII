@@ -2,12 +2,12 @@
 
 [ext_resource type="PackedScene" path="res://Weapons/Scenes/projectiles/rune.tscn" id="1_scene"]
 [ext_resource type="Script" uid="uid://defwrtblkx02f" path="res://Weapons/_scripts/weapon_settings.gd" id="2_script"]
-[ext_resource type="Texture2D" uid="uid://x87wep10td1q" path="res://Weapons/icons/D20.png" id="3_icon"]
+[ext_resource type="Texture2D" uid="uid://cfx3ocs4l5gs3" path="res://Weapons/icons/rune.png" id="3_g7kbw"]
 
 [resource]
 script = ExtResource("2_script")
 weapon_name = "Rune"
-weapon_icon = ExtResource("3_icon")
+weapon_icon = ExtResource("3_g7kbw")
 cool_down = 0.1
 projectile_prefab = ExtResource("1_scene")
 weapon_kind = 2

@@ -765,7 +765,7 @@ func _build_drops_checklist() -> void:
 			continue
 		var group := drops_list.add_group(group_name)
 		for item in grouped[group_name]:
-			if item == null or item.resource_path.is_empty():
+			if item == null or item.resource_path.is_empty() or item.easter_egg:
 				continue
 			var entry := drops_list.add_entry(group, item.item_name, "loot_path", item.resource_path, item.description, item.get_icon())
 			entry.set_meta("loot_item", item)

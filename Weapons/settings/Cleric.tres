@@ -26,4 +26,5 @@ launch_sound = ExtResource("5_jmyuy")
 hit_sound = ExtResource("4_gi2k3")
 projectile_count_capacity = 999
 projectile_count_actual = 999
+friendly_fire = true
 metadata/_custom_type_script = "uid://defwrtblkx02f"
