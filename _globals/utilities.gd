@@ -124,6 +124,14 @@ func set_allegiance(body: Node3D, group_name: String):
 # Whose craft this is: the player (or bot) id it scores for, takes credit for, and is named after. For a player it
 # is also the peer simulating it (its multiplayer authority); a bot is simulated by the host (authority 1) but keeps
 # its own id here - see match.gd::_spawn_craft.
+# Server only. The peers whose match scene (and so the level and everything in it) exists. A plain .rpc() on a node
+# inside the level also reaches peers still loading, which have no such node and log "Node not found" for every call -
+# send to these with rpc_id instead. Whatever a loading peer misses is caught up when it reports ready.
+func ready_peers() -> Array:
+	var match_node := get_tree().get_first_node_in_group("match")
+	return match_node._ready_peers.keys() if match_node != null else []
+
+
 func craft_owner_id(craft: Node) -> int:
 	return int(craft.get_meta(&"owner_id", craft.get_multiplayer_authority()))
 

@@ -32,7 +32,10 @@ func _init() -> void:
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	if not is_multiplayer_authority():
+	# The HUD's authority, not this node's own: this node is made in code (hud_controller.gd) and a node added later
+	# does NOT inherit its parent's authority - it stays with the host, so on a client this check always failed and the
+	# whole selector switched itself off. (The HUD only builds it for the owning peer anyway.)
+	if not get_parent().is_multiplayer_authority():
 		visible = false
 		set_process(false)
 		return

@@ -83,7 +83,8 @@ func take_damage(damage: float, _attacker_id: int = 0) -> void:
 	_hp -= damage
 	if _hp > 0.0:
 		return
-	_destroyed.rpc()
+	for peer_id in Utilities.ready_peers():
+		_destroyed.rpc_id(peer_id)
 	# After its collider is gone, so the loot settles on the floor and not on top of the barrel.
 	await get_tree().create_timer(0.1).timeout
 	var match_node := get_tree().get_first_node_in_group("match")
@@ -91,7 +92,8 @@ func take_damage(damage: float, _attacker_id: int = 0) -> void:
 		match_node.drop_loot_for_structure(global_position)
 	await get_tree().create_timer(respawn_seconds).timeout
 	if is_instance_valid(self) and is_dead:
-		_restored.rpc()
+		for peer_id in Utilities.ready_peers():
+			_restored.rpc_id(peer_id)
 
 
 @rpc("authority", "call_local", "reliable")

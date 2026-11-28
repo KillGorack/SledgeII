@@ -77,7 +77,8 @@ func _on_body_entered(body: Node3D) -> void:
 		return
 	var weapon_node = body.get_node_or_null("weapon_node")
 	if weapon_node and weapon_node.has_method("refill_ammo") and weapon_node.refill_ammo(captured_color):
-		_play_resupply_sound.rpc()
+		for peer_id in Utilities.ready_peers():
+			_play_resupply_sound.rpc_id(peer_id)
 
 
 func _on_body_exited(body: Node3D) -> void:

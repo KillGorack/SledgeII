@@ -66,6 +66,10 @@ var is_host: bool = false
 var peer_teams: Dictionary = {}
 # peer_id -> CraftDef id, written alongside peer_teams (same request/assign path).
 var peer_crafts: Dictionary = {}
+# peer_id -> display name, written alongside peer_teams (same assign path), so the team-select screen can list who is
+# on each team - players and bots - before any match scene exists. match.gd's peer_names is the in-match copy.
+var lobby_names: Dictionary = {}
+const MAX_NAME_LENGTH := 24
 # What this machine picked in the UI (create-game / team-select) - sent with
 # request_team() and used for the host's own craft in host_game().
 var local_craft_id: StringName = CraftCatalog.DEFAULT_ID
@@ -420,6 +424,7 @@ func host_game(game_name: String, map_file_id: int, weapon_paths: Array[String] 
 	current_map_file_id = map_file_id
 	current_map_title = game_name
 	peer_teams = {1: host_team}
+	lobby_names = {1: clean_name(UserData.username, 1)}
 	allowed_craft_ids = craft_ids
 	local_craft_id = allowed_craft_for(local_craft_id)
 	peer_crafts = {1: local_craft_id}
@@ -501,6 +506,7 @@ func start_creative_session(level_data: Dictionary, editing: bool, team: String 
 	current_map_file_id = -1
 	current_map_title = str(level_data.get("name", "Creative level"))
 	peer_teams = {1: team}
+	lobby_names = {1: clean_name(UserData.username, 1)}
 	peer_crafts = {1: local_craft_id}
 	allowed_craft_ids = []
 	allowed_weapon_paths = []
@@ -551,6 +557,7 @@ func stop_hosting() -> void:
 	peer_teams.clear()
 	map_teams.clear()
 	peer_crafts.clear()
+	lobby_names.clear()
 	allowed_craft_ids.clear()
 	peer_names.clear()
 	peer_scores.clear()
@@ -572,6 +579,7 @@ func leave_game() -> void:
 	peer_teams.clear()
 	map_teams.clear()
 	peer_crafts.clear()
+	lobby_names.clear()
 	allowed_craft_ids.clear()
 	peer_names.clear()
 	peer_scores.clear()
@@ -612,7 +620,7 @@ func _send_initial_state(peer_id: int) -> void:
 	# peer isn't in peer_teams at all until request_team() below succeeds, so
 	# match.gd never spawns a craft for them until they've actually chosen.
 	for existing_id in peer_teams.keys():
-		_assign_team.rpc_id(peer_id, existing_id, peer_teams[existing_id], peer_crafts.get(existing_id, CraftCatalog.DEFAULT_ID))
+		_assign_team.rpc_id(peer_id, existing_id, peer_teams[existing_id], peer_crafts.get(existing_id, CraftCatalog.DEFAULT_ID), lobby_names.get(existing_id, ""))
 
 
 # Joiner: greet the host the moment we're connected. A host that doesn't know this call (an older
@@ -668,11 +676,11 @@ func _version_failed(message: String) -> void:
 # by itself - just forwards the request to the host, which is the only one
 # allowed to actually decide (see _request_team below).
 func request_team(team: String) -> void:
-	_request_team.rpc_id(1, team, local_craft_id)
+	_request_team.rpc_id(1, team, local_craft_id, UserData.username)
 
 
 @rpc("any_peer", "call_local", "reliable")
-func _request_team(team: String, craft_id: StringName = CraftCatalog.DEFAULT_ID) -> void:
+func _request_team(team: String, craft_id: StringName = CraftCatalog.DEFAULT_ID, username: String = "") -> void:
 	if not multiplayer.is_server():
 		return
 	var requester_id := multiplayer.get_remote_sender_id()
@@ -695,7 +703,8 @@ func _request_team(team: String, craft_id: StringName = CraftCatalog.DEFAULT_ID)
 	craft_id = allowed_craft_for(craft_id)
 	peer_teams[requester_id] = team
 	peer_crafts[requester_id] = craft_id
-	_assign_team.rpc(requester_id, team, craft_id)
+	lobby_names[requester_id] = clean_name(username, requester_id)
+	_assign_team.rpc(requester_id, team, craft_id, lobby_names[requester_id])
 
 
 # player_registered never fires for a rejected request (peer_teams never
@@ -742,6 +751,12 @@ func allowed_craft_for(id: StringName) -> StringName:
 	return crafts[0].id
 
 
+# A player-supplied name as it is shown to everyone: one short line, never empty. Client-supplied, so the host cleans it.
+static func clean_name(username: String, peer_id: int) -> String:
+	var display_name := username.replace("\n", " ").replace("\r", " ").strip_edges().left(MAX_NAME_LENGTH)
+	return display_name if not display_name.is_empty() else "Player %d" % peer_id
+
+
 # People on `team`. Bots don't count, so they never keep a player out of a team.
 func _team_count(team: String) -> int:
 	var count := 0
@@ -757,14 +772,15 @@ func is_bot_id(peer_id: int) -> bool:
 
 # Host only. Adds a bot to the match: it joins `team` in `craft_id` exactly the way a player does (everyone is told,
 # and match.gd spawns its craft on the player_registered signal), just with no connection behind it. Returns its id.
-func add_bot(team: String, craft_id: StringName) -> int:
+func add_bot(team: String, craft_id: StringName, bot_name: String = "") -> int:
 	var bot_id := BOT_ID_BASE
 	while peer_teams.has(bot_id):
 		bot_id += 1
 	craft_id = allowed_craft_for(craft_id)
 	peer_teams[bot_id] = team
 	peer_crafts[bot_id] = craft_id
-	_assign_team.rpc(bot_id, team, craft_id)
+	lobby_names[bot_id] = bot_name
+	_assign_team.rpc(bot_id, team, craft_id, bot_name)
 	return bot_id
 
 
@@ -796,7 +812,7 @@ func set_map_teams(teams: Array[String]) -> void:
 	map_teams.assign(teams)
 	for peer_id in peer_teams.keys():
 		if not team_on_map(peer_teams[peer_id]):
-			_assign_team.rpc(peer_id, suggest_team(), peer_crafts.get(peer_id, CraftCatalog.DEFAULT_ID))
+			_assign_team.rpc(peer_id, suggest_team(), peer_crafts.get(peer_id, CraftCatalog.DEFAULT_ID), lobby_names.get(peer_id, ""))
 	_sync_map_teams.rpc(map_teams)
 
 
@@ -810,13 +826,16 @@ func _on_peer_disconnected(peer_id: int) -> void:
 	_verified.erase(peer_id)
 	peer_teams.erase(peer_id)
 	peer_crafts.erase(peer_id)
+	lobby_names.erase(peer_id)
 	player_unregistered.emit(peer_id)
 
 
 @rpc("authority", "call_local", "reliable")
-func _assign_team(peer_id: int, team: String, craft_id: StringName = CraftCatalog.DEFAULT_ID) -> void:
+func _assign_team(peer_id: int, team: String, craft_id: StringName = CraftCatalog.DEFAULT_ID, display_name: String = "") -> void:
 	peer_teams[peer_id] = team
 	peer_crafts[peer_id] = craft_id
+	if not display_name.is_empty():
+		lobby_names[peer_id] = display_name
 	player_registered.emit(peer_id, team)
 
 

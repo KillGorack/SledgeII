@@ -388,10 +388,7 @@ func _broadcast_chat_message(line: String) -> void:
 
 # Client-supplied, so keep it to one short line.
 func _clean_name(username: String, peer_id: int) -> String:
-	var display_name := username.replace("\n", " ").replace("\r", " ").strip_edges().left(MAX_NAME_LENGTH)
-	if display_name.is_empty():
-		display_name = "Player %d" % peer_id
-	return display_name
+	return NetworkManager.clean_name(username, peer_id)
 
 
 # Server-only. The whole name list to every loaded peer, on every join/leave -
@@ -1567,11 +1564,12 @@ func _add_bots(per_team: int) -> void:
 	for team in _bot_teams():
 		for i in per_team:
 			var def: CraftDef = crafts.pick_random()
-			var bot_id := NetworkManager.add_bot(team, def.id)
 			var bot_name := "BOT %s" % names[made % names.size()]
 			if made >= names.size():
 				@warning_ignore("integer_division")
 				bot_name += " %d" % (made / names.size() + 1)
+			# The name goes out with the bot's team, so the team-select screen can list it.
+			var bot_id := NetworkManager.add_bot(team, def.id, bot_name)
 			made += 1
 			_peer_names[bot_id] = bot_name
 			_announce("%s has entered the arena." % _colored_name(bot_id, bot_name))

@@ -1334,14 +1334,17 @@ func _build_team_roster() -> void:
 		if not NetworkManager.team_on_map(team):
 			continue
 		var members: Array[String] = []
-		var bots := 0
+		var bot_names: Array[String] = []
 		for peer_id in NetworkManager.peer_teams.keys():
 			if NetworkManager.peer_teams[peer_id] != team:
 				continue
+			var shown: String = NetworkManager.lobby_names.get(peer_id, "")
 			if NetworkManager.is_bot_id(peer_id):
-				bots += 1
+				bot_names.append(shown if not shown.is_empty() else "Bot")
 			else:
-				members.append("You" if peer_id == my_id else "Peer %d" % peer_id)
+				if shown.is_empty():
+					shown = "Peer %d" % peer_id
+				members.append(shown + " (you)" if peer_id == my_id else shown)
 		var color: Color = TEAM_COLORS.get(team, ACCENT)
 		# Bots never fill a team (see NetworkManager._team_count); they are listed after the pilots.
 		var full := members.size() >= NetworkManager.MAX_PLAYERS_PER_TEAM
@@ -1372,13 +1375,18 @@ func _build_team_roster() -> void:
 		fill.add_theme_stylebox_override("fill", fill_style)
 		body.add_child(fill)
 		var list := Label.new()
-		list.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		if bots > 0:
-			members.append("+ %d bot%s" % [bots, "" if bots == 1 else "s"])
-		list.text = "\n".join(members) if not members.is_empty() else "Nobody yet"
+		list.size_flags_vertical = Control.SIZE_EXPAND_FILL if bot_names.is_empty() else Control.SIZE_SHRINK_BEGIN
+		list.text = "\n".join(members) if not members.is_empty() else ("Nobody yet" if bot_names.is_empty() else "No pilots yet")
 		if members.is_empty():
 			list.theme_type_variation = &"DimLabel"
 		body.add_child(list)
+		# The bots, under the pilots and dimmer, by name.
+		if not bot_names.is_empty():
+			var bot_list := Label.new()
+			bot_list.theme_type_variation = &"DimLabel"
+			bot_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+			bot_list.text = "\n".join(bot_names)
+			body.add_child(bot_list)
 		var join_button := Button.new()
 		join_button.text = "FULL" if full else "JOIN"
 		join_button.focus_mode = Control.FOCUS_NONE
