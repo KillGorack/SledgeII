@@ -54,9 +54,11 @@ const NET_SNAP_DISTANCE := 8.0
 const SNAPSHOT_BUFFER_MAX := 32
 
 var engine_audio: AudioStreamPlayer3D
+var _engine_is_mine := false # only your own craft's engine is ever played (see _ready)
 var target_pitch = 3.0
 var target_volume = -30.0
 var ui_pitch: float = 1
+const MAX_ENGINE_PITCH := 99.0
 var pitch_transition_speed = 5.0
 var volume_transition_speed = 5.0
 
@@ -129,6 +131,7 @@ func _ready() -> void:
 		engine_audio.stream = stats.engine_sound
 	# Only your own craft's engine is heard, so a bot (simulated on the host) is as quiet as any other player's.
 	var own_craft := is_multiplayer_authority() and not Utilities.is_bot_craft(body)
+	_engine_is_mine = own_craft
 	if engine_audio and own_craft:
 		engine_audio.pitch_scale = target_pitch
 		engine_audio.volume_db = target_volume
@@ -358,6 +361,9 @@ func _physics_process(delta: float) -> void:
 			_airborne = false
 			_last_air_down_speed = 0.0
 			_ignore_next_landing = true
+			# A wreck has no engine: stop it outright (update_engine_sound starts it again on respawn).
+			if engine_audio and engine_audio.playing:
+				engine_audio.stop()
 			return
 	if stop_forces or stats == null:
 		return
@@ -564,13 +570,18 @@ func move_player(forward_input):
 
 func update_engine_sound():
 	if engine_audio:
+		if _engine_is_mine and not engine_audio.playing:
+			engine_audio.volume_db = -80.0 # back from a respawn: fade in from silence
+			engine_audio.play()
 		var speed : float = body.get_linear_velocity().length()
-		if isGrounded:
-			# Measured against the craft's normal top speed, and the ceiling rises with a speed powerup (Agility),
-			# so going faster than you ever could sounds faster instead of topping out at the same note.
+		# Follows the craft's real velocity (never the throttle), whenever it is mostly upright - on the ground or in the
+		# air, so being flung across the arena sounds like it. Upside down or on its side it idles.
+		if is_right_side_up():
+			# Measured against the craft's normal top speed and allowed to keep climbing well past it, so being flung
+			# at two or three times top speed screams. MAX_ENGINE_PITCH is the ceiling before the craft's own
+			# engine_pitch (Paladin x0.5, Aegis x0.25).
 			var ratio: float = speed / max(stats.max_speed, 1.0)
-			var ceiling: float = 2.0 + 2.0 * maxf(_stat("max_speed") / stats.max_speed, 1.0)
-			target_pitch = clamp(2.0 + ratio * 2.0, 2.0, ceiling) * ui_pitch * stats.engine_pitch
+			target_pitch = clamp(2.0 + ratio * 2.0, 2.0, MAX_ENGINE_PITCH) * ui_pitch * stats.engine_pitch
 			target_volume = clamp(-20 + 10 * ratio, -60.0, -20.0)
 		else:
 			target_pitch = 2.0 * ui_pitch * stats.engine_pitch
