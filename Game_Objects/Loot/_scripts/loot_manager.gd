@@ -34,7 +34,7 @@ const LOOT_LEVELS := [
 # Index of "Normal" - what a new game starts on (the picker, the saved setting and NetworkManager all use it).
 const DEFAULT_LEVEL := 1
 # Several drops fan out in a ring around the wreck: this far (meters), plus a bit per drop so a big pile doesn't overlap.
-const LOOT_RING_RADIUS := 2.0
+const LOOT_RING_RADIUS := 1.5
 const LOOT_RING_PER_DROP := 0.2
 # TEMPORARY test switch: a .tres path here makes EVERY drop that item. Set back to "" for normal weighted drops.
 const DEBUG_FORCE_LOOT := ""
@@ -124,7 +124,7 @@ func drop_at(drop_at_pos: Vector3, dropper_peer: int = 0) -> void:
 				all.append_array(table.items)
 		for i in all.size():
 			var angle := TAU * i / all.size()
-			_spawn(all[i], drop_at_pos + Vector3(cos(angle), 0.0, sin(angle)) * 2.5, dropper_peer, drop_at_pos)
+			_spawn(all[i], drop_at_pos + Vector3(cos(angle), 0.0, sin(angle)) * 2.5, dropper_peer, drop_at_pos, drop_at_pos)
 		return
 	var count := _roll_count()
 	if count == 0:
@@ -137,12 +137,14 @@ func drop_at(drop_at_pos: Vector3, dropper_peer: int = 0) -> void:
 		if count > 1:
 			var angle := start_angle + TAU * i / count
 			spot += Vector3(cos(angle), 0.0, sin(angle)) * (LOOT_RING_RADIUS + LOOT_RING_PER_DROP * count)
-		_spawn(_roll(), spot, dropper_peer, drop_at_pos if count > 1 else Vector3.INF)
+		_spawn(_roll(), spot, dropper_peer, drop_at_pos if count > 1 else Vector3.INF, drop_at_pos)
 
 
 # Server only: place one drop on the floor under `at` and announce it.
 # anchor: the wreck, when `at` is one of several spots fanned out around it.
-func _spawn(item: LootItem, at: Vector3, dropper_peer: int = 0, anchor: Vector3 = Vector3.INF) -> void:
+# launch_from: where the wreck was - the coin arcs from there to its spot (LootPickup), a look only: the drop is
+# already where it will rest.
+func _spawn(item: LootItem, at: Vector3, dropper_peer: int = 0, anchor: Vector3 = Vector3.INF, launch_from: Vector3 = Vector3.INF) -> void:
 	if item == null or item.resource_path.is_empty():
 		return
 	# Settle onto the floor under the wreck instead of hanging in the air (and never onto a
@@ -158,28 +160,29 @@ func _spawn(item: LootItem, at: Vector3, dropper_peer: int = 0, anchor: Vector3 
 		collect(_loot.keys()[0], 0)
 	var id := _next_loot_id
 	_next_loot_id += 1
-	_make(id, item, at, dropper_peer)
+	_make(id, item, at, dropper_peer, launch_from)
 	for peer_id in _match._ready_peers:
 		if peer_id != 1:
-			_spawn_event.rpc_id(peer_id, id, item.resource_path, at)
+			_spawn_event.rpc_id(peer_id, id, item.resource_path, at, launch_from)
 	get_tree().create_timer(item.lifetime).timeout.connect(func(): collect(id, 0))
 
 
-func _make(id: int, item: LootItem, at: Vector3, dropper_peer: int = 0) -> void:
+func _make(id: int, item: LootItem, at: Vector3, dropper_peer: int = 0, launch_from: Vector3 = Vector3.INF) -> void:
 	var pickup: LootPickup = LOOT_SCENE.instantiate()
 	pickup.loot_id = id
 	pickup.item = item
 	pickup.dropped_by = dropper_peer
+	pickup.launch_from = launch_from
 	pickup.position = at
 	_loot[id] = pickup
 	add_child(pickup)
 
 
 @rpc("authority", "call_remote", "reliable", 2)
-func _spawn_event(id: int, item_path: String, at: Vector3) -> void:
+func _spawn_event(id: int, item_path: String, at: Vector3, launch_from: Vector3 = Vector3.INF) -> void:
 	var item := load(item_path) as LootItem
 	if item and not _loot.has(id):
-		_make(id, item, at)
+		_make(id, item, at, 0, launch_from)
 
 
 # Server only. A late joiner is told about the drops already on the floor.

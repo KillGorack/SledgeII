@@ -14,6 +14,14 @@ const COIN_RADIUS := 1.28
 const CRAFT_MASK := (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5)
 const SPIN_SPEED := 1.5
 
+# Where the wreck was, when this drop was thrown out of one (Vector3.INF = it was simply there, e.g. a late joiner
+# catching up). The coin arcs from here to its resting spot over LAUNCH_SECONDS - only the picture moves; the pickup
+# itself is already at its spot, and just can't be taken until the coin has landed.
+var launch_from: Vector3 = Vector3.INF
+const LAUNCH_SECONDS := 0.7
+const LAUNCH_HEIGHT := 1.6 # how far above the straight line the arc peaks (meters)
+const LAUNCH_SPIN := 3.0 # spin speed multiplier while in the air
+
 var loot_id: int = -1
 # The peer whose death left this behind (server's copy only). It never picks it
 # up: otherwise destroying yourself would be a way to keep the loot.
@@ -103,7 +111,8 @@ func _center_height() -> float:
 
 func _process(delta: float) -> void:
 	_age += delta
-	_visual.rotation.y += SPIN_SPEED * delta
+	var flying := _update_launch()
+	_visual.rotation.y += SPIN_SPEED * (LAUNCH_SPIN if flying else 1.0) * delta
 	if item:
 		var left := item.lifetime - _age
 		_visual.visible = left > BLINK_SECONDS or int(_age * 6.0) % 2 == 0
@@ -112,9 +121,30 @@ func _process(delta: float) -> void:
 			queue_free()
 
 
+# The arc from the wreck to the resting spot: eased along the line, plus a parabola on top. Returns whether the coin is
+# still in the air. On landing, the server takes a second look at who is already standing on it (nobody can enter an
+# area they are already inside, so body_entered would never fire for them).
+func _update_launch() -> bool:
+	if launch_from == Vector3.INF:
+		return false
+	var rest := global_position + Vector3.UP * _center_height()
+	if _age >= LAUNCH_SECONDS:
+		launch_from = Vector3.INF
+		_visual.position = Vector3(0.0, _center_height(), 0.0)
+		if multiplayer.is_server():
+			for body in get_overlapping_bodies():
+				_on_body_entered(body)
+		return false
+	var t := _age / LAUNCH_SECONDS
+	var eased := 1.0 - (1.0 - t) * (1.0 - t) # fast out of the wreck, settling at the end
+	var world := launch_from.lerp(rest, eased) + Vector3.UP * LAUNCH_HEIGHT * 4.0 * t * (1.0 - t)
+	_visual.position = to_local(world)
+	return true
+
+
 # Server only.
 func _on_body_entered(body: Node) -> void:
-	if _taken or item == null:
+	if _taken or item == null or launch_from != Vector3.INF:
 		return
 	if dropped_by != 0 and Utilities.craft_owner_id(body) == dropped_by:
 		return
