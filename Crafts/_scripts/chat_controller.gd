@@ -25,7 +25,10 @@ func _ready() -> void:
 	# owned craft's chat should be interactive at all. Not hiding self here -
 	# Hud_InGame (hud_controller.gd) already hides the whole HUD, this Chat
 	# node included, for every non-owning peer's copy.
-	if not get_parent().get_parent().is_multiplayer_authority():
+	# This node's own authority, like radar_controller.gd - NOT the craft's. A bot's craft belongs to the host, so
+	# checking the craft left every bot's hidden chat listening on the host: the chat key opened one of THEIRS
+	# (it takes the key first), never the player's own, and the host could not chat while bots were in the match.
+	if not is_multiplayer_authority():
 		set_process_unhandled_input(false)
 		return
 	# The log (text_log) stays visible at all times - only the input line
@@ -33,6 +36,9 @@ func _ready() -> void:
 	# actively typing.
 	line_edit.visible = false
 	line_edit.text_submitted.connect(_on_submitted)
+	# Losing focus (a click elsewhere, another window taking focus) used to leave the chat "open" with nothing
+	# to type into: gameplay input stayed frozen and the chat key did nothing, because it only opens a closed chat.
+	line_edit.focus_exited.connect(_on_focus_lost)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -50,6 +56,13 @@ func _open() -> void:
 	is_open = true
 	line_edit.visible = true
 	line_edit.grab_focus()
+	# The same press can still be on its way to the box, so focus it again once this frame is done.
+	line_edit.grab_focus.call_deferred()
+
+
+func _on_focus_lost() -> void:
+	if is_open:
+		_close()
 
 
 func _close() -> void:

@@ -291,7 +291,7 @@ func _can_hurt(collider: Node) -> bool:
 func _play_hit_fx(point: Vector3, normal: Vector3) -> void:
 	if _match_node == null or (weapon_settings.hit_sound == null and weapon_settings.explosion_prefab == null):
 		return
-	_match_node._play_impact_fx.rpc(weapon_settings_path, weapon_settings.projectile_color, global_transform, true, false, point, normal, false)
+	_match_node.send_impact_fx(weapon_settings_path, weapon_settings.projectile_color, global_transform, true, false, point, normal, false)
 
 
 func destroy_self() -> void:

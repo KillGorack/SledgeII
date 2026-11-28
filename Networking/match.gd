@@ -358,7 +358,7 @@ func _send_chat_message(sender: String, text: String) -> void:
 	if sender_id == 0:
 		sender_id = 1
 	var chat_name: String = _peer_names.get(sender_id, sender)
-	_broadcast_chat_message.rpc("%s: %s" % [_colored_name(sender_id, chat_name), _bb_escape(text)])
+	_announce("%s: %s" % [_colored_name(sender_id, chat_name), _bb_escape(text)])
 
 
 # BBCode for a name tinted with its peer's team color (white if no team yet).
@@ -1153,7 +1153,9 @@ func _start_capture_request(requester_id: int, recon_path: NodePath) -> void:
 	_team_juice[team] -= JUICE_CAPTURE_COST
 	_broadcast_juice(true)
 	_capturing_recons[recon] = requester_id
-	_run_capture.rpc(get_path_to(gun), recon_path, team)
+	# Only peers whose match scene exists - a broadcast also hits peers still loading (see _ready_peers).
+	for peer_id in _ready_peers.keys():
+		_run_capture.rpc_id(peer_id, get_path_to(gun), recon_path, team)
 
 
 # A gun at base first. With none left, captures outrank the Controller special:
@@ -1496,6 +1498,13 @@ func _volley_transforms(settings: WeaponSettings, muzzle: Transform3D) -> Array[
 # hold up gameplay-critical reliable traffic (spawns, damage, chat) queued
 # behind it. Lives here on the persistent match node, not the projectile, so
 # it still plays if the projectile's despawn wins the race to this peer.
+# Server only. The one way to play it: to every peer whose match scene exists (see _ready_peers). A plain .rpc() also
+# reaches peers still loading, which have no Match node and log "Node not found: Match" for every impact.
+func send_impact_fx(settings_path: String, color: Color, impact_transform: Transform3D, show_hit: bool, show_hole: bool, hole_point: Vector3, hole_normal: Vector3, show_crit: bool = false) -> void:
+	for peer_id in _ready_peers.keys():
+		_play_impact_fx.rpc_id(peer_id, settings_path, color, impact_transform, show_hit, show_hole, hole_point, hole_normal, show_crit)
+
+
 @rpc("authority", "call_local", "unreliable", 1)
 func _play_impact_fx(settings_path: String, color: Color, impact_transform: Transform3D, show_hit: bool, show_hole: bool, hole_point: Vector3, hole_normal: Vector3, show_crit: bool = false) -> void:
 	if settings_path.is_empty():
@@ -1859,7 +1868,8 @@ func _on_craft_defeated(peer_id: int, attacker_id: int, cause: int) -> void:
 	var collected := _record_defeat(peer_id, attacker_id, multiplier)
 	if collected > 0:
 		var juggle := " [color=orange]Juggled x%d![/color]" % multiplier if multiplier > 1 else ""
-		_announce("[color=yellow]Bounty collected by[/color] %s[color=yellow]: %d credits[/color]%s" % [_colored_name(attacker_id, _peer_names.get(attacker_id, "")), collected, juggle])
+		# Second line of the kill feed, indented under the defeat line (which already names the killer).
+		_announce("\u00A0\u00A0[color=yellow]- Bounty collected: %d[/color]%s" % [collected, juggle])
 	if is_instance_valid(victim):
 		loot.drop_at(victim.global_position, peer_id)
 	await get_tree().create_timer(RESPAWN_DELAY).timeout

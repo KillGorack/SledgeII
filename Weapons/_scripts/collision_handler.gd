@@ -775,7 +775,7 @@ func set_hit_scene(include_bullet_hole: bool = false) -> void:
 	var match_node = get_tree().get_first_node_in_group("match")
 	if match_node == null:
 		return
-	match_node._play_impact_fx.rpc(
+	match_node.send_impact_fx(
 		weapon_settings_path,
 		weapon_settings.projectile_color,
 		global_transform,

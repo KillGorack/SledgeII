@@ -99,11 +99,11 @@ func _add_help_hint() -> void:
 	add_child(hint)
 
 
-# Its own CanvasLayer, above the HUD and chat, so the whole view is the card.
+# A full-view card drawn just BEHIND the chat, so the chat (and the kill feed that says who got you) stays readable
+# through the whole death screen. Controls draw in tree order, so it goes in right before the Chat node: the card
+# covers the HUD up to there and the chat is on top of it. (It used to sit on its own CanvasLayer above everything,
+# which nothing can be drawn over.)
 func _build_demise_screen() -> void:
-	var layer := CanvasLayer.new()
-	layer.layer = 50
-	add_child(layer)
 	_demise_screen = TextureRect.new()
 	_demise_screen.texture = DEMISE_SCREEN
 	_demise_screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -111,7 +111,10 @@ func _build_demise_screen() -> void:
 	_demise_screen.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	_demise_screen.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_demise_screen.visible = false
-	layer.add_child(_demise_screen)
+	add_child(_demise_screen)
+	var chat := get_node_or_null("Chat")
+	if chat != null:
+		move_child(_demise_screen, chat.get_index())
 
 
 # Polled rather than signalled: health_node flips _is_destroyed on every peer
@@ -147,7 +150,12 @@ func _process(_delta: float) -> void:
 	# Third: score, which (unlike bounty) is never lost.
 	var score: Array = NetworkManager.peer_scores.get(multiplayer.get_unique_id(), [0, 0, 0, 0]) if NetworkManager.is_online() else [0, 0, 0, 0]
 	var bounty := int(_match_node.get_my_bounty()) if _match_node else 0
-	fps_label.text = "FPS: %d\n%d/%d %d\nScore: %d" % [Engine.get_frames_per_second(), score[0], score[1], bounty, score[3] if score.size() > 3 else 0]
+	# Clients also see their ping: the round trip to the host (the clock sync's best recent sample, see
+	# NetworkManager.round_trip_time). Meaningless on the host, so it isn't shown there.
+	var ping := ""
+	if NetworkManager.is_online() and not multiplayer.is_server() and NetworkManager.is_clock_synced():
+		ping = "  Ping: %d ms" % roundi(NetworkManager.round_trip_time * 1000.0)
+	fps_label.text = "FPS: %d%s\n%d/%d %d\nScore: %d" % [Engine.get_frames_per_second(), ping, score[0], score[1], bounty, score[3] if score.size() > 3 else 0]
 func _on_team_juice_changed(team: String, _amount: float) -> void:
 	if team == weapon_node.team:
 		_update_team_juice_bar()
